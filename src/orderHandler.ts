@@ -13,7 +13,6 @@ import { brandKeyOf, clusterKeys } from './chains.ts'
 import { hourIn, tzOf } from './tz.ts'
 import type { Band, Country, CuisineStats, Order, OrderDebug, OrderRequest, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
 
-
 // 口令走 Haiku 4.5：正式站 [timing] 量到 Claude 佔 3.1–6.4s、等於整段伺服器時間，
 // 換模型是唯一還能砍掉一半以上的手段。要退回 Sonnet 不用改碼，設 ORDER_MODEL=claude-sonnet-5 重新部署即可。
 // 語氣與規則的保證在 enforceRules() 與 localizeOrder()，不靠模型本身。
@@ -270,7 +269,6 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
   }
 }
 
-
 /**
  * 伺服器決定的店 → Order.place（也只在這裡用真 place id 組 Google Maps 連結，階段 B）。
  * 模型寫的 place 不管寫什麼都不採用；pick 為 null（不需要 Places 的卡）→ 原樣回傳、不得產生 mapUrl。
@@ -359,12 +357,6 @@ async function callClaude(io: OrderIo, system: string, user: string, maxTokens: 
 }
 
 /**
- * 第 8 節：一個 LanePlan 打一次 Places。Round 3 起**不在這裡重試**：第二次呼叫就是重試（總共 ≤ 2 次，DEV-PLAN-3 W1.7）。
- * Nearby 照 lane 的 type 查；Text Search 用中文關鍵字（居酒屋、熱炒沒有 type），locationBias 圓。
- * 兩者同一組 fieldMask、同一個 SKU。languageCode 台灣用 zh-TW、日本用 ja（placesLanguage）；
- * 日本的店名要不要改 ja 待實測（H6），先記在 debug 的 country。
- */
-/**
  * 店名語言（STRATEGY H6，2026-10-26 正式站實測證實）：在日本用 zh-TW 查，Google 沒有中文名就回英文拼音
  * （「Toriichizu Yurakucho」），跟招牌「鳥一途」對不上，人站在店門口找不到。日本座標改用 ja，招牌寫什麼就叫什麼；
  * 班長台詞仍是台灣繁中（prompt 與 localizeOrder 不變）。
@@ -385,6 +377,12 @@ export function placesRequest(loc: { lat: number; lng: number }, plan: LanePlan,
   return { url: PLACES_URL[plan.kind], body }
 }
 
+/**
+ * 第 8 節：一個 LanePlan 打一次 Places。Round 3 起**不在這裡重試**：第二次呼叫就是重試（總共 ≤ 2 次，DEV-PLAN-3 W1.7）。
+ * Nearby 照 lane 的 type 查；Text Search 用中文關鍵字（居酒屋、熱炒沒有 type），locationBias 圓。
+ * 兩者同一組 fieldMask、同一個 SKU。languageCode 台灣用 zh-TW、日本用 ja（placesLanguage）；
+ * 日本的店名要不要改 ja 待實測（H6），先記在 debug 的 country。
+ */
 async function fetchPlaces(io: OrderIo, loc: { lat: number; lng: number }, plan: LanePlan, languageCode = 'zh-TW'): Promise<RawPlace[]> {
   const key = process.env.GOOGLE_PLACES_KEY
   if (!key) throw new Error('GOOGLE_PLACES_KEY 未設定')
