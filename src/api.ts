@@ -1,6 +1,7 @@
 // 呼叫 /api/order、/api/weekly；重試與錯誤分類（第 4、11 節）。
 import { DAILY_PLACES_CAP } from './places.ts'
 import { recordDebug } from './debug.ts'
+import { fromDebug, recordTrial } from './trial.ts'
 import type { GeocodeResponse, Order, OrderDebug, OrderRequest, WeeklyReport, WeeklyRequest } from './types.ts'
 
 export type ApiErrorKind =
@@ -125,15 +126,24 @@ async function post<T>(path: string, body: unknown): Promise<{ data: T; res: Res
  * 只進除錯紀錄，不跟著 Order 進畫面與日記。失敗也記一筆——「為什麼沒出口令」才是最需要查的。
  */
 export async function requestOrder(req: OrderRequest): Promise<Order> {
+  // Round 4 試用紀錄：每一道（成功、失敗）都記一筆，不含店名（src/trial.ts）。
+  const base = { module: req.module, level: req.level, choices: req.choices, ...(req.budget?.length ? { budget: req.budget } : {}) }
   try {
     const { data, res } = await post<Order & { debug?: OrderDebug }>('/api/order', req)
-    addPlacesCalls(Number(res.headers.get('x-places-calls') ?? 0))
+    const calls = Number(res.headers.get('x-places-calls') ?? 0)
+    addPlacesCalls(calls)
     const { debug, ...order } = data
     if (debug) recordDebug(debug)
+    const p = (order as Order).place
+    recordTrial({
+      ...base, ok: true, calls, ...fromDebug(debug),
+      ...(p ? { placeId: p.id, mode: p.mode, band: p.band ?? null, ...(p.priceEst ? { priceEst: true } : {}) } : {}),
+    })
     return order as Order
   } catch (e) {
     if (e instanceof ApiError) {
       recordDebug(e.debug ?? { module: req.module, level: req.level, error: e.kind })
+      recordTrial({ ...base, ok: false, error: e.kind, ...fromDebug(e.debug) })
     }
     throw e
   }

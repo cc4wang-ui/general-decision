@@ -10,6 +10,8 @@
 //   closed         店關了：這家 24 小時內不再出現；不動細類
 //   not_this_kind  今天不想吃這類：細類 b += 0.5；不動店
 //   never_again    這家不要再來：90 天；第 2 次 → 永久
+//   repeat         又是這家（Round 4）：14 天不再出現；不動細類、不算「不要再來」次數
+//   price          價格不對（Round 4）：不動記憶，只在這次操作排除（app.tsx excluded）
 //   fav            列入愛店 / 取消
 //   skip（沒做）   不呼叫任何一個——不服從是行為問題，不是店的問題
 import { del, get, set } from 'idb-keyval'
@@ -23,6 +25,8 @@ const DAY = 24 * 3600 * 1000
 export const CLOSED_MS = DAY
 /** 這家不要再來：90 天；第 2 次標記就永久。 */
 export const NEVER_AGAIN_MS = 90 * DAY
+/** 又是這家（Round 4）：14 天不再出現。 */
+export const REPEAT_MS = 14 * DAY
 /** 每家店本機留最近 10 次 shown／done；送伺服器時再各取 5。 */
 export const KEEP_EVENTS = 10
 export const SUMMARY_EVENTS = 5
@@ -124,6 +128,15 @@ export async function markClosed(id: string, now: number, module: MemModule = 'e
     const e = entryOf(store, id, module)
     if (e.dislikeUntil === 'forever') return
     e.dislikeUntil = Math.max(typeof e.dislikeUntil === 'number' ? e.dislikeUntil : 0, now + CLOSED_MS)
+  })
+}
+
+/** 又是這家（Round 4，Cross 2026-10-30「反覆推同一家」）：14 天不再出現；不會把已經更長的封鎖縮短。 */
+export async function markRepeat(id: string, now: number, module: MemModule = 'eat'): Promise<void> {
+  await mutate(now, (store) => {
+    const e = entryOf(store, id, module)
+    if (e.dislikeUntil === 'forever') return
+    e.dislikeUntil = Math.max(typeof e.dislikeUntil === 'number' ? e.dislikeUntil : 0, now + REPEAT_MS)
   })
 }
 

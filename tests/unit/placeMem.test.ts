@@ -10,9 +10,9 @@ vi.mock('idb-keyval', () => ({
 }))
 
 const {
-  CLOSED_MS, KEEP_EVENTS, NEVER_AGAIN_MS, MAX_ENTRIES,
+  CLOSED_MS, KEEP_EVENTS, NEVER_AGAIN_MS, MAX_ENTRIES, REPEAT_MS,
   allMem, clearPlaceMem, cuisineStats, discoveryStats, getMem, markClosed, markDone, markNeverAgain,
-  markNotThisKind, markShown, memSummary, setFav,
+  markNotThisKind, markRepeat, markShown, memSummary, setFav,
 } = await import('../../src/placeMem.ts')
 
 const DAY = 24 * 3600 * 1000
@@ -76,6 +76,25 @@ describe('closed：店關了', () => {
     await markNeverAgain('p1', T0)
     await markClosed('p1', T0 + 2000)
     expect((await getMem('p1'))!.dislikeUntil).toBe('forever')
+  })
+})
+
+describe('repeat：又是這家（Round 4）', () => {
+  it('14 天不再出現；不算「不要再來」次數、不動細類', async () => {
+    await markShown('p1', { module: 'eat', cuisine: 'tw' }, T0)
+    await markRepeat('p1', T0)
+    const e = (await getMem('p1'))!
+    expect(REPEAT_MS).toBe(14 * DAY)
+    expect(e.dislikeUntil).toBe(T0 + REPEAT_MS)
+    expect(e.dislikes).toBe(0)
+    expect(await cuisineStats()).toEqual({})
+    const sum = await memSummary('eat', T0 + DAY)
+    expect(sum.find((m) => m.id === 'p1')?.x).toBe(T0 + REPEAT_MS)
+  })
+  it('不會把已經更長（90 天／永久）的封鎖縮短', async () => {
+    await markNeverAgain('p1', T0)
+    await markRepeat('p1', T0 + 1000)
+    expect((await getMem('p1'))!.dislikeUntil).toBe(T0 + NEVER_AGAIN_MS)
   })
 })
 

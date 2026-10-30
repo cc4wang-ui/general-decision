@@ -16,8 +16,9 @@ import {
 import { SHARE_FALLBACK, shareNode } from './share.ts'
 import { clearDebug, formatCandidate, formatDebug, formatPick, formatPrice, readDebug, type DebugEntry } from './debug.ts'
 import {
-  cuisineStats, discoveryStats, markClosed, markDone, markNeverAgain, markNotThisKind, markShown, memSummary, setFav,
+  cuisineStats, discoveryStats, markClosed, markDone, markNeverAgain, markNotThisKind, markRepeat, markShown, memSummary, setFav,
 } from './placeMem.ts'
+import { clearTrial, exportTrial, readTrial, recordTrial, summarize, tagTrial } from './trial.ts'
 import {
   effectiveBudget, loadBudget, loadCountry, loadNovelty, lunchHidesTop, nextNovelty, NOVELTY_LABEL,
   saveBudget, saveCountry, saveNovelty, toggleBand,
@@ -143,6 +144,7 @@ export function App() {
     // Round 3：日記不再寫店名（Google 條款），只留 place_id 以便之後對回 PlaceMem。
     // R2-01：只有吃／歇才寫 placeId 與 mode；其他卡就算模型帶了 place 也不記。
     const p = isMemModule(c.id) ? o.place : undefined
+    tagTrial(c.id, outcome, reason) // Round 4 試用紀錄：這道口令後來怎麼了
     const list = await putEntry(
       makeEntry(issuedAt.current, c.id, level, o.meme.big, outcome, { placeId: p?.id, reason, mode: p?.mode }),
     )
@@ -195,6 +197,7 @@ export function App() {
     // 第 8 節：需要 Places 且今天還沒超過上限，才去要定位。
     // 手動報座標（C2）換來的位置優先，而且不再去問 GPS。
     if (c.needsPlaces && !underPlacesCap()) {
+      recordTrial({ module: c.id, level, ok: false, error: 'over_cap' })
       setError(new ApiError('over_cap', ERROR_TEXT.over_cap.line))
       setScreen('error')
       return
@@ -212,6 +215,7 @@ export function App() {
     }
     // 2026-09-18：吃／歇沒定位就不能點真店，不再「班長用常識」降級——直接說要座標。
     if (c.needsPlaces && !loc) {
+      recordTrial({ module: c.id, level, ok: false, error: 'no_location' })
       setError(new ApiError('no_location', ERROR_TEXT.no_location.line))
       setScreen('error')
       return
@@ -295,6 +299,8 @@ export function App() {
     if (id) {
       if (reason === 'closed') await safe(() => markClosed(id, now, m), undefined)
       else if (reason === 'never_again') await safe(() => markNeverAgain(id, now, m), undefined)
+      else if (reason === 'repeat') await safe(() => markRepeat(id, now, m), undefined)
+      else if (reason === 'price') { /* 價格不對：不動記憶，只在這次排除；原因記進日記與試用紀錄 */ }
       else {
         await safe(() => markNotThisKind(cuisineKey), undefined)
         if (cuisineKey && !rejectedCuisines.current.includes(cuisineKey)) rejectedCuisines.current.push(cuisineKey)
@@ -413,6 +419,14 @@ export function App() {
             {card.id !== 'rest' && (
               <button className="sheet-opt" data-testid="reason-kind" onClick={() => void reissueWith('not_this_kind')}>
                 <b>今天不想吃這類</b><span>今天少派這一類，班長記一筆</span>
+              </button>
+            )}
+            <button className="sheet-opt" data-testid="reason-repeat" onClick={() => void reissueWith('repeat')}>
+              <b>又是這家</b><span>14 天不派這家</span>
+            </button>
+            {card.id === 'eat' && (
+              <button className="sheet-opt" data-testid="reason-price" onClick={() => void reissueWith('price')}>
+                <b>價格不對</b><span>這次換掉，班長記一筆</span>
               </button>
             )}
             <button className="sheet-opt" data-testid="reason-never" onClick={() => void reissueWith('never_again')}>
@@ -917,6 +931,41 @@ export { Home, Intake, Cmd, LogScreen, Stand, Diary, Weekly }
 function Debug({ level, onHome }: { level: Level; onHome: () => void }) {
   const [entries, setEntries] = useState<DebugEntry[]>(readDebug)
   const [copied, setCopied] = useState(false)
+  // Round 4：60 天試用紀錄（src/trial.ts）。匯出成一個 JSON 檔，交給 Claude 分析。
+  const [trial, setTrial] = useState(() => summarize(readTrial()))
+  const [exported, setExported] = useState('')
+
+  const exportFile = useCallback(() => {
+    void (async () => {
+      const text = exportTrial()
+      const name = `decide-trial-${new Date().toISOString().slice(0, 10)}.json`
+      // iPhone：分享面板（存到檔案、AirDrop、貼給 Claude）；不支援就下載；再不行就複製。
+      try {
+        const file = new File([text], name, { type: 'application/json' })
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: '決斷連試用紀錄' })
+          setExported('已匯出')
+          return
+        }
+      } catch (e) {
+        if ((e as Error)?.name === 'AbortError') return // 使用者自己關掉分享面板
+      }
+      try {
+        const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+        const a = document.createElement('a')
+        a.href = url
+        a.download = name
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+        setExported('已下載')
+      } catch {
+        try { await navigator.clipboard.writeText(text); setExported('已複製') } catch { setExported('匯出失敗') }
+      }
+    })()
+  }, [])
+  const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`)
 
   const copy = useCallback(() => {
     void (async () => {
@@ -935,6 +984,17 @@ function Debug({ level, onHome }: { level: Level; onHome: () => void }) {
       <div className="row">
         <button className="btn line" data-testid="debug-copy" onClick={copy}>{copied ? '已複製' : '複製全部'}</button>
         <button className="btn ghost" data-testid="debug-clear" onClick={() => { clearDebug(); setEntries([]) }}>清掉</button>
+      </div>
+      <div className="notice" data-testid="trial-summary">
+        試用紀錄 {trial.days} 天 · {trial.orders} 道 · 給出口令 {trial.ok} · 7 天內重複 {pct(trial.repeat7d)} · 預算命中 {pct(trial.budgetHit)}
+        {trial.rescue + trial.fallback > 0 ? ` · 救援 ${trial.rescue}／模板 ${trial.fallback}` : ''}
+      </div>
+      <div className="row">
+        <button className="btn line" data-testid="trial-export" onClick={exportFile}>{exported || '匯出 60 天紀錄'}</button>
+        <button
+          className="btn ghost" data-testid="trial-clear"
+          onClick={() => { if (window.confirm('清掉 60 天試用紀錄？匯出後再清。')) { clearTrial(); setTrial(summarize([])) } }}
+        >清掉試用紀錄</button>
       </div>
       {entries.length === 0 && <div className="notice" data-testid="debug-empty">還沒有紀錄。出一道口令再回來看。</div>}
       {entries.map((e, i) => (
