@@ -1,15 +1,18 @@
 // /api/order 的實作（Vercel 入口是 api/order.ts 的薄殼）：定位+卡片+選項 → Places(可選) → 發掘引擎挑店 → Claude 寫口令 → Order JSON（第 4、8、11 節；DEV-PLAN-3 W1.7）。
 // key 只在這裡存在，前端永遠不碰。
 // Round 3：店由 src/discovery.ts pickPlace 決定（T2），Claude 只看得到那一家；每次 ≤ 2 次 Places 呼叫、不並行。
+// Round 4（Cross 2026-10-30「很多情境沒辦法給任何解答」）：前兩次之後一家都派不出去 → 第三次查營業中的超商（rescue）；
+// Claude 失敗 → 伺服器用模板出口令（src/template.ts）。除了沒定位，吃／歇不再空手。
 import { CARD_BY_ID } from './cards.ts'
 import { buildOrderPrompt } from './prompt.ts'
 import { parseOrder, ParseError } from './orderParse.ts'
 import { enforceRules, isNonAnswer } from './rules.ts'
 import { FETCH_COUNT, FIELD_MASK, matchPlace, mergeCandidates, placeMapUrl, toCandidates, type RawPlace } from './places.ts'
-import { pickLane, widenPlan, type LanePlan } from './lanes.ts'
+import { laneEst, pickLane, rescuePlan, widenPlan, type LanePlan } from './lanes.ts'
 import { cuisineOf, mulberry32, pickPlace, type PickOutcome } from './discovery.ts'
-import { bandOf, countryOf, currencyCountry, priceText } from './price.ts'
+import { bandOf, countryOf, currencyCountry, estText, priceText } from './price.ts'
 import { brandKeyOf, clusterKeys } from './chains.ts'
+import { templateOrder } from './template.ts'
 import { hourIn, tzOf } from './tz.ts'
 import type { Band, Country, CuisineStats, Order, OrderDebug, OrderRequest, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
 
@@ -163,31 +166,34 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       dbg.error = 'no_location'
       return json({ error: 'no_location', message: '不報座標，班長就點不了店。開定位再報告。', debug: dbg }, 400)
     }
-    const first = pickLane(card, req.choices ?? {}, req.cuisine, country, rng, hourIn(now, tz))
+    const first = pickLane(card, req.choices ?? {}, req.cuisine, country, rng, hourIn(now, tz), card.id === 'eat' ? req.budget : undefined)
     const tries: { r: number; raw: number; kept: number }[] = []
     const hows: string[] = []
     let cands: PlaceCandidate[] = []
-    // 一次一次來，不並行；總共最多兩次（第一次 lane，不夠 5 家或失敗才第二次）。
-    let plan: LanePlan | null = first
-    let firstStatus = 0
-    for (let call = 0; call < 2 && plan; call++) {
-      const how = plan.kind === 'text' ? `text="${plan.textQuery}" rank=${plan.rank}` : `lane=${plan.lane} rank=${plan.rank}`
+    const loc = req.loc
+    /** 打一次 Places、併進候選。失敗不丟例外（記 raw=-1），回 HTTP 狀態碼（成功 200）。 */
+    const call = async (p: LanePlan): Promise<number> => {
+      const how = p.kind === 'text' ? `text="${p.textQuery}" rank=${p.rank}` : `lane=${p.lane} rank=${p.rank}`
       hows.push(how)
       placesCalled++
       try {
-        const raw = await fetchPlaces(io, req.loc, plan, placesLanguage(countryOf(req.loc)))
-        const got = toCandidates(raw, req.loc, now, req.exclude ?? [], tz).map((c) => ({ ...c, lane: plan!.lane }))
+        const raw = await fetchPlaces(io, loc, p, placesLanguage(countryOf(loc)))
+        const est = laneEst(p.lane)
+        const got = toCandidates(raw, loc, now, req.exclude ?? [], tz).map((c) => ({ ...c, lane: p.lane, ...(est !== undefined ? { estBand: est } : {}) }))
         cands = mergeCandidates(cands, got)
-        tries.push({ r: plan.radius, raw: raw.length, kept: got.length })
-        console.info(`[places] ok ${how} r=${plan.radius} raw=${raw.length} candidates=${got.length}`)
+        tries.push({ r: p.radius, raw: raw.length, kept: got.length })
+        console.info(`[places] ok ${how} r=${p.radius} raw=${raw.length} candidates=${got.length}`)
+        return 200
       } catch (e) {
-        if (call === 0) firstStatus = (e as PlacesError).status ?? 0
-        tries.push({ r: plan.radius, raw: -1, kept: 0 }) // raw=-1：這一次整個查失敗
-        console.warn(`[places] fail ${how} r=${plan.radius}：${(e as Error).message}`)
+        tries.push({ r: p.radius, raw: -1, kept: 0 }) // raw=-1：這一次整個查失敗
+        console.warn(`[places] fail ${how} r=${p.radius}：${(e as Error).message}`)
+        return (e as PlacesError).status ?? 0
       }
-      // 第二次：有效候選 < 5（或第一次失敗）→ 半徑 ×2.5、只要營業中（Text Search openNow）；lane 回 400 → 退回營業中的餐廳。
-      plan = call === 0 && cands.length < MIN_VALID ? widenPlan(first, { forceRestaurant: firstStatus === 400, country }) : null
     }
+    // 一次一次來，不並行。第一次 lane；不夠 5 家或失敗才第二次（半徑 ×2.5、只要營業中；lane 回 400 → 退回營業中的餐廳）。
+    // 平常 ≤ 2 次；只有兩次之後一家都派不出去，才有第三次救援（下面）。
+    const firstStatus = await call(first)
+    if (cands.length < MIN_VALID) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng }))
     placesMs = Date.now() - t0
     country = cands.map((c) => currencyCountry(c.priceRange?.currency)).find(Boolean) ?? country
     dbg.places = {
@@ -196,17 +202,29 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country) })),
     }
     dbg.price = { country, known: cands.filter((c) => bandOf(c, country) !== null).length, total: cands.length }
-    if (cands.length) {
-      pick = pickPlace(cands, req.mem, req.cuisine, {
+    const choose = (budget: OrderRequest['budget']) => cands.length
+      ? pickPlace(cands, req.mem, req.cuisine, {
         now: now.getTime(),
         country,
-        budget: req.budget,
+        budget,
         novelty: req.novelty ?? 'balanced',
         exclude: new Set(req.exclude ?? []),
         rejectedCuisines: new Set(req.rejectedCuisines ?? []),
         clusters: clusterKeys(cands),
         rng,
       })
+      : null
+    pick = choose(req.budget)
+    if (!pick) {
+      // 第三次（救援）：附近營業中的都派不出去 → 營業中的超商。預算不適用（超商就是超商），口令會講清楚（prompt rescue 行）。
+      dbg.rescue = true
+      cands = []
+      await call(rescuePlan(country))
+      placesMs = Date.now() - t0
+      dbg.places.how = hows.join(' → ')
+      dbg.places.candidates.push(...cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country) })))
+      pick = choose(undefined)
+      if (pick) console.warn(`[rescue] module=${req.module}：前兩次派不出店，改派超商`)
     }
     if (!pick) {
       dbg.error = 'no_places'
@@ -259,8 +277,23 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     })
   } catch (e) {
     const status = e instanceof ParseError ? 502 : (e as UpstreamError)?.status ?? 502
-    dbg.error = status === 429 ? 'rate_limited' : 'upstream'
     dbg.ms = { places: placesMs, claude: Date.now() - t0 - placesMs, total: Date.now() - t0 }
+    // Round 4：Claude 失敗不再回「班長在開會」——店已經挑好、規則算得出來，伺服器用模板出口令（src/template.ts）。
+    // 模板一樣經過 enforceRules（禁詞、mode 語料、用語守門）。模板本身失敗才回錯誤。
+    try {
+      const order = enforceRules(templateOrder(req, pick, now, tz), req.module, req.choices ?? {}, now, req.recentOrders, { level: req.level, country, pick })
+      const final = withPlace(order, pick, country)
+      dbg.fallback = 'template'
+      dbg.picked = final.place?.name
+      console.warn(`[fallback] template module=${req.module} claude_status=${status}：${(e as Error)?.message ?? ''}`)
+      return json({ ...final, debug: dbg }, 200, {
+        'x-places-calls': String(placesCalled),
+        'x-timing': `places=${placesMs};claude=${dbg.ms.claude};model=template`,
+      })
+    } catch (te) {
+      console.error(`[fallback] template 也失敗 module=${req.module}：${(te as Error)?.message ?? ''}`)
+    }
+    dbg.error = status === 429 ? 'rate_limited' : 'upstream'
     return json(
       { error: dbg.error, message: '班長在開會。30 秒後再報告。', debug: dbg },
       status === 429 ? 429 : 502,
@@ -285,10 +318,12 @@ export function withPlace(order: Order, pick: PickResult | null, country: Countr
   place.mapUrl = placeMapUrl(p.id, p.name)
   place.mode = pick.mode
   place.visits = pick.visits
-  const band = bandOf(p, country)
+  // Round 4：pick 帶了挑店用的價位檔（Google 資料或推估）就用它；舊呼叫端沒帶 → 照 Google 資料算。
+  const band = pick.band !== undefined ? pick.band : bandOf(p, country)
   place.band = band === null ? null : (Math.min(4, Math.max(1, Math.round(band))) as 1 | 2 | 3 | 4)
-  const text = priceText(p, country)
+  const text = priceText(p, country) ?? (pick.bandEst && band !== null ? estText(band) : undefined)
   if (text) place.priceText = text
+  if (pick.bandEst && band !== null && !priceText(p, country)) place.priceEst = true
   place.country = country
   place.cuisine = cuisineOf(p.primaryType, p.types)
   const brand = brandKeyOf(p.name)
@@ -368,10 +403,20 @@ export function placesLanguage(country: Country): string {
 /** 一個 LanePlan → Places 請求（url＋body）。fetchPlaces 與 api/probe.ts 的預抓共用，兩邊的快取鍵才會一致。 */
 export function placesRequest(loc: { lat: number; lng: number }, plan: LanePlan, languageCode = 'zh-TW'): { url: string; body: string } {
   const circle = { center: { latitude: loc.lat, longitude: loc.lng }, radius: plan.radius }
+  // Round 4：eat 的關鍵字 lane 用 locationRestriction（Text Search 只收方框），把店限在步行範圍內；
+  // locationBias 只是「偏好」，關鍵字冷門時會撈回幾公里外的店。
+  const dLat = plan.radius / 111_320
+  const dLng = plan.radius / (111_320 * Math.cos((loc.lat * Math.PI) / 180))
+  const rectangle = { low: { latitude: loc.lat - dLat, longitude: loc.lng - dLng }, high: { latitude: loc.lat + dLat, longitude: loc.lng + dLng } }
   // 第一次不用 openNow：「60 分內開門」的店也要留（篩選在 toCandidates）；第二次（widenPlan）才要求營業中。
   const body = JSON.stringify(
     plan.kind === 'text'
-      ? { textQuery: plan.textQuery, pageSize: FETCH_COUNT, rankPreference: plan.rank, languageCode, locationBias: { circle }, ...(plan.openNow ? { openNow: true } : {}) }
+      ? {
+        textQuery: plan.textQuery, pageSize: FETCH_COUNT, rankPreference: plan.rank, languageCode,
+        ...(plan.restrict ? { locationRestriction: { rectangle } } : { locationBias: { circle } }),
+        ...(plan.openNow ? { openNow: true } : {}),
+        ...(plan.priceLevels?.length ? { priceLevels: plan.priceLevels } : {}),
+      }
       : { includedTypes: plan.includedTypes, maxResultCount: FETCH_COUNT, rankPreference: plan.rank, languageCode, locationRestriction: { circle } },
   )
   return { url: PLACES_URL[plan.kind], body }

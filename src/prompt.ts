@@ -2,7 +2,7 @@
 import { OFFICER_BY_LEVEL, sampleCorpus } from './officers.ts'
 import { CARD_BY_ID } from './cards.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
-import { bandOf, priceFit, priceText } from './price.ts'
+import { bandOf, estText, priceFit, priceText } from './price.ts'
 import type { Band, Country, Level, ModuleId, OrderRequest, PickResult } from './types.ts'
 
 // Round 3：PlaceCandidate 搬到 types.ts（DEV-PLAN-3 §B.1），這裡轉出口讓既有 import 不用動。
@@ -77,12 +77,13 @@ export function budgetLine(band: number | null, budget: Band[] | undefined): str
 function decidedBlock(req: OrderRequest, pick: PickResult, country: Country): string {
   const p = pick.place
   const hours = p.opensAt ? `${p.opensAt} 開` : p.openUntil ? `營業到 ${p.openUntil}` : '營業中'
-  const price = priceText(p, country) ?? '價位未知'
+  // Round 4：Google 沒有價位資料時，pick 帶我方推估（「推估平價」），只講描述不講金額。
+  const band = pick.band !== undefined ? pick.band : bandOf(p, country)
+  const price = priceText(p, country) ?? (pick.bandEst && band !== null ? `${estText(band)}（我方推估，不准講成確定價位）` : '價位未知')
   const modeRule =
     pick.mode === 'new' ? 'mode=new：在 meme.top 或 meme.bot 講這家他沒去過（新據點）。'
       : pick.mode === 'revisit' ? `mode=revisit：在 meme.top 或 meme.bot 講「第 ${pick.visits} 次」，數字照抄。`
         : 'mode=wildcard：在 meme.top 或 meme.bot 講這是偵察任務。'
-  const band = bandOf(p, country)
   return [
     // R3 修正 S-9：不送 place.id——模型用不到，id 由 withPlace 填（資料最小化，跟不送座標同一個理由）。
     `【店已決定】place.name=${p.name}　${p.walkMin ? `步行 ${p.walkMin} 分　` : ''}${hours}　價位：${price}`,
@@ -90,6 +91,8 @@ function decidedBlock(req: OrderRequest, pick: PickResult, country: Country): st
     '你只負責寫口令：meme.big 就是這家店名（≤10 字，太長用店家慣稱）。',
     modeRule,
     pick.exhausted ? '附近能偵察的新店都偵察完了，這次派的是已知據點。' : '',
+    // Round 4 救援：前兩次查詢之後附近一家都派不出去，派的是營業中的便利商店。
+    p.lane === 'rescue' ? '附近營業中的店都派不出去，這次派的是便利商店：在 meme.bot 直說「附近都收了，去超商」，steps 寫在超商買什麼、幾分鐘內吃完。' : '',
     budgetLine(band, req.budget),
     '禁止提到任何別家店或類別；禁止寫出「價位」以外的金額；禁止寫連結。',
     // Team Lead 設計修訂：口令卡最上面已經印了店名、步行、營業、價位，steps 再講一次就是廢話。

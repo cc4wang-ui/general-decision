@@ -9,7 +9,7 @@
 //   3 打分（log 域）：Thompson 品質抽樣 + 細類偏好 Beta 抽樣 − λ·曝光 + 連鎖 ×0.6 − 步行/25 + 價位適配 + 今天不想吃這類 ×0.5 + 愛店（熟門熟路）×2
 //   4 Efraimidis–Spirakis 加權隨機取一家。
 import { ratingScore } from './places.ts'
-import { bandOf, priceFit } from './price.ts'
+import { effectiveBand, priceFit } from './price.ts'
 import type { Band, Country, CuisineStats, Novelty, PickMode, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
 
 // ── 亂數（可重現）──────────────────────────────────────────────────
@@ -163,6 +163,7 @@ export interface PickOutcome extends PickResult {
   /** 被選的店 14 天內有沒有任何事件（匿名 log 的 seen14d）。 */
   seen14d: boolean
   band: number | null
+  bandEst: boolean
   cuisine: CuisineGroup
 }
 
@@ -224,14 +225,16 @@ export function pickPlace(
   for (const s of lastShown) { if (cooldown.size >= PARAMS.cooldown) break; cooldown.add(s.id) }
   const lastShownAt = (id: string) => Math.max(0, ...(memById.get(id)?.sh ?? []))
 
-  type Row = { c: PlaceCandidate; i: number; b: number; band: number | null; fit: number; E: number; seen: boolean; chain: boolean; g: CuisineGroup }
+  type Row = { c: PlaceCandidate; i: number; b: number; band: number | null; est: boolean; fit: number; E: number; seen: boolean; chain: boolean; g: CuisineGroup }
   let rows: Row[] = cands.map((c, i) => {
     const ms = merged(c.id)
-    const band = bandOf(c, ctx.country)
+    // Round 4：Google 沒有價位資料時用推估（關鍵字 lane 或店的類型），不再讓「價位未知」直接過預算關。
+    const { band, est } = effectiveBand(c, ctx.country)
     return {
       c, i,
       b: bayes(c),
       band,
+      est,
       fit: priceFit(band, ctx.budget),
       E: ms.reduce((s, m) => s + exposure(m, now), 0),
       seen: ms.some((m) => (m.sh?.length ?? 0) > 0 || (m.dn?.length ?? 0) > 0),
@@ -248,8 +251,9 @@ export function pickPlace(
   rows = rows.filter((r) => !ctx.exclude.has(r.c.id))
   rows = stage(rows, (r) => !cooldown.has(r.c.id), (a, b) => lastShownAt(a.c.id) - lastShownAt(b.c.id), 'cooldown', relaxed)
   if (ctx.budget?.length) {
-    // 預算內或價位未知才算過；相鄰檔、再遠的只在不夠 5 家時依適配度補回（R3§4.4：本區沒這價位不硬塞）。
-    rows = stage(rows, (r) => r.fit === 1 || r.band === null, (a, b) => b.fit - a.fit, 'price', relaxed)
+    // Round 4（Cross 2026-10-30「沒辦法按照價格找店」）：只有預算內（Google 資料或推估）才算過。
+    // 不夠 5 家才依適配度補回：價位未知（0.5）先於相鄰檔（0.35），再遠的不補（R3§4.4：本區沒這價位不硬塞）。
+    rows = stage(rows, (r) => r.fit === 1, (a, b) => b.fit - a.fit, 'price', relaxed)
   }
   if (rows.length === 0) return null
   const afterFilter = rows.length
@@ -331,6 +335,7 @@ export function pickPlace(
     afterFilter,
     seen14d,
     band: pick.band,
+    bandEst: pick.est,
     cuisine: pick.g,
   }
 }

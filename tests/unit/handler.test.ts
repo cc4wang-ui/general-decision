@@ -90,23 +90,42 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect(res.status).toBe(200)
   })
 
-  it('Claude 回非法 JSON → 502 + 班長口吻訊息（第 11 節）', async () => {
+  // Round 4（Cross 2026-10-30「很多情境沒辦法給任何解答」）：Claude 失敗不再回「班長在開會」，伺服器用模板出口令。
+  it('Claude 回非法 JSON → 模板口令 200，店仍是伺服器挑的那家，debug.fallback=template', async () => {
     vi.stubGlobal('fetch', routed(() => claudeOk('班長今天請假。')))
     const res = await handler(post({}))
-    expect(res.status).toBe(502)
-    expect((await res.json()).message).toContain('班長在開會')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as Order & { debug: OrderDebug }
+    expect(body.debug.fallback).toBe('template')
+    expect(body.place?.id).toBe('p1')
+    expect(body.meme.big).toBe('阿財魯肉飯')
+    expect(body.steps.length).toBeGreaterThan(0)
+    expect(res.headers.get('x-timing')).toContain('model=template')
   })
 
-  it('Claude 429 → 重試後回 429', async () => {
+  it('Claude 429 → 重試 2 次後改模板口令（200），不讓使用者空手', async () => {
     const claude = vi.fn(() => new Response('rate limited', { status: 429 }))
     vi.stubGlobal('fetch', routed(claude))
     const res = await handler(post({}))
-    expect(res.status).toBe(429)
+    expect(res.status).toBe(200)
     expect(claude).toHaveBeenCalledTimes(3) // 首次 + 兩次重試
+    expect(((await res.json()) as { debug: OrderDebug }).debug.fallback).toBe('template')
   }, 15_000)
 
+  it('模型兩次都推掉不答 → 模板口令（不再 502）', async () => {
+    const no = JSON.stringify({ verdict: 'stop', meme: { top: 'a', big: '大事不受理', bot: '去找連長' }, steps: ['去找連長。'], log: 'x' })
+    vi.stubGlobal('fetch', routed(() => claudeOk(no)))
+    const res = await handler(post({ module: 'reply', choices: { target: '老闆' } }))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as Order & { debug: OrderDebug }
+    expect(body.debug.fallback).toBe('template')
+    expect(body.meme.big).toContain('現在回')
+    expect(JSON.stringify(body)).not.toMatch(/不受理|找連長/)
+  })
+
   // 2026-09-18 斷言改了（Cross：只講類別一律視為失敗）。以下兩條原本是「降級仍出口令」，現在是明確的失敗碼。
-  it('Places 掛掉 → 兩個半徑都試過後回 502 no_places，不打 Claude', async () => {
+  // Round 4：兩個半徑之後再查一次營業中的超商（救援），三次都掛才回 no_places。
+  it('Places 掛掉 → 兩個半徑加超商救援都試過後回 502 no_places，不打 Claude', async () => {
     const claude = vi.fn(() => claudeOk(ORDER_JSON))
     vi.stubGlobal('fetch', routed(claude, () => new Response('boom', { status: 500 })))
     const res = await handler(post({}))
@@ -124,7 +143,7 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect(f).not.toHaveBeenCalled()
   })
 
-  it('lane 有效候選 < 5 → 第二次 Text Search「餐廳」＋ openNow、半徑 2000，第二次有就用', async () => {
+  it('lane 有效候選 < 5 → 第二次 Text Search 通用關鍵字＋ openNow、半徑 2000，第二次有就用', async () => {
     const bodies: string[] = []
     const places = vi.fn((init?: RequestInit) => {
       bodies.push(String(init?.body ?? ''))
@@ -137,12 +156,50 @@ describe('/api/order handler（第 12 節 S5）', () => {
     const res = await handler(post({}))
     expect(res.status).toBe(200)
     expect(res.headers.get('x-places-calls')).toBe('2')
-    expect(JSON.parse(bodies[0]!).locationRestriction.circle.radius).toBe(800)
+    const first = JSON.parse(bodies[0]!)
+    // 第一次：Nearby 圓（800m）或關鍵字 lane 的方框（約 ±800m）
+    if (first.locationRestriction.circle) expect(first.locationRestriction.circle.radius).toBe(800)
+    else expect(first.locationRestriction.rectangle.high.latitude - 25.033).toBeCloseTo(800 / 111_320, 5)
     const second = JSON.parse(bodies[1]!)
     expect(second.locationBias.circle.radius).toBe(2000)
-    expect(second.textQuery).toBe('餐廳')
+    expect(['餐廳', '美食', '小吃']).toContain(second.textQuery)
     expect(second.openNow).toBe(true)
-    expect(second.rankPreference).toBe('DISTANCE')
+    expect(['DISTANCE', 'RELEVANCE']).toContain(second.rankPreference)
+    expect(second.priceLevels).toBeUndefined()
+  })
+
+  it('Round 4 救援：前兩次都沒有營業中的店 → 第三次查營業中的超商，照樣出口令', async () => {
+    const bodies: string[] = []
+    const store: RawPlace = { id: 's7', displayName: { text: '7-ELEVEN 府前門市' }, location: { latitude: 25.0335, longitude: 121.5658 }, currentOpeningHours: { openNow: true }, rating: 3.6, userRatingCount: 80, primaryType: 'convenience_store' }
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('anthropic')) return claudeOk(ORDER_JSON)
+      bodies.push(String(init?.body ?? ''))
+      return new Response(JSON.stringify({ places: bodies.length === 3 ? [store] : [] }), { status: 200 })
+    }))
+    const res = await handler(post({ budget: [3] }))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('x-places-calls')).toBe('3')
+    expect(JSON.parse(bodies[2]!)).toMatchObject({ textQuery: '便利商店', openNow: true })
+    const body = (await res.json()) as Order & { debug: OrderDebug }
+    expect(body.place?.id).toBe('s7')
+    expect(body.debug.rescue).toBe(true)
+    expect(body.debug.places?.how.split(' → ')).toHaveLength(3)
+  })
+
+  it('Round 4 救援：候選全被「不要再來」擋掉 → 也走超商救援', async () => {
+    const store: RawPlace = { id: 's8', displayName: { text: '全家 市府店' }, location: { latitude: 25.0335, longitude: 121.5658 }, currentOpeningHours: { openNow: true }, rating: 3.8, userRatingCount: 90, primaryType: 'convenience_store' }
+    let n = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('anthropic')) return claudeOk(ORDER_JSON)
+      n++
+      return new Response(JSON.stringify({ places: n === 1 ? FIVE : [store] }), { status: 200 })
+    }))
+    const blocked: PlaceMemSummary[] = FIVE.map((p) => ({ id: p.id!, sh: [], dn: [], x: 'forever' as const }))
+    const res = await handler(post({ mem: blocked }))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as Order & { debug: OrderDebug }
+    expect(body.place?.id).toBe('s8')
+    expect(body.debug.rescue).toBe(true)
   })
 
   it('模型只講類別 → 不重打，place 被 pickPlace 的結果覆寫，dbg.forced 有值', async () => {
@@ -182,7 +239,7 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect(body.debug.module).toBe('eat')
     expect(body.debug.model).toBe('claude-haiku-4-5')
     // R3 修正 S-7：5 家營業中 → 只查 1 圈，tries 回到 1 筆
-    expect(body.debug.places?.how).toMatch(/^lane=\S+ rank=(POPULARITY|DISTANCE)$/)
+    expect(body.debug.places?.how).toMatch(/^(lane=\S+ rank=(POPULARITY|DISTANCE)|text="[^"]+" rank=(DISTANCE|RELEVANCE))$/)
     expect(body.debug.places?.tries).toEqual([{ r: 800, raw: 5, kept: 5 }])
     expect(body.debug.places?.candidates[0]).toMatchObject({ name: '阿財魯肉飯' })
     expect(body.debug.picked).toBe('阿財魯肉飯')
@@ -195,7 +252,9 @@ describe('/api/order handler（第 12 節 S5）', () => {
     const res = await handler(post({}))
     const body = (await res.json()) as { error: string; debug: OrderDebug }
     expect(body.debug.error).toBe('no_places')
-    expect(body.debug.places?.tries).toEqual([{ r: 800, raw: -1, kept: 0 }, { r: 2000, raw: -1, kept: 0 }])
+    expect(body.debug.rescue).toBe(true)
+    // 第一次 800、第二次 2000、第三次（超商救援）1500
+    expect(body.debug.places?.tries).toEqual([{ r: 800, raw: -1, kept: 0 }, { r: 2000, raw: -1, kept: 0 }, { r: 1500, raw: -1, kept: 0 }])
   }, 15_000)
 
   it('模型寫別家店 → 不重打（retry 只給 nonanswer），forced 記下來', async () => {
@@ -235,12 +294,42 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect((await handler(post({ module: 'nope' as never }))).status).toBe(400)
   })
 
-  it('沒設 ANTHROPIC_API_KEY → 502，不會洩漏 key 內容', async () => {
+  it('沒設 ANTHROPIC_API_KEY → 模板口令（200），不會洩漏 key 內容', async () => {
     delete process.env.ANTHROPIC_API_KEY
     vi.stubGlobal('fetch', routed(() => claudeOk(ORDER_JSON)))
     const res = await handler(post({}))
-    expect(res.status).toBe(502)
-    expect(JSON.stringify(await res.json())).not.toContain('ANTHROPIC_API_KEY')
+    expect(res.status).toBe(200)
+    const text = JSON.stringify(await res.json())
+    expect(text).not.toContain('ANTHROPIC_API_KEY')
+    expect(text).toContain('"fallback":"template"')
+  })
+
+  it('Round 4 價位：選了預算 → 只派預算內的店（Google 資料或推估），預算外（含推估在外）的不派', async () => {
+    const mk = (id: string, extra: Partial<RawPlace>): RawPlace => ({
+      id, displayName: { text: `店${id}` }, location: { latitude: 25.0335, longitude: 121.5658 }, currentOpeningHours: { openNow: true }, rating: 4.5, userRatingCount: 300, ...extra,
+    })
+    const range = (a: number, b: number) => ({ startPrice: { currencyCode: 'TWD', units: String(a) }, endPrice: { currencyCode: 'TWD', units: String(b) } })
+    const places = [
+      mk('cheap1', { priceRange: range(80, 140) }), mk('cheap2', { priceRange: range(60, 120) }), mk('cheap3', { priceRange: range(100, 150) }),
+      mk('cheap4', { priceLevel: 'PRICE_LEVEL_INEXPENSIVE' }), mk('cheap5', { primaryType: 'noodle_shop' }),
+      mk('pricey1', { priceRange: range(800, 1200) }), mk('pricey2', { priceRange: range(1000, 2000) }), mk('pricey3', { primaryType: 'steak_house' }),
+    ]
+    for (let seed = 1; seed <= 20; seed++) {
+      vi.stubGlobal('fetch', routed(() => claudeOk(ORDER_JSON), () => new Response(JSON.stringify({ places }), { status: 200 })))
+      const body = (await (await handler(post({ budget: [1], seed }))).json()) as Order & { debug: OrderDebug }
+      expect(body.place?.id, `seed ${seed}`).toMatch(/^cheap/)
+    }
+  })
+
+  it('Round 4 價位：Google 沒有價位資料 → 用推估，卡上寫「推估…」不寫金額，priceEst=true', async () => {
+    const noodle: RawPlace = { id: 'n1', displayName: { text: '老王麵店' }, location: { latitude: 25.0335, longitude: 121.5658 }, currentOpeningHours: { openNow: true }, rating: 4.6, userRatingCount: 400, primaryType: 'noodle_shop' }
+    vi.stubGlobal('fetch', routed(() => claudeOk(ORDER_JSON), () => new Response(JSON.stringify({ places: [noodle] }), { status: 200 })))
+    const body = (await (await handler(post({ budget: [1] }))).json()) as Order & { debug: OrderDebug }
+    expect(body.place?.id).toBe('n1')
+    expect(body.place?.priceEst).toBe(true)
+    expect(body.place?.priceText).toBe('推估平價')
+    expect(body.place?.band).toBe(1)
+    expect(body.place?.priceText).not.toMatch(/\d/)
   })
 })
 
@@ -424,18 +513,29 @@ describe('Round 3：Places 呼叫規則', () => {
     expect(JSON.parse(bodies[1]!)).toMatchObject({ textQuery: '餐廳', openNow: true })
   })
 
-  it('甜食走甜食 lane、素走素食 lane；第二次也不退回 restaurant', async () => {
-    for (const [choices, types] of [[{ taste: '甜食' }, ['bakery', 'cafe', 'ice_cream_shop']], [{ diet: '素' }, ['vegetarian_restaurant', 'vegan_restaurant']]] as const) {
-      const bodies: string[] = []
-      vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-        if (String(url).includes('anthropic')) return claudeOk(ORDER_JSON)
-        bodies.push(String(init?.body))
-        return new Response(JSON.stringify({ places: [] }), { status: 200 })
-      }))
-      await handler(post({ choices: { ...choices }, seed: 11 }))
-      expect(bodies).toHaveLength(2)
-      if ('diet' in choices) expect(JSON.parse(bodies[0]!).includedTypes).toEqual(types)
-      expect(JSON.parse(bodies[1]!).includedTypes).toEqual(types)
+  it('甜食走甜食 lane、素走素食 lane；第二次也不退回 restaurant（type 或同一個關鍵字），第三次才是超商救援', async () => {
+    const sweetQ = ['甜點', '豆花', '冰店', '麵包店']
+    const vegQ = ['素食', '蔬食']
+    for (const [choices, types, words] of [[{ taste: '甜食' }, ['bakery', 'cafe', 'ice_cream_shop'], sweetQ], [{ diet: '素' }, ['vegetarian_restaurant', 'vegan_restaurant'], vegQ]] as const) {
+      for (let seed = 1; seed <= 12; seed++) {
+        const bodies: string[] = []
+        vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+          if (String(url).includes('anthropic')) return claudeOk(ORDER_JSON)
+          bodies.push(String(init?.body))
+          return new Response(JSON.stringify({ places: [] }), { status: 200 })
+        }))
+        await handler(post({ choices: { ...choices }, seed }))
+        expect(bodies).toHaveLength(3)
+        const second = JSON.parse(bodies[1]!)
+        if (second.includedTypes) {
+          expect(second.includedTypes).toEqual(types)
+          if ('diet' in choices) expect(JSON.parse(bodies[0]!).includedTypes).toEqual(types)
+        } else {
+          expect(words as readonly string[]).toContain(second.textQuery)
+          expect(JSON.parse(bodies[0]!).textQuery).toBe(second.textQuery)
+        }
+        expect(JSON.parse(bodies[2]!).textQuery).toBe('便利商店')
+      }
     }
   })
 

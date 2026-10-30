@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest'
 import { CARD_BY_ID } from '../../src/cards.ts'
 import { mulberry32 } from '../../src/discovery.ts'
-import { LANES, mealLanes, pickLane, widenPlan, type LanePlan } from '../../src/lanes.ts'
+import { LANES, QUERY_LANES, SWEET_QUERIES, VEG_QUERIES, laneEst, mealLanes, pickLane, priceLevelsFor, rescuePlan, widenPlan, type LanePlan } from '../../src/lanes.ts'
+import { priceFit } from '../../src/price.ts'
 
 const many = (n: number, f: (seed: number) => LanePlan) => Array.from({ length: n }, (_, s) => f(s + 1))
 
@@ -20,12 +21,41 @@ describe('LANES 表', () => {
 })
 
 describe('pickLane', () => {
-  it('只在 verified 的 lane 裡挑（500 個種子）', () => {
+  it('Nearby 只在 verified 的 lane 裡挑；關鍵字 lane 只用 QUERY_LANES，限在方框內（500 個種子）', () => {
     const verified = new Set(LANES.filter((l) => l.verified).map((l) => l.id))
-    for (const p of many(500, (s) => pickLane(CARD_BY_ID.eat, {}, undefined, 'TW', mulberry32(s)))) {
-      expect(p.kind).toBe('nearby')
-      expect(verified.has(p.lane), p.lane).toBe(true)
+    const queries = new Set(QUERY_LANES.TW.map((l) => l.q))
+    const plans = many(500, (s) => pickLane(CARD_BY_ID.eat, {}, undefined, 'TW', mulberry32(s)))
+    for (const p of plans) {
+      if (p.kind === 'nearby') expect(verified.has(p.lane), p.lane).toBe(true)
+      else { expect(queries.has(p.textQuery), p.textQuery).toBe(true); expect(p.restrict).toBe(true); expect(p.lane).toBe(`q:${p.textQuery}`) }
     }
+    // Round 4：兩種都要出現，關鍵字是主力（台灣的便當、麵店、小吃 Nearby 撈不到）
+    const textShare = plans.filter((p) => p.kind === 'text').length / plans.length
+    expect(textShare).toBeGreaterThan(0.4)
+    expect(textShare).toBeLessThan(0.9)
+  })
+
+  it('台灣用台灣關鍵字、日本用日本關鍵字；其他國家只用 Nearby', () => {
+    const jp = many(300, (s) => pickLane(CARD_BY_ID.eat, {}, undefined, 'JP', mulberry32(s))).filter((p) => p.kind === 'text')
+    const jpQ = new Set(QUERY_LANES.JP.map((l) => l.q))
+    expect(jp.length).toBeGreaterThan(0)
+    for (const p of jp) expect(jpQ.has((p as { textQuery: string }).textQuery)).toBe(true)
+    expect(many(200, (s) => pickLane(CARD_BY_ID.eat, {}, undefined, 'other', mulberry32(s))).every((p) => p.kind === 'nearby')).toBe(true)
+  })
+
+  it('有預算：只走關鍵字 lane、帶 priceLevels、推估價位對得上（Round 4）', () => {
+    for (const budget of [[1], [2], [3], [4], [1, 2]] as const) {
+      const plans = many(200, (s) => pickLane(CARD_BY_ID.eat, {}, undefined, 'TW', mulberry32(s), 12, [...budget]))
+      for (const p of plans) {
+        expect(p.kind).toBe('text')
+        if (p.kind !== 'text') continue
+        expect(p.priceLevels).toEqual(priceLevelsFor([...budget]))
+        expect(priceFit(laneEst(p.lane)!, [...budget])).toBeGreaterThan(0)
+      }
+    }
+    expect(priceLevelsFor([1])).toEqual(['PRICE_LEVEL_INEXPENSIVE'])
+    expect(priceLevelsFor([3, 4])).toEqual(['PRICE_LEVEL_MODERATE', 'PRICE_LEVEL_EXPENSIVE', 'PRICE_LEVEL_VERY_EXPENSIVE'])
+    expect(priceLevelsFor(undefined)).toBeUndefined()
   })
 
   it('一般 eat 不會挑甜點／咖啡 lane，會輪替出很多種', () => {
@@ -34,30 +64,35 @@ describe('pickLane', () => {
     expect(lanes.size).toBeGreaterThan(10)
   })
 
-  it('忌口「素」→ 素食 lane（素食＋純素）', () => {
+  it('忌口「素」→ 素食 lane（素食＋純素）或素食關鍵字', () => {
+    const veg = new Set(VEG_QUERIES.TW.map((l) => l.q))
     for (const p of many(50, (s) => pickLane(CARD_BY_ID.eat, { diet: '素' }, undefined, 'TW', mulberry32(s)))) {
-      expect(p.kind === 'nearby' && p.includedTypes).toEqual(['vegetarian_restaurant', 'vegan_restaurant'])
+      if (p.kind === 'nearby') expect(p.includedTypes).toEqual(['vegetarian_restaurant', 'vegan_restaurant'])
+      else expect(veg.has(p.textQuery)).toBe(true)
     }
   })
 
-  it('甜食 → 甜食 lane 組（麵包／咖啡／冰店）', () => {
+  it('甜食 → 甜食 lane 組（麵包／咖啡／冰店）或甜食關鍵字', () => {
     const sweet = new Set(['bakery', 'cafe', 'ice_cream_shop', 'coffee_shop'])
+    const sweetQ = new Set(SWEET_QUERIES.TW.map((l) => l.q))
     for (const p of many(100, (s) => pickLane(CARD_BY_ID.eat, { taste: '甜食' }, undefined, 'TW', mulberry32(s)))) {
-      expect(p.kind === 'nearby' && p.includedTypes.every((t) => sweet.has(t))).toBe(true)
+      if (p.kind === 'nearby') expect(p.includedTypes.every((t) => sweet.has(t))).toBe(true)
+      else expect(sweetQ.has(p.textQuery)).toBe(true)
     }
   })
 
   it('不吃牛 → 不排牛排館；14 點後不排早午餐', () => {
     const noBeef = many(500, (s) => pickLane(CARD_BY_ID.eat, { diet: '不吃牛' }, undefined, 'TW', mulberry32(s)))
-    expect(noBeef.some((p) => p.lane === 'steak_house')).toBe(false)
+    expect(noBeef.some((p) => p.lane === 'steak_house' || p.lane === 'q:牛肉麵' || p.lane === 'q:燒肉')).toBe(false)
     const dinner = many(500, (s) => pickLane(CARD_BY_ID.eat, {}, undefined, 'TW', mulberry32(s), 19))
-    expect(dinner.some((p) => p.lane === 'breakfast_restaurant' || p.lane === 'brunch_restaurant')).toBe(false)
+    expect(dinner.some((p) => p.lane === 'breakfast_restaurant' || p.lane === 'brunch_restaurant' || p.lane === 'q:早午餐')).toBe(false)
     expect(mealLanes({}, 'TW', 9).some((l) => l.id === 'breakfast_restaurant')).toBe(true)
   })
 
-  it('rankPreference：eat 在 POPULARITY／DISTANCE 交替，rest 在 DISTANCE／RELEVANCE 交替', () => {
-    const eat = many(200, (s) => pickLane(CARD_BY_ID.eat, {}, undefined, 'TW', mulberry32(s)))
-    const eatRanks = eat.map((p) => p.rank)
+  it('rankPreference：eat 的 Nearby 在 POPULARITY／DISTANCE 交替、關鍵字在 DISTANCE／RELEVANCE 交替，rest 在 DISTANCE／RELEVANCE 交替', () => {
+    const eat = many(400, (s) => pickLane(CARD_BY_ID.eat, {}, undefined, 'TW', mulberry32(s)))
+    expect(new Set(eat.filter((p) => p.kind === 'text').map((p) => p.rank))).toEqual(new Set(['DISTANCE', 'RELEVANCE']))
+    const eatRanks = eat.filter((p) => p.kind === 'nearby').map((p) => p.rank)
     expect(new Set(eatRanks)).toEqual(new Set(['POPULARITY', 'DISTANCE']))
     const share = eatRanks.filter((r) => r === 'POPULARITY').length / eatRanks.length
     expect(share).toBeGreaterThan(0.35)
@@ -69,7 +104,7 @@ describe('pickLane', () => {
 
   it('細類偏好：拉麵 Beta(30,1) 時，拉麵 lane 的比例遠高於沒有偏好', () => {
     const count = (cuisine?: Record<string, [number, number]>) =>
-      many(1000, (s) => pickLane(CARD_BY_ID.eat, {}, cuisine, 'TW', mulberry32(s))).filter((p) => p.lane === 'ramen_restaurant').length
+      many(1000, (s) => pickLane(CARD_BY_ID.eat, {}, cuisine, 'TW', mulberry32(s))).filter((p) => p.lane === 'ramen_restaurant' || p.lane === 'q:拉麵').length
     const liked = count({ ramen: [30, 1], jp: [1, 5], cn: [1, 5], kr: [1, 5], western: [1, 5], other: [1, 5], seafood: [1, 5], veg: [1, 5], fast: [1, 5] })
     expect(liked).toBeGreaterThan(600) // 75% 走偏好，加上 25% 均勻裡也可能抽到
     expect(count()).toBeLessThan(250)
@@ -97,6 +132,25 @@ describe('widenPlan（第二次呼叫）', () => {
   it('Text Search：同關鍵字、半徑 ×2.5、換 rankPreference、只要營業中', () => {
     expect(widenPlan({ kind: 'text', lane: 'text:咖啡廳', textQuery: '咖啡廳', radius: 800, rank: 'DISTANCE' }))
       .toEqual({ kind: 'text', lane: 'text:咖啡廳', textQuery: '咖啡廳', radius: 2000, rank: 'RELEVANCE', openNow: true })
+  })
+  it('Round 4：帶 rng 時通用關鍵字與排序會輪替（不再每次都是「餐廳＋依距離」那同一批）', () => {
+    const first: LanePlan = { kind: 'nearby', lane: 'ramen_restaurant', includedTypes: ['ramen_restaurant'], radius: 800, rank: 'POPULARITY' }
+    const plans = Array.from({ length: 100 }, (_, i) => widenPlan(first, { country: 'TW', rng: mulberry32(i + 1) }))
+    expect(new Set(plans.map((p) => (p as { textQuery: string }).textQuery))).toEqual(new Set(['餐廳', '美食', '小吃']))
+    expect(new Set(plans.map((p) => p.rank))).toEqual(new Set(['DISTANCE', 'RELEVANCE']))
+    for (const p of plans) expect(p).toMatchObject({ kind: 'text', lane: 'text:open-now', radius: 2000, openNow: true })
+  })
+  it('Round 4：eat 的關鍵字 lane 第二次改通用關鍵字、不帶 priceLevels；甜食／素食關鍵字保留自己', () => {
+    const q: LanePlan = { kind: 'text', lane: 'q:便當', textQuery: '便當', radius: 800, rank: 'DISTANCE', restrict: true, priceLevels: ['PRICE_LEVEL_INEXPENSIVE'] }
+    const w = widenPlan(q, { country: 'TW' })
+    expect(w).toEqual({ kind: 'text', lane: 'text:open-now', textQuery: '餐廳', radius: 2000, rank: 'DISTANCE', openNow: true })
+    const sweet = widenPlan({ kind: 'text', lane: 'q:豆花', textQuery: '豆花', radius: 800, rank: 'RELEVANCE', restrict: true }, { country: 'TW' })
+    expect(sweet).toEqual({ kind: 'text', lane: 'q:豆花', textQuery: '豆花', radius: 2000, rank: 'DISTANCE', openNow: true })
+  })
+  it('Round 4 救援：營業中的便利商店（台灣／日本／其他）', () => {
+    expect(rescuePlan('TW')).toMatchObject({ kind: 'text', lane: 'rescue', textQuery: '便利商店', openNow: true })
+    expect(rescuePlan('JP')).toMatchObject({ textQuery: 'コンビニ' })
+    expect(rescuePlan('other')).toMatchObject({ textQuery: 'convenience store' })
   })
 })
 

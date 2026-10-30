@@ -16,7 +16,8 @@ export type Novelty = 'familiar' | 'balanced' | 'recon'
 /** 這家店對使用者是新的、回訪的、還是偵察抽到的。伺服器算，模型只負責講。 */
 export type PickMode = 'new' | 'revisit' | 'wildcard'
 /** 換一家的原因（A4）。 */
-export type ReissueReason = 'closed' | 'not_this_kind' | 'never_again'
+/** Round 4 加 repeat（又是這家：14 天不派）與 price（價格不對：這次排除、記進試用紀錄）。 */
+export type ReissueReason = 'closed' | 'not_this_kind' | 'never_again' | 'repeat' | 'price'
 
 /** Places 回來、經 toCandidates 整理後的一家店（原本在 prompt.ts，Round 3 移到這裡）。只活在單次請求，不落地。 */
 export interface PlaceCandidate {
@@ -35,6 +36,8 @@ export interface PlaceCandidate {
   priceRange?: { start?: number; end?: number; currency?: string }
   /** 這家是哪條 lane 撈到的（src/lanes.ts），除錯用。 */
   lane?: string
+  /** Round 4：撈到它的關鍵字 lane 推估的價位檔（src/lanes.ts QUERY_LANES est）。Google 有價位資料時不用。 */
+  estBand?: number
 }
 
 /** 送到伺服器的記憶摘要：只有 place_id、我方事件時間戳、我方品牌鍵。沒有店名、評分、座標（R3§3.3）。 */
@@ -79,6 +82,10 @@ export interface PickResult {
   relaxed: string[]
   /** recon 下附近已無曝光為 0 的店。 */
   exhausted: boolean
+  /** Round 4：挑店用的價位檔（Google 資料或推估，可為 x.5）；null＝價位未知。缺省＝舊呼叫端，照 Google 資料算。 */
+  band?: number | null
+  /** Round 4：band 是我方推估（Google 沒有價位資料）。 */
+  bandEst?: boolean
 }
 
 export interface IntakeField {
@@ -145,8 +152,10 @@ export interface Order {
     visits?: number
     /** null = 價位未知（口令卡要顯示「價位未知」）。 */
     band?: Band | null
-    /** 直接由 Google 當次回傳值組成的顯示字串（例「≈NT$150–400」「≈¥1,000〜2,500」）。不落地保存。 */
+    /** 直接由 Google 當次回傳值組成的顯示字串（例「≈NT$150–400」「≈¥1,000〜2,500」）。不落地保存。
+     *  Round 4：Google 沒有價位資料時是我方推估（「推估平價」），不含金額，priceEst=true。 */
     priceText?: string
+    priceEst?: boolean
     country?: Country
     cuisine?: string
     brand?: string
@@ -178,6 +187,10 @@ export interface OrderDebug {
   /** Round 3：候選中有價位資料的比例（R3§4.3 第一週遙測）。 */
   price?: { country: Country; known: number; total: number }
   retry?: 'nonanswer' | 'noplace'
+  /** Round 4：Claude 失敗（逾時、429、格式壞、兩次都推掉）→ 伺服器用模板出口令，不讓使用者空手。 */
+  fallback?: 'template'
+  /** Round 4：前兩次 Places 之後一家都派不出去 → 第三次查營業中的便利商店。 */
+  rescue?: boolean
   forced?: string
   picked?: string
   error?: string
