@@ -30,7 +30,7 @@ Cross 2026-10-30 決定自己連續試用 60 天。回報三類問題：
 | `b789651` | 60 天試用紀錄、匯出、「又是這家」「價格不對」兩個換店原因 |
 
 閘門（2026-10-30，Linux 容器）：
-- `TZ=Asia/Taipei npm run typecheck && npm run test`：✅ 516 條。
+- `TZ=Asia/Taipei npm run typecheck && npm run test`：✅ 511 條。
 - `npm run build`：✅。`npm run check:bundle`：✅（probe 非 preview → 404）。`npm run smoke`：✅。
 - e2e：容器裝不了 WebKit，用 `npx playwright test --browser=chromium tests/e2e` 跑。93 過、5 不過。
   5 條不過（`cmd-layout` ×4、`memory` ×1）在 base `4e37ff1` 用 Chromium 一樣不過，是既有的 Chromium 差異，不是這輪造成。**不據此宣稱 WebKit PASS。**
