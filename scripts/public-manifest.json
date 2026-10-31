@@ -1,0 +1,154 @@
+{
+ "public/design-assets/app-icon-1024.png": {
+  "sha1": "f5eb7b30a31f21e2d36db72b2999caf9fe83127b",
+  "size": 6066
+ },
+ "public/favicon.svg": {
+  "sha1": "3f5bb8f3a6a05b7ca68a62581d2dd5bc88812caf",
+  "size": 9522
+ },
+ "public/icons.svg": {
+  "sha1": "f9897ac25e13de9ea601d2f1ac5d9353dfbefcda",
+  "size": 5031
+ },
+ "public/icons/apple-touch-icon.png": {
+  "sha1": "9b125f6bc7f58aa550561e99e6266a4d7ff568fb",
+  "size": 9430
+ },
+ "public/icons/icon-192.png": {
+  "sha1": "c2768bd1cdd15bee965443ee840c28b5540cee03",
+  "size": 9949
+ },
+ "public/icons/icon-512-maskable.png": {
+  "sha1": "6dec6e3509f5e8195bae3f17b9ff0d8f011148c5",
+  "size": 22925
+ },
+ "public/icons/icon-512.png": {
+  "sha1": "7949dcbbe5156a1ebfd2b7dc46626d71ac727a5c",
+  "size": 28680
+ },
+ "public/manifest.webmanifest": {
+  "sha1": "37ec7a729989dea82d7cfe5fd6906b997ce36def",
+  "size": 696
+ },
+ "public/officers/0/bark.png": {
+  "sha1": "4349144c0001cf34c349b41074b26fbf814d62d1",
+  "size": 651
+ },
+ "public/officers/0/bark.webp": {
+  "sha1": "7babd7fce84804bd2678cd8117280444ea5c3f7e",
+  "size": 336
+ },
+ "public/officers/0/idle.png": {
+  "sha1": "c638e10346310b2bf083d071708b93a29ca9bea9",
+  "size": 623
+ },
+ "public/officers/0/idle.webp": {
+  "sha1": "edc0bc69909e8b84f4a2223bc3335933b2d907db",
+  "size": 328
+ },
+ "public/officers/0/praise.png": {
+  "sha1": "d48903b5919e5930464d4a0b1384918d4d6a9fdd",
+  "size": 667
+ },
+ "public/officers/0/praise.webp": {
+  "sha1": "00fea953b50e31eca69f0e4f6ea63ca899971676",
+  "size": 352
+ },
+ "public/officers/0/punish.png": {
+  "sha1": "45e743a624d7e90112a4f87e0ea091e62d59ec85",
+  "size": 677
+ },
+ "public/officers/0/punish.webp": {
+  "sha1": "e5d9318095fd0edede14bb633b504edd6b22c68a",
+  "size": 348
+ },
+ "public/officers/0/soft.png": {
+  "sha1": "05c6b101f9cec6dc6a3e1c9bb4437db8acf7e715",
+  "size": 615
+ },
+ "public/officers/0/soft.webp": {
+  "sha1": "50bd3ae3f489a6b646af8d569087784350c7ed82",
+  "size": 326
+ },
+ "public/officers/1/bark.png": {
+  "sha1": "3dfa914a41888678237455877f4f44db05c6a7ef",
+  "size": 651
+ },
+ "public/officers/1/bark.webp": {
+  "sha1": "8974d388e1974df9317f44847c9924118e4e06f2",
+  "size": 312
+ },
+ "public/officers/1/idle.png": {
+  "sha1": "931ee83b999c3906f2520e2c59a7d9f86be55aa1",
+  "size": 614
+ },
+ "public/officers/1/idle.webp": {
+  "sha1": "ed17a89e542a6926e43094ec1bae3b3bc8970aec",
+  "size": 298
+ },
+ "public/officers/1/praise.png": {
+  "sha1": "7efc392a5c7d3aafce71d021e29abe87ba30527d",
+  "size": 685
+ },
+ "public/officers/1/praise.webp": {
+  "sha1": "3a2ad657fa267a15bf9c08524a2839840c4c2299",
+  "size": 332
+ },
+ "public/officers/1/punish.png": {
+  "sha1": "d83e287901487c6a6141eca7f2a3d5209b258f9e",
+  "size": 696
+ },
+ "public/officers/1/punish.webp": {
+  "sha1": "e22905584b1f9f95076e3fdcf3519e54cb523ec6",
+  "size": 366
+ },
+ "public/officers/1/soft.png": {
+  "sha1": "56c5a73439631098ddbe2309a83b54de00a81802",
+  "size": 614
+ },
+ "public/officers/1/soft.webp": {
+  "sha1": "6d549def300901f5c00fe1f9fcdac3cedcf06019",
+  "size": 298
+ },
+ "public/officers/2/bark.png": {
+  "sha1": "b6ed45ed825aaa685048c05ed501c6dfccbab63a",
+  "size": 654
+ },
+ "public/officers/2/bark.webp": {
+  "sha1": "5c1e06f44b1b6e50ce3b6591bf93d837f7ee5cdc",
+  "size": 322
+ },
+ "public/officers/2/idle.png": {
+  "sha1": "46e47cadb2cba1de485f20877b1d56ba7e79ff80",
+  "size": 637
+ },
+ "public/officers/2/idle.webp": {
+  "sha1": "d6c1284c1333a5199d5f1cd20f1192228f783bf8",
+  "size": 312
+ },
+ "public/officers/2/praise.png": {
+  "sha1": "55ece5177739968072249d9988940d91000337c2",
+  "size": 675
+ },
+ "public/officers/2/praise.webp": {
+  "sha1": "2df4d8082c2f3d9aae13a2e3df8fee72dac8d27b",
+  "size": 342
+ },
+ "public/officers/2/punish.png": {
+  "sha1": "7a47641b0c276a1579e2781080a05cba783935ff",
+  "size": 685
+ },
+ "public/officers/2/punish.webp": {
+  "sha1": "eee5b0a8edaee6c63160d1c10ad9c7ffaa33e64f",
+  "size": 340
+ },
+ "public/officers/2/soft.png": {
+  "sha1": "bea246b89021b58131f2b56004913b4c47101ced",
+  "size": 635
+ },
+ "public/officers/2/soft.webp": {
+  "sha1": "90ba0401fc2dc280389877e9620967ffe33a1455",
+  "size": 312
+ }
+}
