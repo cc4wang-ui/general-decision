@@ -280,14 +280,17 @@ const GENERIC: Record<Country, string[]> = { TW: ['餐廳', '美食', '小吃'],
  * - forceRestaurant：第一次回 400（lane 的 type 不被接受）→ 一律退回營業中的餐廳 Text Search。
  * - 預算的 priceLevels 第二次不帶：深夜預算內的店常常全關，交給 pickPlace 照預算挑、口令講清楚（budgetLine）。
  */
-export function widenPlan(first: LanePlan, opts: { forceRestaurant?: boolean; country?: Country; rng?: Rng } = {}): LanePlan {
+export function widenPlan(first: LanePlan, opts: { forceRestaurant?: boolean; country?: Country; rng?: Rng; dropPrice?: boolean } = {}): LanePlan {
   const radius = Math.round(first.radius * WIDEN_FACTOR)
   const country = opts.country ?? 'TW'
+  // Round 4 實測（2026-11-01 內湖 09:00）：第二次不帶 priceLevels → 撈回 20 家最近的平價早餐店，
+  // 預算 3、4 檔四次錯三次。有預算就保留 priceLevels；只有「預算內一家都撈不到」的後備（dropPrice）才拿掉。
+  const levels = first.kind === 'text' && first.priceLevels && !opts.dropPrice ? { priceLevels: first.priceLevels } : {}
   const generic = (): LanePlan => {
     const words = GENERIC[country]
     const word = opts.rng ? words[Math.floor(opts.rng() * words.length)]! : words[0]!
     const rank: TextRank = opts.rng && opts.rng() < 0.5 ? 'RELEVANCE' : 'DISTANCE'
-    return { kind: 'text', lane: 'text:open-now', textQuery: word, radius, rank, openNow: true }
+    return { kind: 'text', lane: 'text:open-now', textQuery: word, radius, rank, openNow: true, ...levels }
   }
   // 正式站實測（2026-10-26 深夜，東京站／台北市府）：Nearby 照熱門排序撈回的 20 家幾乎全打烊 → no_places。
   // 第二次一律要求「現在營業中」（Text Search 才有 openNow；Nearby 沒有）。
@@ -295,9 +298,10 @@ export function widenPlan(first: LanePlan, opts: { forceRestaurant?: boolean; co
     if (first.lane.startsWith('q:')) {
       const keep = !opts.forceRestaurant && (first.lane in KEEP_QUERY)
       if (!keep) return generic()
-      return { kind: 'text', lane: first.lane, textQuery: first.textQuery, radius, rank: first.rank === 'DISTANCE' ? 'RELEVANCE' : 'DISTANCE', openNow: true }
+      return { kind: 'text', lane: first.lane, textQuery: first.textQuery, radius, rank: first.rank === 'DISTANCE' ? 'RELEVANCE' : 'DISTANCE', openNow: true, ...levels }
     }
-    return { ...first, radius, rank: first.rank === 'DISTANCE' ? 'RELEVANCE' : 'DISTANCE', openNow: true }
+    const { priceLevels: _drop, ...rest } = first
+    return { ...rest, radius, rank: first.rank === 'DISTANCE' ? 'RELEVANCE' : 'DISTANCE', openNow: true, ...levels }
   }
   const rank: NearbyRank = first.rank === 'POPULARITY' ? 'DISTANCE' : 'POPULARITY'
   const sweet = first.lane === SWEET_LANE.id || LANES.some((l) => l.id === first.lane && SWEET_GROUPS.has(l.group))

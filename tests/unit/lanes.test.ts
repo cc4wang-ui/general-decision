@@ -140,12 +140,17 @@ describe('widenPlan（第二次呼叫）', () => {
     expect(new Set(plans.map((p) => p.rank))).toEqual(new Set(['DISTANCE', 'RELEVANCE']))
     for (const p of plans) expect(p).toMatchObject({ kind: 'text', lane: 'text:open-now', radius: 2000, openNow: true })
   })
-  it('Round 4：eat 的關鍵字 lane 第二次改通用關鍵字、不帶 priceLevels；甜食／素食關鍵字保留自己', () => {
-    const q: LanePlan = { kind: 'text', lane: 'q:便當', textQuery: '便當', radius: 800, rank: 'DISTANCE', restrict: true, priceLevels: ['PRICE_LEVEL_INEXPENSIVE'] }
-    const w = widenPlan(q, { country: 'TW' })
-    expect(w).toEqual({ kind: 'text', lane: 'text:open-now', textQuery: '餐廳', radius: 2000, rank: 'DISTANCE', openNow: true })
-    const sweet = widenPlan({ kind: 'text', lane: 'q:豆花', textQuery: '豆花', radius: 800, rank: 'RELEVANCE', restrict: true }, { country: 'TW' })
-    expect(sweet).toEqual({ kind: 'text', lane: 'q:豆花', textQuery: '豆花', radius: 2000, rank: 'DISTANCE', openNow: true })
+  it('Round 4：eat 的關鍵字 lane 第二次改通用關鍵字、保留 priceLevels（2026-11-01 內湖實測）；dropPrice 才拿掉；甜食／素食關鍵字保留自己', () => {
+    const levels = ['PRICE_LEVEL_MODERATE', 'PRICE_LEVEL_EXPENSIVE']
+    const q: LanePlan = { kind: 'text', lane: 'q:便當', textQuery: '便當', radius: 800, rank: 'DISTANCE', restrict: true, priceLevels: levels }
+    expect(widenPlan(q, { country: 'TW' })).toEqual({ kind: 'text', lane: 'text:open-now', textQuery: '餐廳', radius: 2000, rank: 'DISTANCE', openNow: true, priceLevels: levels })
+    expect(widenPlan(q, { country: 'TW', dropPrice: true })).toEqual({ kind: 'text', lane: 'text:open-now', textQuery: '餐廳', radius: 2000, rank: 'DISTANCE', openNow: true })
+    const sweet = widenPlan({ kind: 'text', lane: 'q:豆花', textQuery: '豆花', radius: 800, rank: 'RELEVANCE', restrict: true, priceLevels: levels }, { country: 'TW' })
+    expect(sweet).toEqual({ kind: 'text', lane: 'q:豆花', textQuery: '豆花', radius: 2000, rank: 'DISTANCE', openNow: true, priceLevels: levels })
+    const plain = widenPlan({ kind: 'text', lane: 'text:咖啡廳', textQuery: '咖啡廳', radius: 800, rank: 'DISTANCE', priceLevels: levels }, { dropPrice: true })
+    expect(plain).not.toHaveProperty('priceLevels')
+    // 沒預算的第一次 → 第二次也不會憑空多出 priceLevels
+    expect(widenPlan({ kind: 'text', lane: 'q:便當', textQuery: '便當', radius: 800, rank: 'DISTANCE', restrict: true })).not.toHaveProperty('priceLevels')
   })
   it('Round 4 救援：營業中的便利商店（台灣／日本／其他）', () => {
     expect(rescuePlan('TW')).toMatchObject({ kind: 'text', lane: 'rescue', textQuery: '便利商店', openNow: true })

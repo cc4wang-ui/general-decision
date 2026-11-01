@@ -10,7 +10,7 @@ import { enforceRules, isNonAnswer } from './rules.ts'
 import { FETCH_COUNT, FIELD_MASK, matchPlace, mergeCandidates, placeMapUrl, toCandidates, type RawPlace } from './places.ts'
 import { laneEst, pickLane, rescuePlan, widenPlan, type LanePlan } from './lanes.ts'
 import { cuisineOf, mulberry32, pickPlace, type PickOutcome } from './discovery.ts'
-import { bandOf, countryOf, currencyCountry, estText, priceText } from './price.ts'
+import { bandOf, countryOf, currencyCountry, effectiveBand, estText, priceFit, priceText } from './price.ts'
 import { brandKeyOf, clusterKeys } from './chains.ts'
 import { templateOrder } from './template.ts'
 import { hourIn, tzOf } from './tz.ts'
@@ -191,9 +191,14 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       }
     }
     // 一次一次來，不並行。第一次 lane；不夠 5 家或失敗才第二次（半徑 ×2.5、只要營業中；lane 回 400 → 退回營業中的餐廳）。
-    // 平常 ≤ 2 次；只有兩次之後一家都派不出去，才有第三次救援（下面）。
+    // 平常 ≤ 2 次；有預算且兩次都撈不到才有預算後備（不帶價位）；之後仍一家都派不出去，才有救援（下面）。
     const firstStatus = await call(first)
-    if (cands.length < MIN_VALID) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng }))
+    // Round 4 實測（2026-11-01）：有預算時「候選夠 5 家」不夠，要「預算內夠 5 家」，不然第二次不會打、只能補預算外的店。
+    const budget = card.id === 'eat' && req.budget?.length ? req.budget : undefined
+    const fitCount = () => budget ? cands.filter((c) => priceFit(effectiveBand(c, country).band, budget, true) === 1).length : cands.length
+    if (cands.length < MIN_VALID || fitCount() < MIN_VALID) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng }))
+    // 有預算、兩次都帶 priceLevels 卻一家都沒撈到 → 拿掉價位再撈一次營業中的餐廳（派預算外的真店，比改派超商強）。
+    if (budget && cands.length === 0) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng, dropPrice: true }))
     placesMs = Date.now() - t0
     country = cands.map((c) => currencyCountry(c.priceRange?.currency)).find(Boolean) ?? country
     dbg.places = {

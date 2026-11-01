@@ -176,7 +176,7 @@ describe('/api/order handler（第 12 節 S5）', () => {
       bodies.push(String(init?.body ?? ''))
       return new Response(JSON.stringify({ places: bodies.length === 3 ? [store] : [] }), { status: 200 })
     }))
-    const res = await handler(post({ budget: [3] }))
+    const res = await handler(post({}))
     expect(res.status).toBe(200)
     expect(res.headers.get('x-places-calls')).toBe('3')
     expect(JSON.parse(bodies[2]!)).toMatchObject({ textQuery: '便利商店', openNow: true })
@@ -184,6 +184,52 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect(body.place?.id).toBe('s7')
     expect(body.debug.rescue).toBe(true)
     expect(body.debug.places?.how.split(' → ')).toHaveLength(3)
+  })
+
+  it('Round 4 救援（有預算）：兩次帶 priceLevels 都空 → 第三次拿掉價位查餐廳 → 仍空才第四次超商', async () => {
+    const bodies: string[] = []
+    const store: RawPlace = { id: 's7', displayName: { text: '7-ELEVEN 府前門市' }, location: { latitude: 25.0335, longitude: 121.5658 }, currentOpeningHours: { openNow: true }, rating: 3.6, userRatingCount: 80, primaryType: 'convenience_store' }
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('anthropic')) return claudeOk(ORDER_JSON)
+      bodies.push(String(init?.body ?? ''))
+      return new Response(JSON.stringify({ places: bodies.length === 4 ? [store] : [] }), { status: 200 })
+    }))
+    const res = await handler(post({ budget: [3] }))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('x-places-calls')).toBe('4')
+    const sent = bodies.map((b) => JSON.parse(b))
+    expect(sent[0].priceLevels).toBeDefined()
+    expect(sent[1].priceLevels).toEqual(sent[0].priceLevels)
+    expect(sent[2]).toMatchObject({ openNow: true })
+    expect(sent[2].priceLevels).toBeUndefined()
+    expect(sent[3]).toMatchObject({ textQuery: '便利商店', openNow: true })
+    const body = (await res.json()) as Order & { debug: OrderDebug }
+    expect(body.place?.id).toBe('s7')
+    expect(body.debug.rescue).toBe(true)
+  })
+
+  it('Round 4 價位（2026-11-01 內湖實測）：第一次 ≥5 家但預算內 0 家 → 仍打第二次、帶同樣 priceLevels，派預算內那家', async () => {
+    const mk = (id: string, a: number, b: number): RawPlace => ({
+      id, displayName: { text: `店${id}` }, location: { latitude: 25.0335, longitude: 121.5658 }, currentOpeningHours: { openNow: true }, rating: 4.7, userRatingCount: 900,
+      priceRange: { startPrice: { currencyCode: 'TWD', units: String(a) }, endPrice: { currencyCode: 'TWD', units: String(b) } },
+    })
+    const cheap = [1, 2, 3, 4, 5, 6].map((n) => mk(`cheap${n}`, 60, 140))
+    const pricey = [mk('pricey1', 500, 900), mk('pricey2', 600, 1000)]
+    for (let seed = 1; seed <= 10; seed++) {
+      const bodies: string[] = []
+      vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).includes('anthropic')) return claudeOk(ORDER_JSON)
+        bodies.push(String(init?.body ?? ''))
+        return new Response(JSON.stringify({ places: bodies.length === 1 ? cheap : pricey }), { status: 200 })
+      }))
+      const res = await handler(post({ budget: [3], seed }))
+      expect(res.headers.get('x-places-calls'), `seed ${seed}`).toBe('2')
+      const sent = bodies.map((b) => JSON.parse(b))
+      expect(sent[1].priceLevels).toEqual(sent[0].priceLevels)
+      const body = (await res.json()) as Order & { debug: OrderDebug }
+      expect(body.place?.id, `seed ${seed}`).toMatch(/^pricey/)
+      expect(body.debug.pick?.relaxed ?? []).not.toContain('price')
+    }
   })
 
   it('Round 4 救援：候選全被「不要再來」擋掉 → 也走超商救援', async () => {

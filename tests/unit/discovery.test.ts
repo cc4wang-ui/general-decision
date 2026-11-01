@@ -228,9 +228,22 @@ describe('pickPlace', () => {
     expect(fav).toBeGreaterThan(plain * 1.5)
   })
 
-  it('價位：預算內＋未知不夠 5 家 → 依序補相鄰檔、記 relaxed price', () => {
-    const c = shops(6, (i) => ({ priceRange: i < 2 ? { start: 80, end: 150 } : { start: 200, end: 400 } }))
+  it('價位：預算內一家都沒有 → 補相鄰檔照樣派、記 relaxed price', () => {
+    const c = shops(6, () => ({ priceRange: { start: 200, end: 400 } }))
     const r = pickPlace(c, [], undefined, ctx(c, { budget: [1] }))!
     expect(r.relaxed).toContain('price')
+    expect(bandOf(r.place, 'TW')).toBe(2)
+  })
+
+  it('價位（2026-11-01 實測）：預算內只有 2 家＋補回 4 家 → 200 次全派預算內，不記 relaxed price', () => {
+    // 預算外（相鄰檔）的店評分高、走路近，故意誘惑（實測：補回的相鄰檔常被抽中）
+    const c = shops(6, (i) => i < 2
+      ? { priceRange: { start: 400, end: 900 }, rating: 4.1, ratingCount: 60, walkMin: 9 }
+      : { priceRange: { start: 200, end: 400 }, rating: 4.9, ratingCount: 3000, walkMin: 1 }) // 相鄰檔（band 2，fit 0.35）
+    for (let s = 0; s < 200; s++) {
+      const r = pickPlace(c, [], undefined, ctx(c, { budget: [3] }, s))!
+      expect(bandOf(r.place, 'TW'), `seed ${s} → ${r.place.id}`).toBe(3)
+      expect(r.relaxed).not.toContain('price')
+    }
   })
 })

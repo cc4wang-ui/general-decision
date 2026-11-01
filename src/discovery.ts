@@ -253,7 +253,12 @@ export function pickPlace(
   if (ctx.budget?.length) {
     // Round 4（Cross 2026-10-30「沒辦法按照價格找店」）：只有預算內（Google 資料或推估）才算過。
     // 不夠 5 家才依適配度補回：價位未知（0.5）先於相鄰檔（0.35），再遠的不補（R3§4.4：本區沒這價位不硬塞）。
+    const mark = relaxed.length
     rows = stage(rows, (r) => r.fit === 1, (a, b) => b.fit - a.fit, 'price', relaxed)
+    // 實測（2026-11-01）：預算內 2 家＋補回 3 家一起抽，補回的店（相鄰檔 0.35、未知 0.5）常被抽中。
+    // 有任何一家預算內 → 只在預算內抽；補回的店只在一家都沒有時才派（relaxed price 只在那時才記）。
+    const inBudget = rows.filter((r) => r.fit === 1)
+    if (inBudget.length) { rows = inBudget; relaxed.splice(mark) }
   }
   if (rows.length === 0) return null
   const afterFilter = rows.length
