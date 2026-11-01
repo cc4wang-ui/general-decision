@@ -62,7 +62,7 @@ src＋api 約 +620／-50 行。拆開看：
 | R5 preview-1 | `dpl_GDQjtxBK13CjwwutZ7xzmw7JsCYT` | `bfd72e7`。直傳：Round 4 的 0a–0i、2a–2c ＋ 新的 3a–3e 覆蓋包＋新 `api/probe.ts` |
 | R5 preview-2 | `dpl_CDUmF5UKV3LG7hQ8KWodjwukuV5A` | `c3a9a13`。preview-1 ＋ 4a（cards.ts、scene.ts：聚餐、約會不催時間） |
 | R5 preview-3 | `dpl_D6YquYypkLNLG69ZdKW6TkpErdxT` | `f6845d6`。preview-2 ＋ 4b（scene.ts、prompt.ts：checker 第 1 輪修正） |
-| R5 preview-4 | （建置中） | preview-3 ＋ 4c（rules.ts：鐘點進位） |
+| R5 preview-4（上線候選） | `dpl_AtRKD5zycDb8RHLRYUMSYe2ArubQ`（general-decision-f8nlv6ns0-cc4wang-uis-projects.vercel.app） | `3c47c39`。preview-3 ＋ 4c（rules.ts：鐘點進位） |
 
 ## 實測中發現並修掉的問題
 
