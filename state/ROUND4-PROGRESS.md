@@ -1,7 +1,7 @@
 # Round 4 進度（接手用）
 
 > 最後更新：2026-11-01。分支 `claude/nifty-ramanujan-szofu5`（本機 commit，GitHub 推送仍被擋）。
-> 正式站仍是 Round 3（main `4e37ff1`）。修後版已在 cc4wang 的 Vercel 建好 preview，等 Cross 決定是否上正式站。
+> 正式站仍是 Round 3（main `4e37ff1`）。修後版 v5 已在 cc4wang 的 Vercel 建好 preview，等 Cross 決定是否上正式站。
 > 新的 session 從這份開始讀。
 
 ## 起因
@@ -16,11 +16,11 @@ Cross 2026-10-30 決定自己連續試用 60 天。回報三類問題：
 
 | # | 條件 | 現況 |
 |---|---|---|
-| 1 | 測試情境中，吃／歇每一格都回真店口令（方圓 3 km 內真的沒有營業中的店除外） | 早上 9–10 點：最終邏輯吃／歇 84/84 有真店。**深夜未實測**（10/26 正式站深夜曾 no_places）。救援已查到 3 km，Places 掛掉改說實話 |
+| 1 | 測試情境中，吃／歇每一格都回真店口令（方圓 3 km 內真的沒有營業中的店除外） | 早上 9–11 點：最終邏輯吃／歇 98/98 有真店。**深夜未實測**（10/26 正式站深夜曾 no_places）。救援已查到 3 km，Places 掛掉改說實話 |
 | 2 | 60 天模擬：7 天內同店重複率 < 15%、30 天內 ≥ 40 家不同的店 | 信義：基線 12.5%／27 家 → 修後 0%／41 家（種子 1）、1.7%／41 家（種子 2） |
-| 3 | 選了預算：派出的店 ≥ 90% 價位相符，推估的卡上標「推估」 | 基線 15/20（75%）→ 第一版修後 14/20（70%，退步）→ 再修後 19/20（95%）；第 4 版板橋再加 4/4 |
+| 3 | 選了預算：派出的店 ≥ 90% 價位相符，推估的卡上標「推估」 | 基線 15/20（75%）→ 第一版修後 14/20（70%，退步）→ 再修後 19/20（95%）；最終邏輯合計 27/28（96%） |
 | 4 | 每道口令存手機 60 天，可匯出成一個檔案，有單元測試 | `src/trial.ts`、`tests/unit/trial.test.ts`、`tests/e2e/r4-trial.spec.ts` |
-| 5 | typecheck、test、build、check:bundle、smoke 通過；測試端點在正式站回 404 | 本機 519 條連跑 3 次通過（checker 抓到的偶發失敗已修）。正式站環境變數只有兩把金鑰、沒有 PROBE_LOCAL；404 要上線後實測 |
+| 5 | typecheck、test、build、check:bundle、smoke 通過；測試端點在正式站回 404 | 本機 521 條連跑 3 次通過（checker 抓到的偶發失敗已修）。正式站環境變數只有兩把金鑰、沒有 PROBE_LOCAL；404 要上線後實測 |
 
 量測原始數字：scratchpad `results/`（session 結束會消失；摘要在上表）。
 
@@ -43,7 +43,8 @@ Vercel preview（cc4wang 團隊，有登入保護）：
 | 修後 v1 | `dpl_9ruqkHZRZ2MbDMmguxeQBiKQENCe` | `41aae74` |
 | 修後 v2 | `dpl_AN2QC5mPGm5g2pNKqAS9BUCCTyRV` | `0debf79` 預算修正 |
 | 修後 v3 | `dpl_CDAYjDV5CBmUQNg4czRhe38xTZX4` | `b520208` 預算修正＋多樣性調整 |
-| **修後 v4（上線候選）** | `dpl_GTFMYgyxZNC7CBPwo16dJYdBgB5J` | `fcd92d8` checker 驗收問題修正 |
+| 修後 v4 | `dpl_GTFMYgyxZNC7CBPwo16dJYdBgB5J` | `fcd92d8` checker 驗收問題修正 |
+| **修後 v5（上線候選）** | `dpl_4xGLDywyLygVoupPibKztawK63zc` | `ffea8e4` checker 複驗問題修正 |
 
 ## Round 4 commit（本機）
 
@@ -56,6 +57,7 @@ Vercel preview（cc4wang 團隊，有登入保護）：
 | `0debf79` | 預算：第二次搜尋保留 priceLevels；預算內有店就只在預算內抽；兩次都空才拿掉價位 |
 | `b520208` | 多樣性：balanced 方針 λ 0.8 → 1.5（R3§2.4 範圍內，離線重播 oracleGap 0.061 ≤ 0.08） |
 | `fcd92d8` | checker 驗收：素食硬過濾、Places 掛掉講實話、救援 3 km、模板口令講實話、偶發測試改固定種子 |
+| `ffea8e4` | checker 複驗：Places 沒查完講實話、手機新增 places_down、素食過濾去誤中 |
 
 ## 實測中發現並修掉的問題（2026-11-01）
 
@@ -64,6 +66,7 @@ Vercel preview（cc4wang 團隊，有登入保護）：
    - 原因二：預算內只有 1–2 家時，補回的相鄰檔一起抽，常被抽中。
 2. 30 天內不同店 38 家，門檻 40。調高 balanced 的曝光懲罰後 41 家（兩個種子）。
 3. 獨立 checker 找到：偶發測試、素食撈到葷食店、Places 掛掉時說「附近沒店」、救援只查 1.5 km、Claude 失敗時模板口令沒講實話。都已修（`fcd92d8`）。
+4. checker 複驗再找到：手機看不到「地圖連不上」、部分失敗仍說附近沒店、素食單字誤中（元素、鮮蔬火鍋、齋藤）。都已修（`ffea8e4`）。
 
 ## 設計決定與假設
 
@@ -81,6 +84,8 @@ Vercel preview（cc4wang 團隊，有登入保護）：
 - 41 家只比門檻多 1 家，而且只量了信義一個地區。模擬期間營業狀態固定在 9 點的快照。
 - 「預算相符」的判定偏寬：Google 只給「中價位」的店，同時算 2 檔與 3 檔。
 - 每道口令最多 4 次 Places（原本 2 次）。手機每日上限 40 次沒動。
+- 素食仍信任 Google 的店家類型（大安曾派「佶田日式涮涮鍋」，類型標素食，未查證）。
+- 救援可能派到約 3 km 外的超商（步行約 38 分），卡上會寫步行分鐘。
 - 模擬平均步行 4.4 → 7.6 分鐘（多樣性的代價）。
 - 量測花費超出原估：約 640 次 Places（原估 250）、約 285 次 Claude。
 - GitHub main 仍是 Round 3。若之後有人推 main，Vercel 會用 Round 3 蓋掉正式站。
