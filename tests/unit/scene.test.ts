@@ -224,6 +224,9 @@ describe('口令對得上情境', () => {
     expect(buildOrderPrompt(req({ scene: '工作讀書', drink: '咖啡' }, 'rest'), pick).user).toContain('插座')
     expect(buildOrderPrompt(req({ scene: SCENE_OTHER, sceneText: '有插座' }), pick).user).toContain('「有插座」')
     expect(buildOrderPrompt(req({}), pick).user).not.toContain('情境：')
+    // 聚餐、約會不催（preview 實測 2026-11-01：卡片規則逼模型寫「30 分鐘內吃完」）
+    for (const id of ['朋友聚餐', '約會吃好一點']) expect(buildOrderPrompt(req({ scene: id }), pick).user).toContain('不准催')
+    expect(buildOrderPrompt(req({ scene: '外帶' }), pick).system).toContain('聚餐、約會不催')
   })
 
   it('模板口令（Claude 失敗時）也照情境寫：外帶不寫在店裡吃完、聚餐寫一起分、工作讀書寫插座', () => {

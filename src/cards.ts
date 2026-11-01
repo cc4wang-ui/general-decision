@@ -19,7 +19,7 @@ export const CARDS: ModuleCard[] = [
     // 甜食時伺服器端改查 bakery / cafe / ice_cream_shop（src/places.ts placesTypesFor）。
     placesQuery: { includedTypes: ['restaurant'], radiusByTransport: { default: 800 } },
     promptHint:
-      '店已由班長決定（見【店已決定】），meme.big = 店名（≤10 字，太長就用店家慣稱）。steps 必須含「點什麼」與「幾分鐘內吃完」。' +
+      '店已由班長決定（見【店已決定】），meme.big = 店名（≤10 字，太長就用店家慣稱）。steps 必須含「點什麼」與時間（幾分鐘內吃完）；有「情境：」那一行時，時間照那一行寫（聚餐、約會不催）。' +
       '使用者選「甜食」時派的是甜點／麵包／咖啡店，點的東西要是甜的；選「鹹食」就不得點甜點當正餐。' +
       'meme.top／meme.bot 先照 mode 講（沒去過／第 N 次／偵察），語氣照火力層；不要自己數這週吃了幾次。',
     reissueLabel: '換一家', // Round 3：原因（店關了／不想吃這類／不要再來）在底部選單
