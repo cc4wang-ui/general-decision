@@ -1,7 +1,10 @@
 # Round 4 進度（接手用）
 
 > 最後更新：2026-11-01。分支 `claude/nifty-ramanujan-szofu5`（本機 commit，GitHub 推送仍被擋）。
-> 正式站仍是 Round 3（main `4e37ff1`）。修後版 v5 已在 cc4wang 的 Vercel 建好 preview，等 Cross 決定是否上正式站。
+> **2026-11-01 11:25 正式站上線 v5**（Cross 回「Go live」）：`dpl_AoLhnWJ9TW4FssNLH3YAySvqPThj`，程式碼 `ffea8e4`，用檔案直傳建置（target production）。
+> 回復點：`dpl_4WfNn9rS542KTbCdz34yi8Y8HuYD`（Round 3，`4e37ff1`）。出事用 Vercel rollback 回這個 ID。
+> 上線驗證：首頁回 v5 的 JS（`index-cgww5LPP.js`）、`/api/probe` 回 404、`/api/order` GET 回 405。
+> 深夜量測已排 2026-11-01 23:40（台北）：v5 preview 量信義、東京兩格。
 > 新的 session 從這份開始讀。
 
 ## 起因
@@ -20,7 +23,7 @@ Cross 2026-10-30 決定自己連續試用 60 天。回報三類問題：
 | 2 | 60 天模擬：7 天內同店重複率 < 15%、30 天內 ≥ 40 家不同的店 | 信義：基線 12.5%／27 家 → 修後 0%／41 家（種子 1）、1.7%／41 家（種子 2） |
 | 3 | 選了預算：派出的店 ≥ 90% 價位相符，推估的卡上標「推估」 | 基線 15/20（75%）→ 第一版修後 14/20（70%，退步）→ 再修後 19/20（95%）；最終邏輯合計 27/28（96%） |
 | 4 | 每道口令存手機 60 天，可匯出成一個檔案，有單元測試 | `src/trial.ts`、`tests/unit/trial.test.ts`、`tests/e2e/r4-trial.spec.ts` |
-| 5 | typecheck、test、build、check:bundle、smoke 通過；測試端點在正式站回 404 | 本機 521 條連跑 3 次通過（checker 抓到的偶發失敗已修）。正式站環境變數只有兩把金鑰、沒有 PROBE_LOCAL；404 要上線後實測 |
+| 5 | typecheck、test、build、check:bundle、smoke 通過；測試端點在正式站回 404 | ✅ 本機 521 條連跑 3 次通過；正式站 `/api/probe` 實測回 404（2026-11-01 11:25） |
 
 量測原始數字：scratchpad `results/`（session 結束會消失；摘要在上表）。
 
