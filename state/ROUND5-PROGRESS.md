@@ -2,7 +2,9 @@
 
 > 最後更新：2026-11-01。分支 `claude/nifty-ramanujan-szofu5`，repo 已搬到 `cc4wang-ui/general-decision`，推送正常（2026-11-01 起）。
 > ⚠️ Vercel 接在這個 repo：推分支 → preview；合併到 `main` → 正式站。Round 5 合併前要 Cross 決定上線 🔒。
-> 正式站仍是 Round 4 v5（`dpl_AoLhnWJ9TW4FssNLH3YAySvqPThj`）。Round 5 只在 preview。
+> **2026-11-01 21:45 正式站上線 Round 5**（Cross 回「上線」）：`dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`，程式碼 `3c5018d`，用檔案直傳建置（target production，檔案跟 preview-6 相同）。
+> 回復點：Round 4 v5 `dpl_AoLhnWJ9TW4FssNLH3YAySvqPThj`。出事用 Vercel rollback 回這個 ID。
+> 上線驗證：首頁回 preview-6 的 JS（`index-DAjiX5VY.js`）、`/api/probe` 回 404、`/api/order` GET 回 405、3 小時內 0 個 runtime error。
 > 新的 session 先讀 `state/ROUND4-PROGRESS.md`（直傳做法、回復點），再讀這份。
 
 ## 起因
@@ -15,9 +17,9 @@ Cross 2026-11-01：「返回的結果不符合我的需求。需要在第一步�
 |---|---|---|
 | 1 | 吃、歇各 ≥ 5 種預設＋「其他」（≤ 20 字），必選 | ✅ 吃 5＋其他、歇 5＋其他（歇加了「等人」湊滿 5 種）。單元＋e2e |
 | 2 | 每種預設都量得到查法改變；手動輸入變成關鍵字 | ✅ `tests/unit/scene.test.ts`：每種預設的第一次查詢指紋跟「沒選」零重疊 |
-| 3 | 真資料：每種預設 × 2 地點都派到真店、符合該情境規則 | ⚠️ checker 兩輪 FAIL → Cross 決定加規則再量。preview-5（大安、東京）24/24 符合規則、營業時間都夠；剩口令鐘點算錯 3 列 → preview-6 修好，等 23:40 真資料驗證 |
+| 3 | 真資料：每種預設 × 2 地點都派到真店、符合該情境規則 | ⚠️ 23/24（preview-6，信義 12/12、東京 11/12）。東京 22:36 的約會附近沒有撐得到 90 分的店。Cross 知道這一列不過，決定上線 |
 | 4 | 沒做 → 不符合情境：不罰站、不扣服從率、有紀錄 | ✅ 單元（diary／trial）＋e2e（`tests/e2e/r5-scene.spec.ts`） |
-| 5 | 閘門過 → preview → 獨立 checker → Cross 決定上線 🔒 | 閘門 ✅；checker 兩輪：條件 1、2、4、5 PASS，條件 3 FAIL → Cross 選「加規則再量一次」。preview-6 量完後由 Cross 決定上線 🔒 |
+| 5 | 閘門過 → preview → 獨立 checker → Cross 決定上線 🔒 | ✅ checker 兩輪後 Cross 選「加規則再量一次」；preview-6 量 23/24（見 7.）；Cross 2026-11-01 回「上線」 |
 
 ## 做了什麼
 
@@ -70,7 +72,7 @@ src＋api 約 +620／-50 行。拆開看：
 | R5 preview-3 | `dpl_D6YquYypkLNLG69ZdKW6TkpErdxT` | `f6845d6`。preview-2 ＋ 4b（scene.ts、prompt.ts：checker 第 1 輪修正） |
 | R5 preview-4 | `dpl_AtRKD5zycDb8RHLRYUMSYe2ArubQ`（general-decision-f8nlv6ns0-cc4wang-uis-projects.vercel.app） | `3c47c39`。preview-3 ＋ 4c（rules.ts：鐘點進位） |
 | R5 preview-5 | `dpl_AUA4cVmeXVTfWxM6XCReKLnokZM4`（general-decision-amn14xjcw-cc4wang-uis-projects.vercel.app） | `b9b7b61`。preview-4 ＋ 4d（orderHandler.ts、places.ts）＋ 4e（scene.ts、probe.ts、types.ts）：久坐情境的最短營業時間、快吃排除燒肉火鍋 |
-| R5 preview-6（上線候選） | `dpl_5AanwyzZauUAUsuLtbyQYyPVWfJ5`（general-decision-hzvfadpoz-cc4wang-uis-projects.vercel.app） | `3c5018d`。preview-5 ＋ 5a（scene.ts、rules.ts、prompt.ts）：鐘點先算好、伺服器修正、外帶步行 ≤ 12 分 |
+| R5 preview-6（= 正式站） | `dpl_5AanwyzZauUAUsuLtbyQYyPVWfJ5`（general-decision-hzvfadpoz-cc4wang-uis-projects.vercel.app） | `3c5018d`。preview-5 ＋ 5a（scene.ts、rules.ts、prompt.ts）：鐘點先算好、伺服器修正、外帶步行 ≤ 12 分 |
 
 ## 實測中發現並修掉的問題
 

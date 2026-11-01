@@ -1,6 +1,7 @@
 # Round 4 進度（接手用）
 
 > 最後更新：2026-11-01。分支 `claude/nifty-ramanujan-szofu5`（本機 commit，GitHub 推送仍被擋）。
+> **2026-11-01 21:45 起正式站是 Round 5**（`dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`），見 `state/ROUND5-PROGRESS.md`。v5 變成回復點。
 > **2026-11-01 11:25 正式站上線 v5**（Cross 回「Go live」）：`dpl_AoLhnWJ9TW4FssNLH3YAySvqPThj`，程式碼 `ffea8e4`，用檔案直傳建置（target production）。
 > 回復點：`dpl_4WfNn9rS542KTbCdz34yi8Y8HuYD`（Round 3，`4e37ff1`）。出事用 Vercel rollback 回這個 ID。
 > 上線驗證：首頁回 v5 的 JS（`index-cgww5LPP.js`）、`/api/probe` 回 404、`/api/order` GET 回 405。
