@@ -93,7 +93,9 @@ function cleanBudget(v: unknown): Band[] | undefined {
  */
 export function sanitizeRequest(raw: OrderRequest): OrderRequest {
   const r = raw as unknown as Record<string, unknown>
-  const loc = isRecord(r.loc) && finite(r.loc.lat) && finite(r.loc.lng) ? { lat: r.loc.lat, lng: r.loc.lng } : undefined
+  // Round 6：loc.label 是使用者自己選的「下車的站」站名（不是 GPS 反查），只進 prompt；去控制字元、截 40 字。
+  const label = isRecord(r.loc) && typeof r.loc.label === 'string' ? r.loc.label.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40) : ''
+  const loc = isRecord(r.loc) && finite(r.loc.lat) && finite(r.loc.lng) ? { lat: r.loc.lat, lng: r.loc.lng, ...(label ? { label } : {}) } : undefined
   const choices: Record<string, string | number> = {}
   if (isRecord(r.choices)) for (const [k, v] of Object.entries(r.choices)) if (typeof v === 'string' || finite(v)) choices[k] = v
   // Round 5：情境「其他」的手動輸入會進 Places 關鍵字與 prompt：去控制字元、截 20 字；空的就拿掉。

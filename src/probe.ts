@@ -5,7 +5,8 @@
 //   sim   ：一個地點 × N 天 × 每天 2 餐，記憶照前端的規則累積。Places 用真資料但同一個請求只打一次（快取），
 //           Claude 換成固定假回應（店由程式決定，Claude 不影響挑哪一家）。量「反覆推同一家」。
 // 回傳裡的店名只給人看報表，不寫進 repo（Google 條款：店家資料不落地，R4）。
-import { FIELD_MASK } from './places.ts'
+import { FIELD_MASK, haversineMeters } from './places.ts'
+import { geocodeLookup } from './geocode.ts'
 import { mealLanes, widenPlan, type LanePlan, type NearbyRank } from './lanes.ts'
 import { countryOf } from './price.ts'
 import { hourIn, tzOf } from './tz.ts'
@@ -19,6 +20,7 @@ export const PROBE_LOCS: Record<string, { lat: number; lng: number; label: strin
   daan: { lat: 25.0265, lng: 121.543, label: '台北大安住宅區' },
   banqiao: { lat: 25.0137, lng: 121.4627, label: '新北板橋' },
   tokyo: { lat: 35.6795, lng: 139.77, label: '東京八重洲' },
+  shinjuku: { lat: 35.6896, lng: 139.7006, label: '東京新宿駅' },
 }
 
 interface Scenario { id: string; module: ModuleId; choices: Record<string, string>; budget?: Band[] }
@@ -360,4 +362,39 @@ export async function runSim(locKey: string, opts: { days?: number; seed?: numbe
     avgWalkMin: +(walk / n).toFixed(1),
     placesCalls: io.misses(),
   }
+}
+
+// ── Round 6：手動報站（mode=geocode）──────────────────────────────────────
+// 10 個東京常用站的日文站名 → /api/geocode 同一份查詢 → 跟參考座標比距離。參考座標是車站中心的公開座標（約略值）。
+export const STATIONS: { q: string; lat: number; lng: number }[] = [
+  { q: '新宿駅', lat: 35.6896, lng: 139.7006 },
+  { q: '東京駅', lat: 35.6812, lng: 139.7671 },
+  { q: '渋谷駅', lat: 35.658, lng: 139.7016 },
+  { q: '池袋駅', lat: 35.7295, lng: 139.7109 },
+  { q: '品川駅', lat: 35.6284, lng: 139.7387 },
+  { q: '上野駅', lat: 35.7141, lng: 139.7774 },
+  { q: '秋葉原駅', lat: 35.6984, lng: 139.7731 },
+  { q: '銀座駅', lat: 35.6717, lng: 139.764 },
+  { q: '六本木駅', lat: 35.6627, lng: 139.7313 },
+  { q: '恵比寿駅', lat: 35.6467, lng: 139.7101 },
+]
+export const GEOCODE_PASS_M = 300
+
+export interface GeocodeRow { q: string; kind: string; label?: string; distM?: number; pass: boolean; ms: number }
+export interface GeocodeResult { rows: GeocodeRow[]; summary: { stations: number; pass: number; failed: string[]; maxDistM: number; placesCalls: number } }
+
+export async function runGeocodeProbe(opts: { fetchFn?: typeof fetch; key?: string; base?: string } = {}): Promise<GeocodeResult> {
+  const key = opts.key ?? process.env.GOOGLE_PLACES_KEY
+  if (!key) throw new Error('GOOGLE_PLACES_KEY 未設定')
+  const base = opts.base ?? process.env.PLACES_BASE_URL ?? 'https://places.googleapis.com'
+  const rows = await Promise.all(STATIONS.map(async (st): Promise<GeocodeRow> => {
+    const t0 = Date.now()
+    const r = await geocodeLookup(st.q, key, base, opts.fetchFn ?? fetch)
+    const ms = Date.now() - t0
+    if (r.kind !== 'ok') return { q: st.q, kind: r.kind, pass: false, ms }
+    const distM = Math.round(haversineMeters(st, r.loc))
+    return { q: st.q, kind: 'ok', label: r.label, distM, pass: distM <= GEOCODE_PASS_M, ms }
+  }))
+  const failed = rows.filter((r) => !r.pass).map((r) => `${r.q}:${r.kind === 'ok' ? `${r.distM} m` : r.kind}`)
+  return { rows, summary: { stations: rows.length, pass: rows.filter((r) => r.pass).length, failed, maxDistM: Math.max(0, ...rows.map((r) => r.distM ?? 0)), placesCalls: rows.length } }
 }

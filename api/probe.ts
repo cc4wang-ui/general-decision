@@ -3,8 +3,9 @@
 //   GET /api/probe?mode=matrix&loc=xinyi
 //   GET /api/probe?mode=sim&loc=xinyi&days=60&seed=1[&budget=2]
 //   GET /api/probe?mode=scene&loc=xinyi（Round 5：吃、歇每一種情境各一次）
+//   GET /api/probe?mode=geocode（Round 6：10 個日文站名 → 座標，對參考座標量誤差）
 // 實作在 src/probe.ts。
-import { PROBE_LOCS, runMatrix, runSceneMatrix, runSim } from '../src/probe.ts'
+import { PROBE_LOCS, runGeocodeProbe, runMatrix, runSceneMatrix, runSim } from '../src/probe.ts'
 import type { Band } from '../src/types.ts'
 
 export const config = { runtime: 'nodejs', maxDuration: 60 }
@@ -19,6 +20,9 @@ async function handler(request: Request): Promise<Response> {
   if (!probeEnabled()) return json({ error: 'not_found' }, 404)
   if (request.method !== 'GET') return json({ error: 'method_not_allowed' }, 405)
   const q = new URL(request.url).searchParams
+  if (q.get('mode') === 'geocode') {
+    try { return json(await runGeocodeProbe()) } catch (e) { return json({ error: 'probe_failed', message: String(e) }, 500) }
+  }
   const loc = q.get('loc') ?? 'xinyi'
   if (!Object.hasOwn(PROBE_LOCS, loc)) return json({ error: 'bad_request', locs: Object.keys(PROBE_LOCS) }, 400)
   const budget = q.get('budget')?.split(',').map(Number).filter((b): b is Band => b === 1 || b === 2 || b === 3 || b === 4)

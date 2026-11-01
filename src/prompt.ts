@@ -53,6 +53,8 @@ export function buildOrderPrompt(req: OrderRequest, pick: PickResult | null, cou
     // 資料最小化（Team Lead，2026-10-22）：店已由伺服器挑好，模型用不到座標——只告訴它在哪個國家，不送經緯度、不送地點名稱。
     req.loc ? `使用者人在${country === 'JP' ? '日本' : country === 'TW' ? '台灣' : '台灣與日本以外的地方'}。` : '使用者沒有給定位。依規則 6 降級，不得編造店名與距離。',
     country === 'JP' ? '使用者人在日本：交通講電車／地下鐵，不講捷運；金額只有日圓。' : '',
+    // Round 6：使用者自己報「下車的站」。步行分鐘已從車站算；口令從出站寫起。
+    req.loc?.label ? `使用者剛在「${req.loc.label}」下車，從車站出發。steps 第一步從出站寫起（例如「出站後走 N 分」），N 用給你的步行分鐘數。` : '',
     `使用者的選擇：${JSON.stringify(req.choices, null, 0)}`,
     // Round 5：情境一行（口令要對得上：外帶不寫內用、聚餐寫幾道一起分…）。
     sceneOf(req.module, req.choices ?? {})?.rule.hint ?? '',

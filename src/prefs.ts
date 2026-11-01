@@ -98,3 +98,21 @@ export function orderScenes(options: string[], last: string, other: string): str
   if (!last || last === other || !options.includes(last)) return options
   return [last, ...options.filter((o) => o !== last)]
 }
+
+// ── 下車的站（Round 6）：最近 5 站，只存站名不存座標（座標每次重查，R12 不落地） ─────
+const STATION_KEY = 'decide.stations.v1'
+export const STATION_MAX = 5
+export function loadStations(): string[] {
+  try {
+    const v = JSON.parse(read(STATION_KEY) ?? '[]') as unknown
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length > 0).slice(0, STATION_MAX) : []
+  } catch { return [] }
+}
+/** 剛用過的排第一；同名去重；最多 5 個。回傳新清單。 */
+export function saveStation(name: string): string[] {
+  const n = name.trim()
+  if (!n) return loadStations()
+  const list = [n, ...loadStations().filter((s) => s !== n)].slice(0, STATION_MAX)
+  write(STATION_KEY, JSON.stringify(list))
+  return list
+}

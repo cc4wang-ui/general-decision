@@ -1,14 +1,12 @@
 // Vercel Function：手動報地點 → 座標（DEV-PLAN-3 C2）。拒絕定位的人報「台北車站」也拿得到口令。
 // 伺服器不存任何東西、log 不記查詢字串與座標（R12）。key 只在這裡存在，前端永遠不碰。
+import { GEOCODE_MAX_Q, geocodeLookup } from '../src/geocode.ts'
 import type { GeocodeRequest, GeocodeResponse } from '../src/types.ts'
 
 export const config = { runtime: 'nodejs' }
 
 const PLACES_BASE = process.env.PLACES_BASE_URL ?? 'https://places.googleapis.com'
-const TEXT_URL = `${PLACES_BASE}/v1/places:searchText`
-/** 只要座標與名稱，不帶評分、營業時間（少拿就少一分條款與費用風險）。 */
-const GEOCODE_FIELD_MASK = 'places.location,places.displayName'
-const MAX_Q = 60
+const MAX_Q = GEOCODE_MAX_Q
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
@@ -36,32 +34,22 @@ async function handler(request: Request): Promise<Response> {
     return json({ error: 'upstream', message: '班長在開會。30 秒後再報告。' }, 502, { 'x-places-calls': '0' })
   }
 
-  let res: Response
-  try {
-    res = await fetch(TEXT_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': GEOCODE_FIELD_MASK },
-      body: JSON.stringify({ textQuery: q, pageSize: 1, languageCode: 'zh-TW' }),
-      signal: AbortSignal.timeout(8000),
-    })
-  } catch {
+  // Round 6：查詢本體搬到 src/geocode.ts（跟 preview 量測共用）；日文站名用 ja 查。
+  const r = await geocodeLookup(q, key, PLACES_BASE)
+  if (r.kind === 'timeout') {
     console.warn('[geocode] fail timeout')
     return json({ error: 'upstream', message: '班長在開會。30 秒後再報告。' }, 502, { 'x-places-calls': '1' })
   }
-  if (!res.ok) {
-    console.warn(`[geocode] fail ${res.status}`)
-    return json({ error: res.status === 429 ? 'rate_limited' : 'upstream', message: '班長在開會。30 秒後再報告。' }, res.status === 429 ? 429 : 502, { 'x-places-calls': '1' })
+  if (r.kind === 'http') {
+    console.warn(`[geocode] fail ${r.status}`)
+    return json({ error: r.status === 429 ? 'rate_limited' : 'upstream', message: '班長在開會。30 秒後再報告。' }, r.status === 429 ? 429 : 502, { 'x-places-calls': '1' })
   }
-  const data = (await res.json()) as { places?: { location?: { latitude?: number; longitude?: number }; displayName?: { text?: string } }[] }
-  const p = data.places?.[0]
-  const lat = p?.location?.latitude
-  const lng = p?.location?.longitude
-  if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+  if (r.kind === 'not_found') {
     console.info('[geocode] not_found')
     return json({ error: 'not_found', message: '找不到這個地方。報個車站或地標。' }, 404, { 'x-places-calls': '1' })
   }
   console.info('[geocode] ok') // 不記 q、不記座標
-  const out: GeocodeResponse = { loc: { lat, lng }, label: p?.displayName?.text || q }
+  const out: GeocodeResponse = { loc: r.loc, label: r.label }
   return json(out, 200, { 'x-places-calls': '1' })
 }
 

@@ -6,7 +6,7 @@ import { Avatar } from './avatar.tsx'
 import { InsigniaMark } from './insignia.tsx'
 import { MemeCard, StepsCard } from './meme.tsx'
 import {
-  ApiError, ERROR_TEXT, GEO_DENIED_LINE, getLocation, requestGeocode, requestOrder, requestWeekly,
+  ApiError, ERROR_TEXT, GEO_DENIED_LINE, GEO_DOUBT_LINE, geoDoubt, getLocation, requestGeocode, requestOrder, requestWeekly, type GeoDoubt, type GeoReason,
   underPlacesCap, type GeoResult,
 } from './api.ts'
 import {
@@ -20,7 +20,7 @@ import {
 } from './placeMem.ts'
 import { clearTrial, exportTrial, readTrial, recordTrial, summarize, tagTrial } from './trial.ts'
 import {
-  effectiveBudget, loadBudget, loadCountry, loadLastScene, loadNovelty, lunchHidesTop, nextNovelty, NOVELTY_LABEL,
+  effectiveBudget, loadBudget, loadCountry, loadLastScene, loadStations, saveStation, loadNovelty, lunchHidesTop, nextNovelty, NOVELTY_LABEL,
   orderScenes, saveBudget, saveCountry, saveLastScene, saveNovelty, toggleBand,
 } from './prefs.ts'
 import { SCENE_KEY, SCENE_OTHER, SCENE_TEXT_KEY, SCENE_TEXT_MAX, sanitizeSceneText } from './scene.ts'
@@ -69,6 +69,8 @@ export function safe<T>(fn: () => Promise<T>, fallback: T, ms: number = SAFE_TIM
 }
 
 type Loc = { lat: number; lng: number }
+/** Round 6：出發點。label = 使用者自己報的「下車的站」站名（GPS 座標沒有 label）。 */
+type Origin = Loc & { label?: string }
 type MemModule = 'eat' | 'rest'
 const isMemModule = (id: ModuleId): id is MemModule => id === 'eat' || id === 'rest'
 
@@ -94,12 +96,17 @@ export function App() {
   const [reasonOpen, setReasonOpen] = useState(false)
   /** Round 5：「沒做」先問原因（不符合情境 → 不罰站；就是不想做 → 罰站）。 */
   const [skipOpen, setSkipOpen] = useState(false)
+  /** Round 6：「從哪裡出發」底部選單。doubt 有值 = 送出時定位太舊／太粗，先問再派；loc 是那個可疑的座標。 */
+  const [locOpen, setLocOpen] = useState<{ doubt?: GeoDoubt; loc?: Loc } | null>(null)
+  /** Round 6：這道口令選的「下車的站」（null = 目前位置）。 */
+  const [station, setStation] = useState<string | null>(null)
+  const [stations, setStations] = useState<string[]>(loadStations)
   const [discovery, setDiscovery] = useState({ newPlaces: 0, revisits: 0 })
   const excluded = useRef<string[]>([])
   /** 這道口令已經說過「今天不想吃這類」的細類（換口令時送給伺服器降權）。 */
   const rejectedCuisines = useRef<string[]>([])
   /** 手動報座標換來的位置：只在這道口令的換口令之間沿用，不存本機（C2）。 */
-  const manualLoc = useRef<Loc | undefined>(undefined)
+  const manualLoc = useRef<Origin | undefined>(undefined)
   /** 這一道口令的時間戳，換口令時沿用，讓日記只留一筆（第 10 節）。 */
   const issuedAt = useRef<string>('')
 
@@ -190,12 +197,14 @@ export function App() {
     excluded.current = []
     rejectedCuisines.current = []
     manualLoc.current = undefined
+    setStation(null)
+    setLocOpen(null)
     issuedAt.current = ''
     // Round 5：吃／歇第一步先選情境（獨立一頁：原本的選單維持 ≤ 3 題、一屏放得下）。
     setScreen(c.intake.some((f) => f.type === 'scene') ? 'scene' : 'intake')
   }, [])
 
-  const fetchOrder = useCallback(async (c: ModuleCard, ch: Record<string, string | number>, locOverride?: Loc) => {
+  const fetchOrder = useCallback(async (c: ModuleCard, ch: Record<string, string | number>, locOverride?: Origin) => {
     setScreen('waiting')
     setError(null)
 
@@ -207,21 +216,32 @@ export function App() {
       setScreen('error')
       return
     }
-    let loc: Loc | undefined = locOverride ?? manualLoc.current
+    let loc: Origin | undefined = locOverride ?? manualLoc.current
+    let geoReason: GeoReason = 'ok'
     if (loc) {
       setGeoDenied(false)
     } else if (c.needsPlaces && underPlacesCap()) {
       const geo = await (geoAhead.current ?? getLocation())
-      geoAhead.current = null // 用過即丟；換口令會重新要一次（maximumAge 120s，通常瞬間回）
+      geoAhead.current = null // 用過即丟；換口令會重新要一次（maximumAge 30s，通常瞬間回）
       loc = geo.loc
+      geoReason = geo.reason
       setGeoDenied(geo.denied)
+      // Round 6：車上的定位常是上一站的或誤差幾百公尺。先問「在車上？」，不直接派店。
+      const doubt = geoDoubt(geo)
+      if (loc && doubt) {
+        setLocOpen({ doubt, loc })
+        setScreen('intake')
+        return
+      }
     } else {
       setGeoDenied(false)
     }
     // 2026-09-18：吃／歇沒定位就不能點真店，不再「班長用常識」降級——直接說要座標。
+    // Round 6：分兩種——使用者拒絕（開定位）vs 地下收不到（報下車的站）。
     if (c.needsPlaces && !loc) {
-      recordTrial({ module: c.id, level, ok: false, error: 'no_location' })
-      setError(new ApiError('no_location', ERROR_TEXT.no_location.line))
+      const kind = geoReason === 'denied' || geoReason === 'unsupported' ? 'no_location' : 'no_signal'
+      recordTrial({ module: c.id, level, ok: false, error: kind })
+      setError(new ApiError(kind, ERROR_TEXT[kind].line))
       setScreen('error')
       return
     }
@@ -280,19 +300,48 @@ export function App() {
     void fetchOrder(card, choices)
   }, [card, choices, fetchOrder])
 
+  /** Round 6：報「下車的站」→ /api/geocode → 當這道口令的出發點。站名記最近 5 個（不記座標）。 */
+  const pickStation = useCallback(async (q: string): Promise<{ err: string } | { origin: Origin }> => {
+    if (!underPlacesCap()) return { err: ERROR_TEXT.over_cap.line }
+    try {
+      const g = await requestGeocode(q)
+      const origin: Origin = { ...g.loc, label: g.label }
+      manualLoc.current = origin
+      setStation(g.label)
+      setStations(saveStation(g.label))
+      setLocOpen(null)
+      return { origin }
+    } catch (e) {
+      return { err: e instanceof ApiError ? ERROR_TEXT[e.kind].line : ERROR_TEXT.upstream.line }
+    }
+  }, [])
+
   /** C2：沒有定位時手動報地點。回傳錯誤文字（顯示在輸入列下面）；成功就直接重送，畫面會換掉。 */
   const reportLocation = useCallback(async (q: string): Promise<string | null> => {
     if (!card) return null
-    if (!underPlacesCap()) return ERROR_TEXT.over_cap.line
-    try {
-      const g = await requestGeocode(q)
-      manualLoc.current = g.loc
-      void fetchOrder(card, choices, g.loc)
-      return null
-    } catch (e) {
-      return e instanceof ApiError ? ERROR_TEXT[e.kind].line : ERROR_TEXT.upstream.line
-    }
-  }, [card, choices, fetchOrder])
+    const r = await pickStation(q)
+    if ('err' in r) return r.err
+    void fetchOrder(card, choices, r.origin)
+    return null
+  }, [card, choices, fetchOrder, pickStation])
+
+  /** Round 6：選單上的「從哪裡出發」。送出前選站只換出發點；定位可疑時選站就直接派。 */
+  const chooseStation = useCallback(async (q: string): Promise<string | null> => {
+    const go = !!locOpen?.doubt
+    const r = await pickStation(q)
+    if ('err' in r) return r.err
+    if (go && card) void fetchOrder(card, choices, r.origin)
+    return null
+  }, [card, choices, fetchOrder, locOpen, pickStation])
+
+  const useCurrent = useCallback(() => {
+    const doubtLoc = locOpen?.loc
+    manualLoc.current = undefined
+    setStation(null)
+    setLocOpen(null)
+    // 定位可疑但使用者說就用它：帶著這個座標直接派（不再問一次）。
+    if (doubtLoc && card) void fetchOrder(card, choices, doubtLoc)
+  }, [card, choices, fetchOrder, locOpen])
 
   /** 換一家。吃／歇要先問原因（底部選單），其他卡（去／飛）維持原樣直接換。 */
   const reissue = useCallback(() => {
@@ -431,6 +480,7 @@ export function App() {
             card={card} level={level} choices={choices}
             onChange={(k, v) => setChoices((c) => ({ ...c, [k]: v }))}
             onBack={goHome} onSubmit={submit} onScene={() => setScreen('scene')}
+            origin={card.needsPlaces ? (station ?? '目前位置') : undefined} onOrigin={() => setLocOpen({})}
             country={country} budget={effectiveBudget(country === 'TW' || country === 'JP' ? budgets[country] : [], hideTop)}
             hideTop={hideTop} onBudget={changeBudget}
           />
@@ -439,7 +489,8 @@ export function App() {
         {screen === 'error' && error && (
           <ErrorScreen
             level={level} error={error} onRetry={submit} onHome={goHome} onDiary={() => setScreen('diary')}
-            onManualLoc={error.kind === 'no_location' ? reportLocation : undefined}
+            onManualLoc={error.kind === 'no_location' || error.kind === 'no_signal' ? reportLocation : undefined}
+            stations={stations}
           />
         )}
         {screen === 'cmd' && card && order && (
@@ -464,6 +515,9 @@ export function App() {
           />
         )}
         {screen === 'debug' && <Debug level={level} onHome={goHome} />}
+        {locOpen && card && (
+          <LocSheet doubt={locOpen.doubt} stations={stations} onCurrent={useCurrent} onPick={chooseStation} onClose={() => setLocOpen(null)} />
+        )}
         {skipOpen && card && (
           <Sheet title="為什麼沒做？" sub="照實報告，班長不冤枉人。" onClose={() => setSkipOpen(false)} testid="skip-sheet">
             <button className="sheet-opt" data-testid="skip-mismatch" onClick={mismatch}>
@@ -656,11 +710,13 @@ function ScenePick({ card, level, value, text, onPick, onText, onNext, onBack }:
   )
 }
 
-function Intake({ card, level, choices, onChange, onBack, onSubmit, onScene, country = 'TW', budget = [], hideTop = false, onBudget }: {
+function Intake({ card, level, choices, onChange, onBack, onSubmit, onScene, origin, onOrigin, country = 'TW', budget = [], hideTop = false, onBudget }: {
   card: ModuleCard; level: Level; choices: Record<string, string | number>
   onChange: (k: string, v: string | number) => void; onBack: () => void; onSubmit: () => void
   /** Round 5：回第一步改情境（只有吃／歇）。 */
   onScene?: () => void
+  /** Round 6：出發點標籤（「目前位置」或站名）；undefined = 這張卡不用定位，不顯示。 */
+  origin?: string; onOrigin?: () => void
   /** 預算 chips 的幣別看座標（不看手機語系）；other = 整列隱藏。 */
   country?: Country; budget?: Band[]; hideTop?: boolean; onBudget?: (n: Band | null) => void
 }) {
@@ -686,6 +742,11 @@ function Intake({ card, level, choices, onChange, onBack, onSubmit, onScene, cou
         {hasScene && (
           <button className="scene-tag" data-testid="scene-change" onClick={onScene}>
             情境：{scLabel || '未選'}<span aria-hidden="true">　改</span>
+          </button>
+        )}
+        {origin !== undefined && (
+          <button className="scene-tag loc-tag" data-testid="loc-change" onClick={onOrigin} aria-label={`出發點：${origin}，改`}>
+            📍{origin}
           </button>
         )}
       </div>
@@ -749,7 +810,7 @@ function Waiting({ level }: { level: Level }) {
 }
 
 /** C2：沒有定位時手動報座標。輸入車站或地標 → /api/geocode → 用回來的位置重送（不存本機）。 */
-function ManualLoc({ onGo }: { onGo: (q: string) => Promise<string | null> }) {
+function ManualLoc({ onGo, label = '下車的站或地標' }: { onGo: (q: string) => Promise<string | null>; label?: string }) {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -764,11 +825,11 @@ function ManualLoc({ onGo }: { onGo: (q: string) => Promise<string | null> }) {
   }
   return (
     <form className="manual" data-testid="manual-loc-row" onSubmit={(e) => void go(e)}>
-      <label className="lab" htmlFor="manual-loc">手動報座標</label>
+      <label className="lab" htmlFor="manual-loc">{label}</label>
       <div className="manual-in">
         <input
           id="manual-loc" data-testid="manual-loc" type="text" inputMode="search" enterKeyHint="go"
-          autoComplete="off" maxLength={60} placeholder="車站或地標，例如：台北車站" value={q} onChange={(e) => setQ(e.target.value)}
+          autoComplete="off" maxLength={60} placeholder="例如：新宿駅、台北車站" value={q} onChange={(e) => setQ(e.target.value)}
         />
         <button className="btn" type="submit" data-testid="manual-loc-go" disabled={busy || !q.trim()}>{busy ? '查詢中' : '報座標'}</button>
       </div>
@@ -777,10 +838,20 @@ function ManualLoc({ onGo }: { onGo: (q: string) => Promise<string | null> }) {
   )
 }
 
-function ErrorScreen({ level, error, onRetry, onHome, onDiary, onManualLoc }: {
+function ErrorScreen({ level, error, onRetry, onHome, onDiary, onManualLoc, stations = [] }: {
   level: Level; error: ApiError; onRetry: () => void; onHome: () => void; onDiary: () => void
   onManualLoc?: (q: string) => Promise<string | null>
+  /** Round 6：最近報過的站，一鍵再用。 */
+  stations?: string[]
 }) {
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  const tap = async (name: string) => {
+    if (!onManualLoc || busy) return
+    setBusy(name); setErr('')
+    const msg = await onManualLoc(name)
+    if (msg) { setErr(msg); setBusy('') }
+  }
   const t = ERROR_TEXT[error.kind]
   return (
     <section className="screen" data-screen="error">
@@ -790,6 +861,12 @@ function ErrorScreen({ level, error, onRetry, onHome, onDiary, onManualLoc }: {
         {t.line}
         {t.sub && <small>{t.sub}</small>}
       </div>
+      {onManualLoc && stations.length > 0 && (
+        <div className="chips loc-recent" data-testid="loc-recent" aria-label="最近報過的站">
+          {stations.map((s) => <button key={s} className="chip" disabled={!!busy} onClick={() => void tap(s)}>{busy === s ? '查詢中' : s}</button>)}
+        </div>
+      )}
+      {err && <p className="manual-err" role="alert">{err}</p>}
       {onManualLoc && <ManualLoc onGo={onManualLoc} />}
       <div className="row">
         <button className="btn" data-testid="retry" onClick={onRetry}>再報告一次</button>
@@ -1035,6 +1112,35 @@ function Weekly({ level, report, failed, onBack, onHome }: {
 }
 
 // 底部選單（像 iOS action sheet）：從下面升起，點背景、「不換了」或 Esc 收起。
+/** Round 6：「從哪裡出發」底部選單。目前位置／最近 5 站／打字報站。doubt 有值＝定位可疑，選了就直接派。 */
+function LocSheet({ doubt, stations, onCurrent, onPick, onClose }: {
+  doubt?: GeoDoubt; stations: string[]; onCurrent: () => void; onPick: (q: string) => Promise<string | null>; onClose: () => void
+}) {
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  const tap = async (name: string) => {
+    if (busy) return
+    setBusy(name); setErr('')
+    const msg = await onPick(name)
+    if (msg) { setErr(msg); setBusy('') }
+  }
+  return (
+    <Sheet title={doubt ? GEO_DOUBT_LINE[doubt] : '從哪裡出發？'} sub="在車上就報下車的站。步行時間從那一站算。" onClose={onClose} testid="loc-sheet">
+      <button className="sheet-opt" data-testid="loc-current" onClick={onCurrent}>
+        <b>{doubt ? '就用目前位置' : '目前位置'}</b><span>{doubt ? '班長照這個座標派' : 'GPS 在哪就從哪算'}</span>
+      </button>
+      {stations.length > 0 && (
+        <div className="chips loc-recent" data-testid="loc-recent" aria-label="最近報過的站">
+          {stations.map((s) => <button key={s} className="chip" disabled={!!busy} onClick={() => void tap(s)}>{busy === s ? '查詢中' : s}</button>)}
+        </div>
+      )}
+      {err && <p className="manual-err" role="alert">{err}</p>}
+      <ManualLoc onGo={onPick} label="下車的站" />
+      <button className="sheet-cancel" data-testid="loc-cancel" onClick={onClose}>我再想想</button>
+    </Sheet>
+  )
+}
+
 function Sheet({ title, sub, onClose, children, testid }: {
   title: string; sub?: string; onClose: () => void; children: ReactNode; testid?: string
 }) {

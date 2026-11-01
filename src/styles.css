@@ -154,4 +154,9 @@ main[data-level="2"]{--officer-green:#005800;--officer-deep:#000000;--meme-edge:
 .intake-top{display:flex;justify-content:space-between;align-items:center;gap:8px;align-self:stretch}
 .scene-tag{font:inherit;font-size:.8125rem;font-weight:650;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;min-height:44px;padding:8px 0;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .scene-tag span{color:var(--mute);font-weight:500}
+/* Round 6：出發點標籤跟情境標籤同一行，一起擠在返回鍵右邊；都用省略號，不換行、不加高度。 */
+.intake-top .scene-tag{max-width:44%}.intake-top .loc-tag{max-width:30%;flex:0 1 auto}
+.loc-recent{padding:10px 0 4px}.loc-recent .chip{min-height:48px}
+.sheet .manual{padding:10px 0 4px;border-top:1px solid var(--line)}.sheet .manual .lab{margin:0}
+[data-screen="error"] .loc-recent{padding:0}
 .ent .r.mis{background:var(--khaki);color:var(--ink)}

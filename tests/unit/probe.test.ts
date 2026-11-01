@@ -98,3 +98,33 @@ describe('runSim／runMatrix', () => {
     expect(m.summary.scenarios).toBe(12)
   })
 })
+
+// Round 6：mode=geocode——10 個日文站名 → 座標，對參考座標量誤差。
+import { GEOCODE_PASS_M, STATIONS, runGeocodeProbe } from '../../src/probe.ts'
+describe('runGeocodeProbe（Round 6）', () => {
+  const okFetch = (skip?: string) => (async (_url: string | URL | Request, init?: RequestInit) => {
+    const q = JSON.parse(String(init?.body)).textQuery as string
+    const st = STATIONS.find((s) => s.q === q)
+    if (!st || q === skip) return new Response(JSON.stringify({}), { status: 200 })
+    // 參考座標往北偏 0.001 度（約 111 公尺）：在 300 公尺內
+    return new Response(JSON.stringify({ places: [{ location: { latitude: st.lat + 0.001, longitude: st.lng }, displayName: { text: q } }] }), { status: 200 })
+  }) as unknown as typeof fetch
+  it('10 站都在門檻內 → 10/10；每站一次 Places 呼叫', async () => {
+    const r = await runGeocodeProbe({ fetchFn: okFetch(), key: 'k' })
+    expect(STATIONS).toHaveLength(10)
+    expect(r.summary).toMatchObject({ stations: 10, pass: 10, failed: [], placesCalls: 10 })
+    expect(r.summary.maxDistM).toBeLessThanOrEqual(GEOCODE_PASS_M)
+    expect(r.rows.every((x) => x.kind === 'ok' && x.label === x.q)).toBe(true)
+  })
+  it('一站查不到 → 列進 failed、pass 9', async () => {
+    const r = await runGeocodeProbe({ fetchFn: okFetch('銀座駅'), key: 'k' })
+    expect(r.summary.pass).toBe(9)
+    expect(r.summary.failed).toEqual(['銀座駅:not_found'])
+  })
+  it('沒有金鑰 → 丟錯（不打 Google）', async () => {
+    const saved = process.env.GOOGLE_PLACES_KEY
+    delete process.env.GOOGLE_PLACES_KEY
+    await expect(runGeocodeProbe({ fetchFn: okFetch() })).rejects.toThrow()
+    if (saved) process.env.GOOGLE_PLACES_KEY = saved
+  })
+})

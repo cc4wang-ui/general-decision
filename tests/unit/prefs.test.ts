@@ -88,3 +88,27 @@ describe('午餐隱藏最高檔（用當地時間，不是手機時間）', () =
     expect(effectiveBudget([3, 4], false)).toEqual([3, 4])
   })
 })
+
+// Round 6：下車的站——最近 5 站，只存站名。
+import { STATION_MAX, loadStations, saveStation } from '../../src/prefs.ts'
+describe('下車的站（Round 6）', () => {
+  beforeEach(() => localStorage.clear())
+  it('空的 → []；存了就排第一；同名去重；最多 5 個', () => {
+    expect(loadStations()).toEqual([])
+    saveStation('新宿駅'); saveStation('東京駅'); saveStation('新宿駅')
+    expect(loadStations()).toEqual(['新宿駅', '東京駅'])
+    for (const s of ['a', 'b', 'c', 'd']) saveStation(s)
+    expect(loadStations()).toHaveLength(STATION_MAX)
+    expect(loadStations()[0]).toBe('d')
+    expect(loadStations()).not.toContain('東京駅')
+  })
+  it('只存站名，沒有座標；空白不存；壞資料不炸', () => {
+    saveStation('  台北車站 ')
+    expect(localStorage.getItem('decide.stations.v1')).toBe('["台北車站"]')
+    expect(saveStation('   ')).toEqual(['台北車站'])
+    localStorage.setItem('decide.stations.v1', '{bad')
+    expect(loadStations()).toEqual([])
+    localStorage.setItem('decide.stations.v1', '[1,"x",null]')
+    expect(loadStations()).toEqual(['x'])
+  })
+})

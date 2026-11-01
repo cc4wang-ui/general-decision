@@ -5,7 +5,7 @@ import { fromDebug, recordTrial } from './trial.ts'
 import type { GeocodeResponse, Order, OrderDebug, OrderRequest, WeeklyReport, WeeklyRequest } from './types.ts'
 
 export type ApiErrorKind =
-  'offline' | 'rate_limited' | 'upstream' | 'bad_request' | 'no_location' | 'no_places' | 'places_down' | 'not_found' | 'over_cap'
+  'offline' | 'rate_limited' | 'upstream' | 'bad_request' | 'no_location' | 'no_signal' | 'no_places' | 'places_down' | 'not_found' | 'over_cap'
 
 export class ApiError extends Error {
   kind: ApiErrorKind
@@ -27,6 +27,8 @@ export const ERROR_TEXT: Record<ApiErrorKind, { line: string; sub?: string }> = 
   bad_request: { line: '這個口令班長聽不懂。回報告。' },
   // 2026-09-18：吃／歇一定要點真店。沒定位、附近沒開著的店 → 直接說，不用類別糊過去。
   no_location: { line: '不報座標，班長就點不了店。開定位再報告。' },
+  // Round 6：定位開著但拿不到（地下、車廂）。不是使用者的錯，不叫人開定位——報下車的站。
+  no_signal: { line: '地下收不到定位。報你要下車的站。', sub: '出站有訊號後，可以再用目前位置。' },
   no_places: { line: '方圓 3 公里內查不到營業中的店，連超商都沒有。換個地方再報告。' },
   // Round 4 checker（2026-11-01）：地圖服務掛掉或沒查完，不能說成「附近沒店」。試用紀錄也要分得出來。
   places_down: { line: '地圖服務暫時連不上，班長沒查完。30 秒後再報告。' },
@@ -67,24 +69,51 @@ export function underPlacesCap(): boolean {
 }
 
 // ── 定位 ─────────────────────────────────────────────────────────
+export type GeoReason = 'ok' | 'denied' | 'unavailable' | 'timeout' | 'unsupported'
 export interface GeoResult {
   loc?: { lat: number; lng: number }
+  /** 沒拿到座標（任何原因）。 */
   denied: boolean
+  /** Round 6：分得出「使用者拒絕」跟「地下收不到」。 */
+  reason: GeoReason
+  /** 定位誤差（公尺）與定位時間（ms）。在車上常常是舊的或粗的。 */
+  accuracy?: number
+  fixAt?: number
+}
+
+/** Round 6：定位比這個舊或粗，就先問使用者在不在車上，不直接派店。 */
+export const GEO_STALE_MS = 60_000
+export const GEO_COARSE_M = 300
+export type GeoDoubt = 'stale' | 'coarse'
+export function geoDoubt(g: GeoResult, now: number = Date.now()): GeoDoubt | null {
+  if (!g.loc) return null
+  if (g.accuracy !== undefined && Number.isFinite(g.accuracy) && g.accuracy > GEO_COARSE_M) return 'coarse'
+  if (g.fixAt !== undefined && Number.isFinite(g.fixAt) && now - g.fixAt > GEO_STALE_MS) return 'stale'
+  return null
+}
+export const GEO_DOUBT_LINE: Record<GeoDoubt, string> = {
+  stale: '定位是 1 分鐘以前的。你在車上？',
+  coarse: '定位誤差超過 300 公尺。你在車上？',
 }
 
 export function getLocation(timeoutMs = 6000): Promise<GeoResult> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
-    return Promise.resolve({ denied: true })
+    return Promise.resolve({ denied: true, reason: 'unsupported' })
   }
   return new Promise((resolve) => {
     let settled = false
     const done = (r: GeoResult) => { if (!settled) { settled = true; resolve(r) } }
     navigator.geolocation.getCurrentPosition(
-      (p) => done({ loc: { lat: p.coords.latitude, lng: p.coords.longitude }, denied: false }),
-      () => done({ denied: true }),
-      { timeout: timeoutMs, maximumAge: 120_000, enableHighAccuracy: false },
+      (p) => done({
+        loc: { lat: p.coords.latitude, lng: p.coords.longitude }, denied: false, reason: 'ok',
+        ...(typeof p.coords.accuracy === 'number' ? { accuracy: p.coords.accuracy } : {}),
+        ...(typeof p.timestamp === 'number' ? { fixAt: p.timestamp } : {}),
+      }),
+      (e) => done({ denied: true, reason: e.code === 1 ? 'denied' : e.code === 3 ? 'timeout' : 'unavailable' }),
+      // maximumAge 30 秒（原 120 秒）：車上 2 分鐘前的座標已經是上一站。更舊的交給 geoDoubt 判斷。
+      { timeout: timeoutMs, maximumAge: 30_000, enableHighAccuracy: false },
     )
-    setTimeout(() => done({ denied: true }), timeoutMs + 500)
+    setTimeout(() => done({ denied: true, reason: 'timeout' }), timeoutMs + 500)
   })
 }
 
