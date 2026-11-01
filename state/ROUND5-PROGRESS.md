@@ -14,9 +14,9 @@ Cross 2026-11-01：「返回的結果不符合我的需求。需要在第一步�
 |---|---|---|
 | 1 | 吃、歇各 ≥ 5 種預設＋「其他」（≤ 20 字），必選 | ✅ 吃 5＋其他、歇 5＋其他（歇加了「等人」湊滿 5 種）。單元＋e2e |
 | 2 | 每種預設都量得到查法改變；手動輸入變成關鍵字 | ✅ `tests/unit/scene.test.ts`：每種預設的第一次查詢指紋跟「沒選」零重疊 |
-| 3 | 真資料：每種預設 × 2 地點都派到真店、符合該情境規則 | ⚠️ 機械規則 6 個地點都 12/12；checker 第 2 輪：口令跟情境矛盾 6 列（店快關門、約會被趕、快吃派燒肉）→ FAIL |
+| 3 | 真資料：每種預設 × 2 地點都派到真店、符合該情境規則 | ⚠️ checker 兩輪 FAIL → Cross 決定加規則再量。preview-5（大安、東京）24/24 符合規則、營業時間都夠；剩口令鐘點算錯 3 列 → preview-6 修好，等 23:40 真資料驗證 |
 | 4 | 沒做 → 不符合情境：不罰站、不扣服從率、有紀錄 | ✅ 單元（diary／trial）＋e2e（`tests/e2e/r5-scene.spec.ts`） |
-| 5 | 閘門過 → preview → 獨立 checker → Cross 決定上線 🔒 | 閘門 ✅；checker 兩輪：條件 1、2、4、5 PASS，條件 3 FAIL（見下）；等 Cross 決定 |
+| 5 | 閘門過 → preview → 獨立 checker → Cross 決定上線 🔒 | 閘門 ✅；checker 兩輪：條件 1、2、4、5 PASS，條件 3 FAIL → Cross 選「加規則再量一次」。preview-6 量完後由 Cross 決定上線 🔒 |
 
 ## 做了什麼
 
@@ -45,7 +45,7 @@ src＋api 約 +620／-50 行。拆開看：
 
 ## 閘門（2026-11-01）
 
-- typecheck ✅、單元 547 條 ✅（要 `TZ=Asia/Taipei`）、build ✅、check:bundle ✅、smoke ✅。
+- typecheck ✅、單元 561 條 ✅（要 `TZ=Asia/Taipei`）、build ✅、check:bundle ✅、smoke ✅（`3c5018d`）。
 - e2e（Chromium 代替 WebKit）：101 過、5 不過。5 條（cmd-layout ×4、memory ×1）在上線版本一樣不過，是既有的 Chromium 差異。
 
 ## commit（本機）
@@ -54,6 +54,11 @@ src＋api 約 +620／-50 行。拆開看：
 |---|---|
 | `90df98e` | 情境第一步、沒做先問原因 |
 | `bfd72e7` | 量測工具 `mode=scene`；除錯候選帶主類別 |
+| `c3a9a13` | 聚餐、約會不催時間 |
+| `f6845d6` | checker 第 1 輪修正 |
+| `3c47c39` | 不合法鐘點進位 |
+| `b9b7b61` | checker 第 2 輪修正：最短營業時間、快吃排除燒肉火鍋 |
+| `3c5018d` | 鐘點先算好給 prompt＋伺服器修正；外帶步行 ≤ 12 分 |
 
 ## Preview
 
@@ -63,7 +68,8 @@ src＋api 約 +620／-50 行。拆開看：
 | R5 preview-2 | `dpl_CDUmF5UKV3LG7hQ8KWodjwukuV5A` | `c3a9a13`。preview-1 ＋ 4a（cards.ts、scene.ts：聚餐、約會不催時間） |
 | R5 preview-3 | `dpl_D6YquYypkLNLG69ZdKW6TkpErdxT` | `f6845d6`。preview-2 ＋ 4b（scene.ts、prompt.ts：checker 第 1 輪修正） |
 | R5 preview-4 | `dpl_AtRKD5zycDb8RHLRYUMSYe2ArubQ`（general-decision-f8nlv6ns0-cc4wang-uis-projects.vercel.app） | `3c47c39`。preview-3 ＋ 4c（rules.ts：鐘點進位） |
-| R5 preview-5（上線候選） | `dpl_AUA4cVmeXVTfWxM6XCReKLnokZM4`（general-decision-amn14xjcw-cc4wang-uis-projects.vercel.app） | `b9b7b61`。preview-4 ＋ 4d（orderHandler.ts、places.ts）＋ 4e（scene.ts、probe.ts、types.ts）：久坐情境的最短營業時間、快吃排除燒肉火鍋 |
+| R5 preview-5 | `dpl_AUA4cVmeXVTfWxM6XCReKLnokZM4`（general-decision-amn14xjcw-cc4wang-uis-projects.vercel.app） | `b9b7b61`。preview-4 ＋ 4d（orderHandler.ts、places.ts）＋ 4e（scene.ts、probe.ts、types.ts）：久坐情境的最短營業時間、快吃排除燒肉火鍋 |
+| R5 preview-6（上線候選） | `dpl_5AanwyzZauUAUsuLtbyQYyPVWfJ5`（general-decision-hzvfadpoz-cc4wang-uis-projects.vercel.app） | `3c5018d`。preview-5 ＋ 5a（scene.ts、rules.ts、prompt.ts）：鐘點先算好、伺服器修正、外帶步行 ≤ 12 分 |
 
 ## 實測中發現並修掉的問題
 
@@ -89,6 +95,12 @@ src＋api 約 +620／-50 行。拆開看：
    - 一個人快吃排除燒肉、韓式烤肉、火鍋、吃到飽、牛排、居酒屋、酒吧。
    - 歇的提示寫最短停留：放空 30、聊天 60、工作讀書 90 分以上，不准催人走。
 
+6. preview-5 重測（大安 20:11、東京 21:11）：24/24 符合規則；走到店後剩的營業時間都 ≥ 該情境下限；快吃沒再派燒肉。
+   - 剩下的問題都是模型算錯鐘點：大安 20:11 寫「23:11 前到店」；東京 21:11 聚餐寫「21:30 前吃完」、約會寫「21:30 前吃完出店」。
+   - 東京「外帶」派到步行 29 分的店（外帶原本沒有步行上限）。
+   - 已修（`3c5018d`）：伺服器先算好「現在、到店、最早離開、關門」交給 prompt；模型寫錯時，伺服器把過去或超過關門的時間改成到店／關門時間，把早於最早離開的時間改成最早離開時間。外帶加步行 ≤ 12 分。
+   - 真資料驗證排在 2026-11-01 23:40 的量測（信義 1 次 scene probe），不另外花量測費。
+
 ## 已知風險
 
 - 「其他」的字直接進 Google 關鍵字，查不到時會擴大一次再退回超商。
@@ -98,4 +110,5 @@ src＋api 約 +620／-50 行。拆開看：
 - 東京的「歇」關鍵字仍是中文（咖啡廳），會撈到甜點店（ルワンジュ）。Round 4 就是這樣，不是這輪造成。下一輪候選。
 - 「朋友聊天」跟「一個人放空」在同一地點常派同一家（聊天只改半徑）。
 - 東京「宵夜」查「牛丼」撈到燒肉店。Google 關鍵字的相關性問題。
-- 宵夜只在 19–20 點量過，深夜未量。
+- 宵夜只在 19–21 點量過，深夜未量（23:40 量測會補）。
+- 量測花費：Round 5 共量了約 144 個情境（約 200 次 Places＋144 次 Claude），超過原本估的約 150 次 Places（約 US$5）。
