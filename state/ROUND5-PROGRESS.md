@@ -1,6 +1,7 @@
 # Round 5 進度（接手用）
 
-> 最後更新：2026-11-01。分支 `claude/nifty-ramanujan-szofu5`（本機 commit，GitHub 推送仍被擋）。
+> 最後更新：2026-11-01。分支 `claude/nifty-ramanujan-szofu5`，repo 已搬到 `cc4wang-ui/general-decision`，推送正常（2026-11-01 起）。
+> ⚠️ Vercel 接在這個 repo：推分支 → preview；合併到 `main` → 正式站。Round 5 合併前要 Cross 決定上線 🔒。
 > 正式站仍是 Round 4 v5（`dpl_AoLhnWJ9TW4FssNLH3YAySvqPThj`）。Round 5 只在 preview。
 > 新的 session 先讀 `state/ROUND4-PROGRESS.md`（直傳做法、回復點），再讀這份。
 
