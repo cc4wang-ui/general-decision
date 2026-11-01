@@ -3,8 +3,8 @@ import { OFFICER_BY_LEVEL, sampleCorpus } from './officers.ts'
 import { CARD_BY_ID } from './cards.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
 import { bandOf, estText, priceFit, priceText } from './price.ts'
-import { sceneOf } from './scene.ts'
-import { tzOf } from './tz.ts'
+import { sceneOf, sceneTimes, sceneTimesLine } from './scene.ts'
+import { hhmmIn, tzOf } from './tz.ts'
 import type { Band, Country, Level, ModuleId, OrderRequest, PickResult } from './types.ts'
 
 // Round 3：PlaceCandidate 搬到 types.ts（DEV-PLAN-3 §B.1），這裡轉出口讓既有 import 不用動。
@@ -120,6 +120,8 @@ function decidedBlock(req: OrderRequest, pick: PickResult, country: Country): st
     // Round 4 救援：前兩次查詢之後附近一家都派不出去，派的是營業中的便利商店。
     p.lane === 'rescue' ? '附近營業中的店都派不出去，這次派的是便利商店：在 meme.bot 直說「附近都收了，去超商」，steps 寫在超商買什麼、幾分鐘內吃完。' : '',
     budgetLine(band, req.budget),
+    // Round 5：到店、最早離開、關門都先算好（preview-5 實測：模型自己加減會算錯）。
+    sceneTimesLine(sceneTimes(sceneOf(req.module, req.choices ?? {}), hhmmIn(req.now, tzOf(req.loc)), p.walkMin, p.closeInMin)),
     '禁止提到任何別家店或類別；禁止寫出「價位」以外的金額；禁止寫連結。',
     // Team Lead 設計修訂：口令卡最上面已經印了店名、步行、營業、價位，steps 再講一次就是廢話。
     '口令卡上已經印好店名、步行分鐘、營業時間、價位：steps 不要重複這些，只寫點什麼、怎麼吃、幾分鐘內吃完這類動作（「HH:MM 開」的店例外，要講幾點到）。',

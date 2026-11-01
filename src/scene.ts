@@ -43,6 +43,8 @@ export interface SceneRule {
   maxWalk?: number
   /** 走到店之後至少還要營業幾分鐘（checker 2026-11-01：快打烊的店，口令只能叫人坐 2–30 分鐘）。 */
   minOpen?: number
+  /** 久坐的情境：口令寫的離開時間不得早於「到店＋這麼多分鐘」（伺服器會改，src/rules.ts）。 */
+  stay?: number
   /** 寫進 prompt 的一行，讓口令對得上情境。 */
   hint: string
 }
@@ -72,7 +74,7 @@ const EAT: SceneRule[] = [
     hint: '情境：一個人、趕時間。steps 只點一道，20 分鐘內吃完。',
   },
   {
-    id: '外帶', radius: 600, minOpen: 10,
+    id: '外帶', radius: 600, minOpen: 10, maxWalk: 12,
     queries: {
       TW: [q('便當', 'tw', 1), q('滷味', 'tw', 1), q('鹽酥雞', 'tw', 1), q('水餃 鍋貼', 'cn', 1), q('港式 燒臘', 'cn', 1.5), q('小吃', 'tw', 1)],
       JP: [q('弁当', 'jp', 1), q('テイクアウト', 'fast', 1.5), q('おにぎり', 'jp', 1), q('惣菜', 'jp', 1)],
@@ -81,7 +83,7 @@ const EAT: SceneRule[] = [
     hint: '情境：外帶。steps 寫點什麼、外帶回去吃，不要寫內用、不要寫幾分鐘內在店裡吃完。',
   },
   {
-    id: '朋友聚餐', radius: 1200, minOpen: 90, avoidTypes: [...FASTISH, ...DESSERTISH],
+    id: '朋友聚餐', radius: 1200, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH],
     queries: {
       TW: [q('熱炒', 'tw', 2.5), q('火鍋', 'hotpot', 2.5), q('燒肉', 'jp', 3, BEEF), q('餐酒館', 'western', 3), q('韓式料理', 'kr', 2, HOT), q('泰式料理', 'other', 2, HOT)],
       JP: [q('居酒屋', 'jp', 2.5), q('焼肉', 'jp', 3, BEEF), q('焼き鳥', 'jp', 2.5), q('お好み焼き', 'jp', 2), q('中華料理', 'cn', 1.5), q('韓国料理', 'kr', 2, HOT)],
@@ -90,7 +92,7 @@ const EAT: SceneRule[] = [
     hint: '情境：朋友聚餐，一群人。steps 寫點幾道一起分，不要寫一個人的份量；時間寫 90 分鐘以上，不准催。',
   },
   {
-    id: '約會吃好一點', radius: 1500, minOpen: 90, avoidTypes: [...FASTISH, ...DESSERTISH], minRating: 4.3,
+    id: '約會吃好一點', radius: 1500, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH], minRating: 4.3,
     queries: {
       TW: [q('義大利麵', 'western', 2.5), q('餐酒館', 'western', 3), q('日式料理', 'jp', 3), q('牛排', 'western', 3, BEEF), q('鐵板燒', 'jp', 2.5), q('法式料理', 'western', 3.5)],
       JP: [q('イタリアン', 'western', 2.5), q('フレンチ', 'western', 3.5), q('寿司', 'jp', 2.5), q('天ぷら', 'jp', 2.5), q('和食', 'jp', 3)],
@@ -114,10 +116,10 @@ const EAT: SceneRule[] = [
  * 不是只改口令。修飾詞加在「喝什麼」的關鍵字前面（REST_MOD）。
  */
 const REST: SceneRule[] = [
-  { id: '一個人放空', radius: 600, maxWalk: 10, minOpen: 40, hint: '情境：一個人放空。steps 寫坐下、點一杯、不看手機；坐 30 分鐘以上。' },
-  { id: '工作讀書', radius: 1000, maxWalk: 15, minOpen: 90, hint: '情境：要工作或讀書，會坐很久。steps 寫找有插座的位子、點一杯、專心多久後休息；坐 90 分鐘以上，不准催人走。' },
-  { id: '朋友聊天', radius: 1000, maxWalk: 15, minOpen: 60, hint: '情境：跟朋友聊天。steps 寫找能坐幾個人的位子、點什麼一起喝；坐 60 分鐘以上，不准催人走。' },
-  { id: '談事情', radius: 1000, minRating: 4.2, maxWalk: 15, minOpen: 60, hint: '情境：要談事情，需要安靜。steps 寫找角落的位子、先點好再開始談；預留 60 分鐘以上。' },
+  { id: '一個人放空', radius: 600, maxWalk: 10, minOpen: 40, stay: 30, hint: '情境：一個人放空。steps 寫坐下、點一杯、不看手機；坐 30 分鐘以上。' },
+  { id: '工作讀書', radius: 1000, maxWalk: 15, minOpen: 90, stay: 90, hint: '情境：要工作或讀書，會坐很久。steps 寫找有插座的位子、點一杯、專心多久後休息；坐 90 分鐘以上，不准催人走。' },
+  { id: '朋友聊天', radius: 1000, maxWalk: 15, minOpen: 60, stay: 60, hint: '情境：跟朋友聊天。steps 寫找能坐幾個人的位子、點什麼一起喝；坐 60 分鐘以上，不准催人走。' },
+  { id: '談事情', radius: 1000, minRating: 4.2, maxWalk: 15, minOpen: 60, stay: 60, hint: '情境：要談事情，需要安靜。steps 寫找角落的位子、先點好再開始談；預留 60 分鐘以上。' },
   { id: '等人', radius: 400, maxWalk: 6, minOpen: 25, hint: '情境：等人或空檔，待不久。steps 寫點一杯、坐 20 分鐘、時間到就走。' },
 ]
 /** 歇的情境修飾詞：只加在咖啡（酒吧、居酒屋不適合「不限時」）。 */
@@ -231,4 +233,77 @@ export function eatOtherQuery(text: string, choices: Record<string, string | num
 export function sceneWiden(scene: Scene | null, country: Country): string[] | undefined {
   if (!scene?.rule.widen || (country !== 'TW' && country !== 'JP')) return undefined
   return scene.rule.widen[country]
+}
+
+// ── 鐘點（checker 2026-11-01 第 2 輪、preview-5 實測）──────────────────────
+// 模型自己加減分鐘常常算錯：當地 20:11 寫「23:11 前到店」、21:11 寫聚餐「21:30 前吃完」。
+// 伺服器先算好「到店」「最早離開」「關門」給 prompt，再把口令裡違反的鐘點改掉。
+
+export interface SceneTimes {
+  /** 都是當地一天裡的第幾分鐘（0–1439）。 */
+  now: number
+  arrive: number
+  /** 久坐的情境才有：到店＋stay。 */
+  leave?: number
+  close?: number
+}
+
+const toHM = (min: number) => {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+}
+export const hm = toHM
+
+/** localNow＝當地「HH:MM」。walkMin／closeInMin 是派到的那家店的。 */
+export function sceneTimes(scene: Scene | null, localNow: string, walkMin: number | undefined, closeInMin: number | undefined): SceneTimes | null {
+  if (!scene) return null
+  const [h, m] = localNow.split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null
+  const now = h! * 60 + m!
+  const arrive = now + (walkMin ?? 0)
+  const close = closeInMin !== undefined ? now + closeInMin : undefined
+  const t: SceneTimes = { now, arrive }
+  if (close !== undefined) t.close = close
+  if (scene.rule.stay !== undefined) t.leave = close !== undefined ? Math.min(arrive + scene.rule.stay, close) : arrive + scene.rule.stay
+  return t
+}
+
+/** prompt 用的一行（模型照抄數字，不要自己算）。 */
+export function sceneTimesLine(t: SceneTimes | null): string {
+  if (!t) return ''
+  const parts = [`現在 ${toHM(t.now)}`, `走到店 ${toHM(t.arrive)}`]
+  if (t.close !== undefined) parts.push(`店 ${toHM(t.close)} 關`)
+  const leave = t.leave !== undefined ? `steps 寫的離開、吃完時間不得早於 ${toHM(t.leave)}。` : ''
+  return `【已算好】${parts.join('，')}。鐘點照這些寫，不要自己加減。${leave}`
+}
+
+const HM_RE = /(?<!\d)(\d{1,2})([:：])(\d{2})(?!\d)/g
+/** 開門、關門、最後點餐的鐘點由 fixHours 管，這裡不碰。 */
+const HOURS_CTX = /開|營業|關|打烊|點餐/
+const ARRIVE_CTX = /^\s*(前|以前)?\s*(到|抵達|進店|進場|進門)/
+const LEAVE_CTX = /^\s*(前|以前)\s*(吃完|離開|出店|散|撤|走|結束|講完|談完|喝完|收工|起身|回家|收隊)/
+
+/**
+ * 口令裡的鐘點照伺服器算的時間改：
+ * - 比現在早、或比關門晚 30 分以上（明顯算錯）→ 後面接「到／抵達」就改成到店時間，否則改成關門時間。
+ * - 久坐的情境：「HH:MM 前吃完／離開…」早於最早離開時間 → 改成最早離開時間。
+ */
+export function fixSceneClock(text: string, t: SceneTimes | null): string {
+  if (!t) return text
+  return text.replace(HM_RE, (all, hh: string, sep: string, mm: string, offset: number, whole: string) => {
+    const after = whole.slice(offset + all.length, offset + all.length + 8)
+    const before = whole.slice(Math.max(0, offset - 4), offset)
+    if (HOURS_CTX.test(after.slice(0, 3)) || HOURS_CTX.test(before)) return all
+    const v = Number(hh) * 60 + Number(mm)
+    if (Number(hh) > 23 || Number(mm) > 59) return all // 不合法的交給 fixClock
+    const d = (v - t.now + 1440) % 1440 // 從現在往後幾分鐘
+    const closeD = t.close !== undefined ? t.close - t.now : undefined
+    const fmt = (min: number) => toHM(min).replace(':', sep)
+    // 「比現在早」：往後超過 20 小時＝其實是幾小時前
+    const past = d > 20 * 60
+    const tooLate = closeD !== undefined && d > closeD + 30
+    if (past || tooLate) return ARRIVE_CTX.test(after) || t.close === undefined ? fmt(t.arrive) : fmt(t.close)
+    if (t.leave !== undefined && LEAVE_CTX.test(after) && d < t.leave - t.now) return fmt(t.leave)
+    return all
+  })
 }

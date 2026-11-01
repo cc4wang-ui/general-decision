@@ -5,6 +5,8 @@ import { stripBranch } from './chains.ts'
 import { localizeFields, localizeText, stripUrls } from './locale.ts'
 import { NEUTRAL_LOG, NEUTRAL_STEP, hasWrongCount, lineSalt, modeLine, neutralBot, satisfiesMode } from './modeLines.ts'
 import { amountsIn, priceText } from './price.ts'
+import { fixSceneClock, sceneOf, sceneTimes } from './scene.ts'
+import { hhmmIn } from './tz.ts'
 import type { Country, EnforceCtx, Level, ModuleId, Order, PickResult } from './types.ts'
 
 /** attend：★≤2 且非婚禮 → 不去。 */
@@ -75,6 +77,7 @@ export function enforceRules(
   order = scrubBanned(order, level, pick, now)
   if (pick) order = enforceMode(order, level, pick, now)
   order = fixClocks(order)
+  if (pick) order = fixSceneClocks(order, module, choices, pick, now, ctx?.country ?? 'TW')
   return localizeOrder(order, ctx?.country ?? 'TW')
 }
 
@@ -92,6 +95,18 @@ export function fixClock(text: string): string {
     h %= 24
     return `${String(h).padStart(2, '0')}${sep}${String(m).padStart(2, '0')}`
   })
+}
+
+/** 情境的鐘點（到店、最早離開、關門）由伺服器算，口令裡違反的改掉（src/scene.ts fixSceneClock）。 */
+function fixSceneClocks(order: Order, module: ModuleId, choices: Record<string, string | number>, pick: PickResult, now: Date, country: Country): Order {
+  const t = sceneTimes(sceneOf(module, choices), hhmmIn(now.toISOString(), country === 'JP' ? 'Asia/Tokyo' : 'Asia/Taipei'), pick.place.walkMin, pick.place.closeInMin)
+  if (!t) return order
+  const top = fixSceneClock(order.meme.top, t)
+  const bot = fixSceneClock(order.meme.bot, t)
+  const steps = order.steps.map((s) => fixSceneClock(s, t))
+  if (top === order.meme.top && bot === order.meme.bot && steps.every((x, i) => x === order.steps[i])) return order
+  console.warn(`[rules] 口令的鐘點跟情境對不上，已照伺服器算的時間改 module=${module}`)
+  return { ...order, meme: { ...order.meme, top, bot }, steps }
 }
 
 function fixClocks(order: Order): Order {

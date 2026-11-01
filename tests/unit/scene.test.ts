@@ -505,3 +505,44 @@ describe('handler：快打烊的店不派給久坐的情境', () => {
     }
   })
 })
+
+describe('鐘點照伺服器算的時間（preview-5：大安 20:11 寫「23:11 前到店」、東京聚餐約會寫「21:30 前吃完」）', () => {
+  it('sceneTimes：到店＝現在＋步行；久坐的最早離開＝到店＋停留（不超過關門）', async () => {
+    const { sceneTimes, sceneTimesLine, hm } = await import('../../src/scene.ts')
+    const t = sceneTimes(sceneOf('eat', { scene: '朋友聚餐' }), '21:11', 3, 109)!
+    expect([hm(t.now), hm(t.arrive), hm(t.leave!), hm(t.close!)]).toEqual(['21:11', '21:14', '22:44', '23:00'])
+    const short = sceneTimes(sceneOf('eat', { scene: '約會吃好一點' }), '21:11', 13, 95)!
+    expect(hm(short.leave!)).toBe('22:46') // 被關門時間截住
+    expect(sceneTimes(sceneOf('eat', { scene: '一個人快吃' }), '20:11', 3, 79)!.leave).toBeUndefined()
+    expect(sceneTimesLine(t)).toContain('不得早於 22:44')
+    expect(sceneTimesLine(t)).toContain('走到店 21:14')
+    expect(sceneTimes(null, '21:11', 3, 109)).toBeNull()
+  })
+
+  it('fixSceneClock：明顯算錯的改成到店或關門；久坐的離開時間不得太早；開門關門的鐘點不碰', async () => {
+    const { sceneTimes, fixSceneClock } = await import('../../src/scene.ts')
+    const quick = sceneTimes(sceneOf('eat', { scene: '一個人快吃' }), '20:11', 3, 79)
+    expect(fixSceneClock('現在出發，23:11前到店', quick)).toBe('現在出發，20:14前到店')
+    expect(fixSceneClock('19:30 前吃完', quick)).toBe('21:30 前吃完') // 比現在早 → 改成關門
+    expect(fixSceneClock('20:30 前吃完', quick)).toBe('20:30 前吃完') // 合理的不動
+    expect(fixSceneClock('營業到 21:30，21:00 關門', quick)).toBe('營業到 21:30，21:00 關門')
+    const party = sceneTimes(sceneOf('eat', { scene: '朋友聚餐' }), '21:11', 3, 109)
+    expect(fixSceneClock('21:30前吃完，該撤', party)).toBe('22:44前吃完，該撤')
+    expect(fixSceneClock('21:20 出發', party)).toBe('21:20 出發') // 出發時間不是離開時間
+    expect(fixSceneClock('22:50 前離開', party)).toBe('22:50 前離開')
+    const date = sceneTimes(sceneOf('eat', { scene: '約會吃好一點' }), '21:11', 13, 109)
+    expect(fixSceneClock('21:30前吃完出店', date)).toBe('22:54前吃完出店')
+    const work = sceneTimes(sceneOf('rest', { scene: '工作讀書', drink: '咖啡' }), '20:11', 9, 109)
+    expect(fixSceneClock('20:30 前必須離開', work)).toBe('20:30 前必須離開') // 「前必須離開」不在離開語境清單 → 不動（保守）
+    expect(fixSceneClock('20:30 前離開', work)).toBe('21:50 前離開')
+  })
+
+  it('enforceRules 會套用（有 pick、有情境時）；prompt 帶【已算好】那一行', async () => {
+    const { enforceRules } = await import('../../src/rules.ts')
+    const pick = { place: { id: 'p', name: '炭火焼肉', walkMin: 3, closeInMin: 109 }, mode: 'new', visits: 1, pool: 1, afterFilter: 1, relaxed: [], exhausted: false, seen14d: false } as unknown as PickResult
+    const o = enforceRules({ verdict: 'do', meme: { top: '班長下令', big: '炭火焼肉', bot: '90分鐘內搞定' }, steps: ['一起夾著吃', '21:30前吃完，該撤'], place: { id: '', name: '' }, log: '21:11 口令。' }, 'eat', { scene: '朋友聚餐' }, new Date('2026-11-01T12:11:00Z'), [], { level: 1, country: 'JP', pick })
+    expect(o.steps[1]).toBe('22:44前吃完，該撤')
+    const u = buildOrderPrompt({ module: 'eat', level: 1, choices: { scene: '朋友聚餐' }, now: '2026-11-01T12:11:00Z', loc: { lat: 35.6795, lng: 139.77 }, recentOrders: [] } as unknown as OrderRequest, pick, 'JP').user
+    expect(u).toContain('【已算好】現在 21:11，走到店 21:14，店 23:00 關')
+  })
+})
