@@ -61,10 +61,20 @@ src＋api 約 +620／-50 行。拆開看：
 |---|---|---|
 | R5 preview-1 | `dpl_GDQjtxBK13CjwwutZ7xzmw7JsCYT` | `bfd72e7`。直傳：Round 4 的 0a–0i、2a–2c ＋ 新的 3a–3e 覆蓋包＋新 `api/probe.ts` |
 | R5 preview-2 | `dpl_CDUmF5UKV3LG7hQ8KWodjwukuV5A` | `c3a9a13`。preview-1 ＋ 4a（cards.ts、scene.ts：聚餐、約會不催時間） |
+| R5 preview-3 | `dpl_D6YquYypkLNLG69ZdKW6TkpErdxT` | `f6845d6`。preview-2 ＋ 4b（scene.ts、prompt.ts：checker 第 1 輪修正） |
+| R5 preview-4 | （建置中） | preview-3 ＋ 4c（rules.ts：鐘點進位） |
 
 ## 實測中發現並修掉的問題
 
 1. preview-1 的「朋友聚餐」口令寫「20–40 分鐘內吃完」（三個地點都有）。原因：吃卡規則寫死「必須含幾分鐘內吃完」。改成照情境那一行寫，聚餐、約會寫 90 分鐘以上（`c3a9a13`）。
+
+2. 獨立 checker 第 1 輪（2026-11-01）FAIL，條件 3：板橋、內湖各 3 列不合情境。已修（`f6845d6`）：
+   - 選咖啡＋談事情派到「安靜小酒館」（酒吧）→ 歇選咖啡時排除酒吧類。
+   - 約會晚餐派到法式甜點蛋糕店 → 約會、聚餐排除甜點店（選「甜食」時不排除）。
+   - 口令的鐘點照 UTC 寫（當地 19:32 寫「11:52 前」）→ prompt 改給當地時間。這是 Round 4 以前就有的問題。
+   - 歇的工作讀書、朋友聊天、談事情加步行 ≤ 15 分；宵夜排除還沒開門的店。
+   - 另外：src＋api 改超過 300 行，原因補在上面「為什麼改超過 300 行」。
+3. preview-3 重測板橋、內湖（19:47）：24/24 符合規則，checker 抓到的 3 類沒再出現；鐘點都是當地時間。新發現內湖「等人」寫「19:67分」（模型算錯進位）→ 伺服器把不合法鐘點進位（`rules.ts fixClock`，19:67 → 20:07）。
 
 ## 已知風險
 

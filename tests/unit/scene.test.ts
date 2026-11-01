@@ -420,3 +420,18 @@ describe('checker 2026-11-01 第 1 輪的修正', () => {
     expect(jp).toContain('現在時間：2026-11-01 20:32（日本當地時間）')
   })
 })
+
+describe('不合法的鐘點自動進位（內湖：「19:67分一到立刻起身」）', () => {
+  it('分鐘 ≥ 60 進位、小時 ≥ 24 繞回；合法的不動', async () => {
+    const { fixClock, enforceRules } = await import('../../src/rules.ts')
+    expect(fixClock('19:67分一到立刻起身')).toBe('20:07分一到立刻起身')
+    expect(fixClock('23:75 前回家')).toBe('00:15 前回家')
+    expect(fixClock('24:10 打烊')).toBe('00:10 打烊')
+    expect(fixClock('19：90 前')).toBe('20：30 前')
+    expect(fixClock('19:52 走人，20:10 前吃完')).toBe('19:52 走人，20:10 前吃完')
+    expect(fixClock('步行 13 分鐘')).toBe('步行 13 分鐘')
+    const o = enforceRules({ verdict: 'do', meme: { top: '等人', big: '咖啡', bot: '19:67 收隊' }, steps: ['坐滿20分鐘', '19:67分一到立刻起身'], log: '19:47 口令。' }, 'rest', {}, new Date('2026-11-01T11:47:00Z'), [])
+    expect(o.steps[1]).toBe('20:07分一到立刻起身')
+    expect(o.meme.bot).toBe('20:07 收隊')
+  })
+})

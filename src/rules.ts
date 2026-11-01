@@ -74,7 +74,33 @@ export function enforceRules(
   if (pick) order = fixHours(order, pick, level, now)
   order = scrubBanned(order, level, pick, now)
   if (pick) order = enforceMode(order, level, pick, now)
+  order = fixClocks(order)
   return localizeOrder(order, ctx?.country ?? 'TW')
+}
+
+/**
+ * Round 5 實測（2026-11-01 內湖）：模型自己往後加分鐘會算錯進位，寫出「19:67分」。
+ * 分鐘 ≥ 60 就進位到小時（19:67 → 20:07），小時 ≥ 24 就繞回（24:10 → 00:10）。合法的鐘點不動。
+ */
+export function fixClock(text: string): string {
+  return text.replace(/(?<!\d)(\d{1,2})([:：])(\d{2})(?!\d)/g, (all, hh: string, sep: string, mm: string) => {
+    let h = Number(hh)
+    let m = Number(mm)
+    if (m < 60 && h < 24) return all
+    h += Math.floor(m / 60)
+    m %= 60
+    h %= 24
+    return `${String(h).padStart(2, '0')}${sep}${String(m).padStart(2, '0')}`
+  })
+}
+
+function fixClocks(order: Order): Order {
+  const top = fixClock(order.meme.top)
+  const bot = fixClock(order.meme.bot)
+  const steps = order.steps.map(fixClock)
+  const log = fixClock(order.log)
+  if (top === order.meme.top && bot === order.meme.bot && log === order.log && steps.every((x, i) => x === order.steps[i])) return order
+  return { ...order, meme: { ...order.meme, top, bot }, steps, log }
 }
 
 /** meme.big 用的店名：模型寫的若是店名的一段（慣稱）且 ≤10 字就留；否則去分店字尾；還太長就截 10 字。 */
