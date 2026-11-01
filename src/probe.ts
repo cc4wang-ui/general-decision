@@ -10,6 +10,7 @@ import { mealLanes, widenPlan, type LanePlan, type NearbyRank } from './lanes.ts
 import { countryOf } from './price.ts'
 import { hourIn, tzOf } from './tz.ts'
 import { handleOrder, placesLanguage, placesRequest, type OrderIo } from './orderHandler.ts'
+import { SCENE_OTHER, sceneOf, sceneOptions, scenePasses } from './scene.ts'
 import type { Band, ModuleId, Order, OrderDebug, OrderRequest, PlaceMemSummary } from './types.ts'
 
 export const PROBE_LOCS: Record<string, { lat: number; lng: number; label: string }> = {
@@ -126,6 +127,81 @@ export async function runMatrix(locKey: string, now = new Date(), io?: OrderIo):
       budgetHit: budgetRows.filter((r) => r.fit === 'hit').length,
       budgetUnknown: budgetRows.filter((r) => r.fit === 'unknown').length,
       budgetMiss: budgetRows.filter((r) => r.fit === 'miss').length,
+      maxMs: Math.max(...rows.map((r) => r.ms ?? 0)),
+    },
+  }
+}
+
+// ── scene（Round 5）：每一種情境 × 一個地點，真 Places、真 Claude ─────────────
+
+/** 「其他」量測用的手動輸入（常見、Google 查得到的那種）。 */
+export const SCENE_TEXT_PROBE = { eat: '吃到飽', rest: '有插座' } as const
+
+export interface SceneRow {
+  id: string
+  module: 'eat' | 'rest'
+  scene: string
+  status: number
+  ok: boolean
+  /** 派到的店符合情境的規則（排除速食、評分、步行；宵夜要營業中；不是超商救援）。 */
+  pass: boolean
+  why?: string
+  error?: string
+  picked?: string
+  type?: string
+  rating?: number
+  walkMin?: number
+  opensAt?: string
+  how?: string
+  dbg?: OrderDebug['scene']
+  steps?: string[]
+  bot?: string
+  ms?: number
+}
+
+/** 一個地點把吃、歇的每一種情境同時打一次。歇一律「咖啡」（情境修飾詞主要加在咖啡）。 */
+export async function runSceneMatrix(locKey: string, now = new Date(), io?: OrderIo): Promise<{ loc: string; localHour: number; rows: SceneRow[]; summary: Record<string, unknown> }> {
+  const loc = PROBE_LOCS[locKey]
+  if (!loc) throw new Error(`未知地點 ${locKey}`)
+  const cases = (['eat', 'rest'] as const).flatMap((m) => sceneOptions(m).map((scene) => ({ m, scene })))
+  const rows = await Promise.all(cases.map(async ({ m, scene }): Promise<SceneRow> => {
+    const t = Date.now()
+    const choices: Record<string, string> = m === 'eat' ? { scene, diet: '都可以', taste: '都可以' } : { scene, drink: '咖啡' }
+    if (scene === SCENE_OTHER) choices.sceneText = SCENE_TEXT_PROBE[m]
+    const res = await handleOrder(post({
+      module: m, level: 1, choices, loc: { lat: loc.lat, lng: loc.lng }, now: now.toISOString(), recentOrders: [], novelty: 'balanced',
+    }), io)
+    const b = (await res.json().catch(() => ({}))) as Body
+    const d = b.debug
+    const c = d?.places?.candidates.find((x) => x.name === b.place?.name)
+    const rule = sceneOf(m, choices)
+    const fails: string[] = []
+    if (!b.place?.id) fails.push('沒派店')
+    if (d?.rescue) fails.push('超商救援')
+    if (b.place && c && !scenePasses({ primaryType: c.type, rating: c.rating, walkMin: c.walkMin }, rule)) fails.push(`不符規則（${c.type ?? '?'}／${c.rating ?? '?'}★／${c.walkMin ?? '?'}分）`)
+    if (rule?.rule.openNow && c?.opensAt) fails.push(`還沒開（${c.opensAt}）`)
+    if (scene === SCENE_OTHER && !d?.places?.how.includes(SCENE_TEXT_PROBE[m])) fails.push('關鍵字沒用到手動輸入')
+    return {
+      id: `${m}:${scene}`, module: m, scene, status: res.status, ok: res.status === 200 && !!b.place?.id,
+      pass: fails.length === 0, ...(fails.length ? { why: fails.join('；') } : {}),
+      ...(b.error ? { error: b.error } : {}),
+      ...(b.place ? { picked: b.place.name } : {}),
+      ...(c ? { type: c.type, rating: c.rating, walkMin: c.walkMin, ...(c.opensAt ? { opensAt: c.opensAt } : {}) } : {}),
+      ...(d?.places ? { how: d.places.how } : {}),
+      ...(d?.scene ? { dbg: d.scene } : {}),
+      ...(b.steps ? { steps: b.steps, bot: b.meme?.bot } : {}),
+      ms: Date.now() - t,
+    }
+  }))
+  return {
+    loc: loc.label,
+    localHour: hourIn(now, tzOf(loc)),
+    rows,
+    summary: {
+      scenarios: rows.length,
+      ok: rows.filter((r) => r.ok).length,
+      pass: rows.filter((r) => r.pass).length,
+      failed: rows.filter((r) => !r.pass).map((r) => `${r.id}:${r.why ?? r.error ?? r.status}`),
       maxMs: Math.max(...rows.map((r) => r.ms ?? 0)),
     },
   }

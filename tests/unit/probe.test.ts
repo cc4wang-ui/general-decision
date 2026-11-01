@@ -2,7 +2,7 @@
 // Round 4 量測工具：正式站必須 404；sim 走正式 handleOrder、Places 同一請求只打一次、Claude 不真的打。
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import api from '../../api/probe.ts'
-import { cachingIo, runMatrix, runSim } from '../../src/probe.ts'
+import { cachingIo, runMatrix, runSceneMatrix, runSim } from '../../src/probe.ts'
 import type { RawPlace } from '../../src/places.ts'
 
 /** 假 Places：每個 lane／查法回 20 家不同 id 的營業中店（id 帶請求內容的雜湊，模擬不同 lane 撈到不同店）。 */
@@ -78,5 +78,23 @@ describe('runSim／runMatrix', () => {
     expect(m.rows.length).toBeGreaterThan(10)
     expect(m.rows.find((r) => r.id === 'eat')?.ok).toBe(true)
     expect(m.summary.scenarios).toBe(m.rows.length)
+  })
+
+  it('scene（Round 5）：吃、歇每一種情境各一列；「其他」用手動輸入當關鍵字；不符規則的列 pass=false', async () => {
+    const real = fakePlaces()
+    const claude = vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: '{"verdict":"do","meme":{"top":"a","big":"b","bot":"c"},"steps":["1","2","3"],"log":"x"}' }] }), { status: 200 }))
+    const io = { fetch: (async (u: string | URL | Request, init?: RequestInit) => (String(u).includes('anthropic') ? claude() : real(u, init))) as typeof fetch }
+    const m = await runSceneMatrix('xinyi', new Date('2026-11-01T12:30:00+08:00'), io)
+    expect(m.rows.map((r) => r.id)).toEqual([
+      'eat:一個人快吃', 'eat:外帶', 'eat:朋友聚餐', 'eat:約會吃好一點', 'eat:宵夜', 'eat:其他',
+      'rest:一個人放空', 'rest:工作讀書', 'rest:朋友聊天', 'rest:談事情', 'rest:等人', 'rest:其他',
+    ])
+    expect(m.rows.every((r) => r.ok)).toBe(true)
+    expect(m.rows.find((r) => r.id === 'eat:其他')?.how).toContain('吃到飽')
+    expect(m.rows.find((r) => r.id === 'rest:工作讀書')?.how).toContain('不限時 咖啡廳')
+    // 假資料的店都在 0–400 m、評分 4.0–4.7：約會（≥ 4.3）要嘛派到夠高分的、要嘛標不符規則
+    const date = m.rows.find((r) => r.id === 'eat:約會吃好一點')!
+    expect(date.pass).toBe((date.rating ?? 5) >= 4.3)
+    expect(m.summary.scenarios).toBe(12)
   })
 })

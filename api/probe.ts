@@ -2,8 +2,9 @@
 // preview 有 Vercel 登入保護（ssoProtection），外人打不到；仍會用真的 Places／Claude 金鑰，每次呼叫都花錢。
 //   GET /api/probe?mode=matrix&loc=xinyi
 //   GET /api/probe?mode=sim&loc=xinyi&days=60&seed=1[&budget=2]
+//   GET /api/probe?mode=scene&loc=xinyi（Round 5：吃、歇每一種情境各一次）
 // 實作在 src/probe.ts。
-import { PROBE_LOCS, runMatrix, runSim } from '../src/probe.ts'
+import { PROBE_LOCS, runMatrix, runSceneMatrix, runSim } from '../src/probe.ts'
 import type { Band } from '../src/types.ts'
 
 export const config = { runtime: 'nodejs', maxDuration: 60 }
@@ -25,6 +26,7 @@ async function handler(request: Request): Promise<Response> {
     if (q.get('mode') === 'sim') {
       return json(await runSim(loc, { days: Number(q.get('days') ?? 60), seed: Number(q.get('seed') ?? 1), ...(budget?.length ? { budget } : {}) }))
     }
+    if (q.get('mode') === 'scene') return json(await runSceneMatrix(loc))
     return json(await runMatrix(loc))
   } catch (e) {
     return json({ error: 'probe_failed', message: String(e) }, 500)

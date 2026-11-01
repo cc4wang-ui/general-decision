@@ -180,7 +180,8 @@ export interface OrderDebug {
   places?: {
     how: string // 'lane=ramen_restaurant rank=DISTANCE' 或 'text="居酒屋"'
     tries: { r: number; raw: number; kept: number }[]
-    candidates: { name: string; rating?: number; count?: number; walkMin?: number; openUntil?: string; opensAt?: string; band?: number | null }[]
+    /** type＝Google 的主類別（Round 5：量測情境「排除速食」用）。 */
+    candidates: { name: string; rating?: number; count?: number; walkMin?: number; openUntil?: string; opensAt?: string; band?: number | null; type?: string }[]
   }
   /** Round 3：發掘引擎的決定過程。不含 place_id。 */
   pick?: { mode: PickMode; lane: string; pool: number; afterFilter: number; relaxed: string[]; exhausted: boolean; seed?: number }
