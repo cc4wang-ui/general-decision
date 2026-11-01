@@ -64,3 +64,29 @@ export async function mockOrderFailure(page: Page, status: number, body = '{"err
     route.fulfill({ status, contentType: 'application/json', body }),
   )
 }
+
+/**
+ * Round 5：吃／歇第一步先選情境（獨立一頁）。點卡片 → 有情境頁就點一個（預設第一個）→ 等到原本的選單。
+ * 其他卡片照舊直接進選單。scene='其他' 時停在情境頁（輸入框由測試自己填）。
+ */
+export async function openCard(page: Page, id: string, scene?: string) {
+  await page.locator(`[data-card="${id}"]`).click()
+  if (id !== 'eat' && id !== 'rest') return
+  await pickScene(page, scene)
+}
+
+export async function pickScene(page: Page, scene?: string) {
+  const row = page.locator('[data-screen="scene"] [data-field="scene"]')
+  await row.waitFor()
+  // 已選的 chip 前面有 CSS 的 ✓（算進無障礙名稱），用 textContent 比對。
+  const chip = scene ? row.locator('.chip').filter({ hasText: new RegExp(`^${scene}$`) }) : row.locator('.chip').first()
+  await chip.click()
+  if (scene === '其他') return
+  await page.locator('[data-screen="intake"]').waitFor()
+}
+
+/** Round 5：吃／歇的「沒做」先問原因；這裡選「我就是不想做」（照舊罰站）。其他卡片直接罰站。 */
+export async function refuseOrder(page: Page, card = 'eat') {
+  await page.getByRole('button', { name: '沒做' }).click()
+  if (card === 'eat' || card === 'rest') await page.getByTestId('skip-refuse').click()
+}

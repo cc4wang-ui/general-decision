@@ -3,7 +3,7 @@
 import { expect, test, type Page } from '@playwright/test'
 // @ts-expect-error design/ 是 .mjs，沒有型別宣告
 import { nesPalette } from '../../design/hwpalette.mjs'
-import { FIXED_ORDER, mockOrder, mockOrderFailure, prime } from './fixtures.ts'
+import { FIXED_ORDER, mockOrder, mockOrderFailure, prime, openCard, refuseOrder } from './fixtures.ts'
 
 const NES: string[] = (nesPalette() as string[]).map((h) => h.toUpperCase())
 
@@ -113,12 +113,12 @@ async function audit(page: Page, palette: string[]) {
 /** 8 個畫面各自的到達路徑。 */
 const SCREENS: { name: string; go: (page: Page) => Promise<void> }[] = [
   { name: 'home', go: async (p) => { await p.goto('/') } },
-  { name: 'intake', go: async (p) => { await p.goto('/'); await p.locator('[data-card="eat"]').click() } },
-  { name: 'cmd', go: async (p) => { await p.goto('/'); await p.locator('[data-card="eat"]').click(); await p.getByRole('button', { name: '是！班長' }).click() } },
+  { name: 'intake', go: async (p) => { await p.goto('/'); await openCard(p, 'eat') } },
+  { name: 'cmd', go: async (p) => { await p.goto('/'); await openCard(p, 'eat'); await p.getByRole('button', { name: '是！班長' }).click() } },
   {
     name: 'log',
     go: async (p) => {
-      await p.goto('/'); await p.locator('[data-card="eat"]').click()
+      await p.goto('/'); await openCard(p, 'eat')
       await p.getByRole('button', { name: '是！班長' }).click()
       await p.getByRole('button', { name: '報告班長，完成' }).click()
     },
@@ -126,9 +126,9 @@ const SCREENS: { name: string; go: (page: Page) => Promise<void> }[] = [
   {
     name: 'stand',
     go: async (p) => {
-      await p.goto('/'); await p.locator('[data-card="eat"]').click()
+      await p.goto('/'); await openCard(p, 'eat')
       await p.getByRole('button', { name: '是！班長' }).click()
-      await p.getByRole('button', { name: '沒做' }).click()
+      await refuseOrder(p)
     },
   },
   { name: 'diary', go: async (p) => { await p.goto('/'); await p.getByRole('button', { name: '新兵日記' }).click() } },
@@ -162,7 +162,7 @@ for (const scheme of ['light', 'dark'] as const) {
     test(`error：渲染後每個實色都在 NES 色盤內、文字對比過 WCAG AA`, async ({ page }) => {
       await mockOrderFailure(page, 502)
       await page.goto('/')
-      await page.locator('[data-card="eat"]').click()
+      await openCard(page, 'eat')
       await page.getByRole('button', { name: '是！班長' }).click()
       await expect(page.locator('[data-screen="error"]')).toBeVisible()
 
@@ -207,7 +207,7 @@ for (const scheme of ['light', 'dark'] as const) {
           expect(b.ratio, `lv${level}/${scheme} 徽章色 ${b.hex} 對名牌底 ${mark.bg}`).toBeGreaterThanOrEqual(3)
         }
         expect(mark.key, `lv${level} 徽章`).toBe(['1-1', '1-2', '2-1'][level])
-        await page.locator('[data-card="eat"]').click()
+        await openCard(page, 'eat')
         await page.getByRole('button', { name: '是！班長' }).click()
         await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
 

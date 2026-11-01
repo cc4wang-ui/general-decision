@@ -1,6 +1,6 @@
 // 第 13.2 節 Happy ×7：每卡 home→intake→「是！班長」→cmd 出現 .meme .big 非空。
 import { expect, test } from '@playwright/test'
-import { mockOrder, prime } from './fixtures.ts'
+import { mockOrder, prime, openCard } from './fixtures.ts'
 
 // Round 3：先設好同意旗標，免得被首次同意畫面擋住。
 test.beforeEach(async ({ page }) => { await prime(page) })
@@ -15,7 +15,7 @@ for (const id of CARDS) {
     await page.goto('/')
     await expect(page.locator('[data-screen="home"]')).toBeVisible()
 
-    await page.locator(`[data-card="${id}"]`).click()
+    await openCard(page, id)
     await expect(page.locator('[data-screen="intake"]')).toBeVisible()
 
     await page.getByRole('button', { name: '是！班長' }).click()

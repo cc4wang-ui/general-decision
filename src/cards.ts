@@ -1,4 +1,5 @@
 // 八張模組卡 — DECIDE-DEV-DOC-v1.md 第 6 節。
+import { SCENE_KEY, sceneOptions } from './scene.ts'
 import type { ModuleCard, ModuleId } from './types.ts'
 
 export const CARDS: ModuleCard[] = [
@@ -7,6 +8,8 @@ export const CARDS: ModuleCard[] = [
     title: '吃',
     subtitle: '中午、晚上，吃什麼',
     intake: [
+      // Round 5（Cross 2026-11-01）：第一步先問情境，必選、沒有預設（上次選的排第一個，但不幫他選）。
+      { key: SCENE_KEY, label: '情境', type: 'scene', options: sceneOptions('eat'), default: '' },
       { key: 'diet', label: '忌口', type: 'chips', options: ['不辣', '不吃牛', '素', '都可以'], default: '都可以' },
       { key: 'taste', label: '想吃', type: 'chips', options: ['鹹食', '甜食', '都可以'], default: '都可以' },
       // Round 3：預算（每人每餐）。標籤依國家由 src/price.ts bandLabels() 產生，值走 OrderRequest.budget，不走 choices。
@@ -59,6 +62,7 @@ export const CARDS: ModuleCard[] = [
     title: '歇',
     subtitle: '現在，去哪喝一杯',
     intake: [
+      { key: SCENE_KEY, label: '情境', type: 'scene', options: sceneOptions('rest'), default: '' },
       { key: 'drink', label: '喝什麼', type: 'chips', options: ['咖啡', '酒吧', '居酒屋', '熱炒燒烤'], default: '咖啡' },
     ],
     needsPlaces: true,
@@ -149,6 +153,13 @@ export const MINOR_IDS: ModuleId[] = ['sleep', 'reply', 'buy', 'travel']
  * 點名台詞：每張卡 × 三段火力。介面 ModuleCard 由第 5 節鎖定，故另存一張表。
  * index = Level。
  */
+/** Round 5：情境（吃／歇的第一步）的班長台詞，依火力層。 */
+export const SCENE_BARKS: [string, string, string] = [
+  '那、那個…現在是什麼情況？',
+  '先報告情境！一個人還是一群人？趕不趕？',
+  '情況都講不清楚就想派店？報告情境！',
+]
+
 export const MODULE_BARKS: Record<ModuleId, [string, string, string]> = {
   eat: [
     '有、有沒有忌口？',

@@ -145,3 +145,13 @@ main[data-level="2"]{--officer-green:#005800;--officer-deep:#000000;--meme-edge:
 .consent-body small{display:block;font-size:.75rem;color:var(--mute);line-height:1.55}
 .consent-foot{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
 .linkish{font:inherit;color:var(--mute);background:none;border:0;padding:8px 0;min-height:36px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+/* Round 5 情境列 */
+.lab .req{margin-left:8px;font-size:.6875rem;font-weight:650;color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:1px 6px}
+.scene-chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.scene-chips .chip{text-align:left}
+.scene-in{margin-top:12px}
+.scene-need{margin-top:10px}
+.intake-top{display:flex;justify-content:space-between;align-items:center;gap:8px;align-self:stretch}
+.scene-tag{font:inherit;font-size:.8125rem;font-weight:650;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;min-height:44px;padding:8px 0;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scene-tag span{color:var(--mute);font-weight:500}
+.ent .r.mis{background:var(--khaki);color:var(--ink)}

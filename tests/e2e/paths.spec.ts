@@ -1,6 +1,6 @@
 // 第 13.2 節 三路：完成→log 頁；店關了→big 改變且 reissue 鍵消失；沒做→stand 倒數至 0 回 home。
 import { expect, test } from '@playwright/test'
-import { FIXED_ORDER, SECOND_ORDER, mockOrder, prime } from './fixtures.ts'
+import { FIXED_ORDER, SECOND_ORDER, mockOrder, prime, openCard, refuseOrder } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => { await prime(page) })
 
@@ -8,7 +8,7 @@ test.use({ geolocation: { latitude: 25.033, longitude: 121.5654 }, permissions: 
 
 async function toCmd(page: import('@playwright/test').Page, card = 'eat') {
   await page.goto('/')
-  await page.locator(`[data-card="${card}"]`).click()
+  await openCard(page, card)
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
 }
@@ -56,7 +56,7 @@ test('換口令會把上一家放進 exclude', async ({ page }) => {
 test('沒做 → 罰則倒數到 0 自動回首頁', async ({ page }) => {
   await mockOrder(page)
   await toCmd(page)
-  await page.getByRole('button', { name: '沒做' }).click()
+  await refuseOrder(page)
   await expect(page.locator('[data-screen="stand"]')).toBeVisible()
   await expect(page.getByTestId('meme')).toHaveClass(/red/)
   await expect(page.getByTestId('meme-num')).toHaveText('20') // level 1：伏地挺身 20 下

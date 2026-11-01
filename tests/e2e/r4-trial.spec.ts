@@ -1,6 +1,6 @@
 // Round 4：60 天試用。換一家多兩個原因（又是這家／價格不對）；每道口令寫進試用紀錄；除錯畫面看得到摘要、匯出得出檔案。
 import { expect, test, type Page } from '@playwright/test'
-import { FIXED_ORDER, SECOND_ORDER, captureOrders, prime } from './fixtures.ts'
+import { FIXED_ORDER, SECOND_ORDER, captureOrders, prime, openCard } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => { await prime(page) })
 test.use({ geolocation: { latitude: 25.033, longitude: 121.5654 }, permissions: ['geolocation'] })
@@ -11,7 +11,7 @@ const trialOf = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getI
 
 async function toCmd(page: Page, card = 'eat') {
   await page.goto('/')
-  await page.locator(`[data-card="${card}"]`).click()
+  await openCard(page, card)
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
 }

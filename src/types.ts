@@ -91,8 +91,8 @@ export interface PickResult {
 export interface IntakeField {
   key: string // 'diet' | 'transport' | 'minutes' | 'occasion' | 'stars' | 'budget' ...
   label: string
-  /** chips 單選；stars 1–5；bands = 價位檔多選（只在 eat）：options 留空，標籤由 src/price.ts bandLabels(country) 依國家產生，值走 OrderRequest.budget 不走 choices。 */
-  type: 'chips' | 'stars' | 'bands'
+  /** chips 單選；scene＝情境單選（Round 5：必選、沒有預設、「其他」可手動輸入，字走 choices.sceneText）；stars 1–5；bands = 價位檔多選（只在 eat）：options 留空，標籤由 src/price.ts bandLabels(country) 依國家產生，值走 OrderRequest.budget 不走 choices。 */
+  type: 'chips' | 'stars' | 'bands' | 'scene'
   options?: string[]
   default: string | number
 }
@@ -191,6 +191,8 @@ export interface OrderDebug {
   fallback?: 'template'
   /** Round 4：前兩次 Places 之後一家都派不出去 → 第三次查營業中的便利商店。 */
   rescue?: boolean
+  /** Round 5：這次的情境、情境篩完剩幾家／共幾家、是不是放回整批才派得出去。text＝「其他」使用者打的字（只在手機，不進伺服器 log）。 */
+  scene?: { id: string; text?: string; kept: number; total: number; relaxed: boolean }
   forced?: string
   picked?: string
   error?: string
@@ -206,7 +208,8 @@ export interface DiaryEntry {
   placeName?: string
   /** Round 3：之後靠這個對回 PlaceMem（愛店／不再推薦）。 */
   placeId?: string
-  outcome: 'done' | 'reissued' | 'punished'
+  /** mismatch（Round 5）：沒做，因為派的不符合使用者的情境——不罰站、不算進服從率。 */
+  outcome: 'done' | 'reissued' | 'punished' | 'mismatch'
   reason?: ReissueReason
   mode?: PickMode
 }

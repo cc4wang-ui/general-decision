@@ -14,6 +14,7 @@ import { cuisineOf, mulberry32, pickPlace, type PickOutcome } from './discovery.
 import { bandOf, countryOf, currencyCountry, effectiveBand, estText, priceFit, priceText } from './price.ts'
 import { brandKeyOf, clusterKeys } from './chains.ts'
 import { templateOrder } from './template.ts'
+import { SCENE_TEXT_KEY, sanitizeSceneText, sceneFilter, sceneOf, scenePasses, sceneWiden } from './scene.ts'
 import { hourIn, tzOf } from './tz.ts'
 import type { Band, Country, CuisineStats, Order, OrderDebug, OrderRequest, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
 
@@ -95,6 +96,12 @@ export function sanitizeRequest(raw: OrderRequest): OrderRequest {
   const loc = isRecord(r.loc) && finite(r.loc.lat) && finite(r.loc.lng) ? { lat: r.loc.lat, lng: r.loc.lng } : undefined
   const choices: Record<string, string | number> = {}
   if (isRecord(r.choices)) for (const [k, v] of Object.entries(r.choices)) if (typeof v === 'string' || finite(v)) choices[k] = v
+  // Round 5：情境「其他」的手動輸入會進 Places 關鍵字與 prompt：去控制字元、截 20 字；空的就拿掉。
+  if (SCENE_TEXT_KEY in choices) {
+    const t = sanitizeSceneText(choices[SCENE_TEXT_KEY])
+    if (t) choices[SCENE_TEXT_KEY] = t
+    else delete choices[SCENE_TEXT_KEY]
+  }
   const recentOrders = Array.isArray(r.recentOrders)
     ? (r.recentOrders as unknown[]).filter((o): o is OrderRequest['recentOrders'][number] => isRecord(o) && typeof o.module === 'string' && typeof o.big === 'string' && typeof o.at === 'string').slice(0, MAX_RECENT)
     : []
@@ -167,7 +174,12 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       dbg.error = 'no_location'
       return json({ error: 'no_location', message: '不報座標，班長就點不了店。開定位再報告。', debug: dbg }, 400)
     }
-    const first = pickLane(card, req.choices ?? {}, req.cuisine, country, rng, hourIn(now, tz), card.id === 'eat' ? req.budget : undefined)
+    // Round 5（Cross 2026-11-01「返回的結果不符合我的需求」）：先看情境，決定查什麼、查多遠、挑店前排除什麼。
+    const scene = sceneOf(req.module, req.choices ?? {})
+    const first = pickLane(card, req.choices ?? {}, req.cuisine, country, rng, hourIn(now, tz), card.id === 'eat' ? req.budget : undefined, scene)
+    const words = sceneWiden(scene, country)
+    /** 伺服器 log 不記「其他」使用者打的字（手機上的 debug 照留）。 */
+    const logHow = (how: string) => (scene?.text ? how.split(scene.text).join('<輸入>') : how)
     const tries: { r: number; raw: number; kept: number }[] = []
     const hows: string[] = []
     let cands: PlaceCandidate[] = []
@@ -184,11 +196,11 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
         if (veg && p.lane !== 'rescue') got = got.filter(looksVeg) // 忌口「素」：關鍵字查詢會混進葷食店
         cands = mergeCandidates(cands, got)
         tries.push({ r: p.radius, raw: raw.length, kept: got.length })
-        console.info(`[places] ok ${how} r=${p.radius} raw=${raw.length} candidates=${got.length}`)
+        console.info(`[places] ok ${logHow(how)} r=${p.radius} raw=${raw.length} candidates=${got.length}`)
         return 200
       } catch (e) {
         tries.push({ r: p.radius, raw: -1, kept: 0 }) // raw=-1：這一次整個查失敗
-        console.warn(`[places] fail ${how} r=${p.radius}：${(e as Error).message}`)
+        console.warn(`[places] fail ${logHow(how)} r=${p.radius}：${(e as Error).message}`)
         return (e as PlacesError).status ?? 0
       }
     }
@@ -202,10 +214,11 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     const firstStatus = await call(first)
     // Round 4 實測（2026-11-01）：有預算時「候選夠 5 家」不夠，要「預算內夠 5 家」，不然第二次不會打、只能補預算外的店。
     const budget = card.id === 'eat' && req.budget?.length ? req.budget : undefined
-    const fitCount = () => budget ? cands.filter((c) => priceFit(effectiveBand(c, country).band, budget, true) === 1).length : cands.length
-    if (cands.length < MIN_VALID || fitCount() < MIN_VALID) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng }))
+    // Round 5：情境也算進「夠不夠 5 家」：一個人快吃只算步行 8 分內的、約會只算評分夠的。
+    const fitCount = () => cands.filter((c) => scenePasses(c, scene) && (!budget || priceFit(effectiveBand(c, country).band, budget, true) === 1)).length
+    if (cands.length < MIN_VALID || fitCount() < MIN_VALID) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng, words }))
     // 有預算、兩次都帶 priceLevels 卻一家都沒撈到 → 拿掉價位再撈一次營業中的餐廳（派預算外的真店，比改派超商強）。
-    if (budget && cands.length === 0 && !allFailed()) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng, dropPrice: true }))
+    if (budget && cands.length === 0 && !allFailed()) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng, dropPrice: true, words }))
     placesMs = Date.now() - t0
     country = cands.map((c) => currencyCountry(c.priceRange?.currency)).find(Boolean) ?? country
     dbg.places = {
@@ -214,8 +227,8 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country) })),
     }
     dbg.price = { country, known: cands.filter((c) => bandOf(c, country) !== null).length, total: cands.length }
-    const choose = (budget: OrderRequest['budget']) => cands.length
-      ? pickPlace(cands, req.mem, req.cuisine, {
+    const choose = (budget: OrderRequest['budget'], pool: PlaceCandidate[] = cands) => pool.length
+      ? pickPlace(pool, req.mem, req.cuisine, {
         now: now.getTime(),
         country,
         budget,
@@ -226,7 +239,10 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
         rng,
       })
       : null
-    pick = choose(req.budget)
+    // 情境的偏好（排除速食、評分、步行）先篩；篩完沒店、或篩過的店都被記憶擋掉 → 用整批候選（寧可派得到）。
+    const sf = sceneFilter(cands, scene)
+    pick = choose(req.budget, sf.kept) ?? (sf.kept.length < cands.length ? choose(req.budget, cands) : null)
+    if (scene) dbg.scene = { id: scene.id, ...(scene.text ? { text: scene.text } : {}), kept: sf.kept.length, total: cands.length, relaxed: sf.relaxed || (!!pick && !sf.kept.some((k) => k.id === pick!.place.id)) }
     if (!pick && !allFailed()) {
       // 第三次（救援）：附近營業中的都派不出去 → 營業中的超商。預算不適用（超商就是超商），口令會講清楚（prompt rescue 行）。
       dbg.rescue = true
@@ -259,7 +275,8 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     }
     dbg.pick = { mode: pick.mode, lane: pick.place.lane ?? first.lane, pool: pick.pool, afterFilter: pick.afterFilter, relaxed: pick.relaxed, exhausted: pick.exhausted, seed }
     // 匿名一行（R12）：不記 place_id、不記座標、不記店名。第一週拿來量價位覆蓋率（R3§4.3）。
-    console.info(`[pick] module=${req.module} mode=${pick.mode} lane=${dbg.pick.lane} pool=${pick.pool} kept=${pick.afterFilter} known_price=${(dbg.price.known / Math.max(1, dbg.price.total)).toFixed(2)} country=${country} seen14d=${pick.seen14d} relaxed=${pick.relaxed.join('|') || '-'}`)
+    // 情境只記 id（「其他」不記使用者打的字）。
+    console.info(`[pick] module=${req.module} scene=${scene?.id ?? '-'} mode=${pick.mode} lane=${dbg.pick.lane} pool=${pick.pool} kept=${pick.afterFilter} known_price=${(dbg.price.known / Math.max(1, dbg.price.total)).toFixed(2)} country=${country} seen14d=${pick.seen14d} relaxed=${pick.relaxed.join('|') || '-'}`)
   }
 
   // ── Claude ────────────────────────────────────────────────────

@@ -1,0 +1,370 @@
+// @vitest-environment node
+// Round 5 情境（Cross 2026-11-01「返回的結果不符合我的需求，第一步先確認使用者情境偏好」）。
+// STOP 1：預設 ≥ 5 種＋「其他」（≤ 20 字），必選。STOP 2：每一種預設都會改查法；手動輸入變成關鍵字。
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import api, { sanitizeRequest } from '../../api/order.ts'
+import { CARD_BY_ID } from '../../src/cards.ts'
+import { mulberry32 } from '../../src/discovery.ts'
+import { pickLane, widenPlan, type LanePlan } from '../../src/lanes.ts'
+import { priceFit } from '../../src/price.ts'
+import { buildOrderPrompt } from '../../src/prompt.ts'
+import {
+  SCENE_OTHER, SCENE_QUERIES, SCENE_TEXT_MAX, eatOtherQuery, restQuery, sanitizeSceneText, sceneFilter, sceneOf, sceneOptions, scenePasses, sceneWiden,
+} from '../../src/scene.ts'
+import { templateOrder } from '../../src/template.ts'
+import { stats } from '../../src/diary.ts'
+import { summarize, type TrialEntry } from '../../src/trial.ts'
+import type { RawPlace } from '../../src/places.ts'
+import type { DiaryEntry, Order, OrderDebug, OrderRequest, PickResult, PlaceCandidate } from '../../src/types.ts'
+
+const many = (n: number, f: (seed: number) => LanePlan) => Array.from({ length: n }, (_, s) => f(s + 1))
+const eatPlans = (choices: Record<string, string | number>, country: 'TW' | 'JP' = 'TW', n = 200) =>
+  many(n, (s) => pickLane(CARD_BY_ID.eat, choices, undefined, country, mulberry32(s), 12, undefined, sceneOf('eat', choices)))
+const restPlans = (choices: Record<string, string | number>, country: 'TW' | 'JP' = 'TW', n = 50) =>
+  many(n, (s) => pickLane(CARD_BY_ID.rest, choices, undefined, country, mulberry32(s), 12, undefined, sceneOf('rest', choices)))
+/** 一個查法的指紋：種類、半徑、關鍵字、openNow。用來比「有沒有改查法」。 */
+const sig = (p: LanePlan) => `${p.kind}|${p.radius}|${p.kind === 'text' ? p.textQuery : p.includedTypes.join(',')}|${p.kind === 'text' ? !!p.openNow : false}`
+
+describe('情境選單（STOP 1）', () => {
+  it('吃、歇各有 ≥ 5 種預設＋「其他」；第一個欄位就是情境、沒有預設值；其他卡沒有情境', () => {
+    for (const m of ['eat', 'rest'] as const) {
+      const opts = sceneOptions(m)
+      expect(opts.at(-1)).toBe(SCENE_OTHER)
+      expect(opts.length - 1).toBeGreaterThanOrEqual(5)
+      const f = CARD_BY_ID[m].intake[0]!
+      expect(f).toMatchObject({ key: 'scene', type: 'scene', default: '' })
+      expect(f.options).toEqual(opts)
+    }
+    for (const m of ['go', 'attend', 'sleep', 'reply', 'buy', 'travel'] as const) {
+      expect(CARD_BY_ID[m].intake.some((f) => f.type === 'scene')).toBe(false)
+      expect(sceneOptions(m)).toEqual([])
+    }
+  })
+
+  it('沒選、選了不認得的、選「其他」沒寫字 → 沒有情境', () => {
+    expect(sceneOf('eat', {})).toBeNull()
+    expect(sceneOf('eat', { scene: '' })).toBeNull()
+    expect(sceneOf('eat', { scene: '不存在' })).toBeNull()
+    expect(sceneOf('eat', { scene: SCENE_OTHER })).toBeNull()
+    expect(sceneOf('eat', { scene: SCENE_OTHER, sceneText: '   ' })).toBeNull()
+    expect(sceneOf('go', { scene: '外帶' })).toBeNull()
+  })
+
+  it('手動輸入：去換行與控制字元、合併空白、截 20 字（以字計，不是 UTF-16）', () => {
+    expect(sanitizeSceneText('  有\n插座\t\u0007安靜  ')).toBe('有 插座 安靜')
+    const long = '吃到飽'.repeat(10)
+    expect([...sanitizeSceneText(long)]).toHaveLength(SCENE_TEXT_MAX)
+    expect([...sanitizeSceneText('🍜'.repeat(30))]).toHaveLength(SCENE_TEXT_MAX)
+    expect(sanitizeSceneText(42)).toBe('')
+  })
+})
+
+describe('每一種預設都會改查法（STOP 2）', () => {
+  it('吃：每種預設的第一次查詢都跟「沒選情境」不一樣，而且只用該情境自己的關鍵字池、半徑照情境', () => {
+    const base = new Set(eatPlans({}).map(sig))
+    for (const id of sceneOptions('eat').filter((o) => o !== SCENE_OTHER)) {
+      const scene = sceneOf('eat', { scene: id })!
+      const pool = new Set(scene.rule.queries!.TW.map((q) => q.q))
+      const plans = eatPlans({ scene: id })
+      for (const p of plans) {
+        expect(p.kind, id).toBe('text')
+        if (p.kind !== 'text') continue
+        expect(pool.has(p.textQuery), `${id}：${p.textQuery}`).toBe(true)
+        expect(p.radius, id).toBe(scene.rule.radius)
+        expect(p.restrict, id).toBe(true)
+        expect(!!p.openNow, id).toBe(!!scene.rule.openNow)
+      }
+      // 指紋完全沒有重疊 = 查法真的變了
+      expect(plans.filter((p) => base.has(sig(p))), id).toHaveLength(0)
+      // 關鍵字池至少用到一半（不是卡在同一個）
+      expect(new Set(plans.map((p) => (p.kind === 'text' ? p.textQuery : ''))).size, id).toBeGreaterThanOrEqual(Math.ceil(pool.size / 2))
+    }
+  })
+
+  it('吃（日本）：用日本的關鍵字池', () => {
+    for (const id of sceneOptions('eat').filter((o) => o !== SCENE_OTHER)) {
+      const pool = new Set(sceneOf('eat', { scene: id })!.rule.queries!.JP.map((q) => q.q))
+      for (const p of eatPlans({ scene: id }, 'JP', 60)) expect(p.kind === 'text' && pool.has(p.textQuery), id).toBe(true)
+    }
+  })
+
+  it('吃：一個人快吃 500 m、宵夜第一次就只要營業中、聚餐與約會半徑較大', () => {
+    expect(sceneOf('eat', { scene: '一個人快吃' })!.rule).toMatchObject({ radius: 500, maxWalk: 8 })
+    expect(eatPlans({ scene: '宵夜' }).every((p) => p.kind === 'text' && p.openNow === true)).toBe(true)
+    expect(eatPlans({}).some((p) => p.kind === 'text' && p.openNow)).toBe(false)
+    expect(sceneOf('eat', { scene: '朋友聚餐' })!.rule.radius).toBeGreaterThan(800)
+    expect(sceneOf('eat', { scene: '約會吃好一點' })!.rule.radius).toBeGreaterThan(800)
+  })
+
+  it('吃：忌口照樣擋關鍵字（不吃牛不排燒肉／牛排／牛丼；不辣不排韓式／泰式）', () => {
+    for (const id of ['朋友聚餐', '約會吃好一點', '宵夜', '一個人快吃']) {
+      for (const country of ['TW', 'JP'] as const) {
+        const qs = eatPlans({ scene: id, diet: '不吃牛' }, country).map((p) => (p.kind === 'text' ? p.textQuery : ''))
+        expect(qs.filter((q) => /牛|燒肉|焼肉/.test(q)), `${id} ${country}`).toEqual([])
+        const hot = eatPlans({ scene: id, diet: '不辣' }, country).map((p) => (p.kind === 'text' ? p.textQuery : ''))
+        expect(hot.filter((q) => /韓|泰|韓国/.test(q)), `${id} ${country}`).toEqual([])
+      }
+    }
+  })
+
+  it('吃：甜食、吃素照原本的 lane（不會派甜食的人去熱炒），只換成情境的半徑', () => {
+    for (const p of eatPlans({ scene: '朋友聚餐', taste: '甜食' })) {
+      expect(p.radius).toBe(1200)
+      if (p.kind === 'text') expect(['甜點', '豆花', '冰店', '麵包店']).toContain(p.textQuery)
+      else expect(p.includedTypes.some((t) => ['bakery', 'cafe', 'ice_cream_shop', 'coffee_shop'].includes(t))).toBe(true)
+    }
+    for (const p of eatPlans({ scene: '一個人快吃', diet: '素' })) {
+      expect(p.radius).toBe(500)
+      if (p.kind === 'text') expect(['素食', '蔬食']).toContain(p.textQuery)
+      else expect(p.lane).toBe('veg')
+    }
+  })
+
+  it('吃：有預算時只排推估價位對得上的情境關鍵字，並帶 priceLevels', () => {
+    const plans = many(100, (s) => pickLane(CARD_BY_ID.eat, { scene: '朋友聚餐' }, undefined, 'TW', mulberry32(s), 19, [2], sceneOf('eat', { scene: '朋友聚餐' })))
+    for (const p of plans) {
+      expect(p.kind).toBe('text')
+      if (p.kind !== 'text') continue
+      expect(p.priceLevels).toEqual(['PRICE_LEVEL_INEXPENSIVE', 'PRICE_LEVEL_MODERATE'])
+      const est = sceneOf('eat', { scene: '朋友聚餐' })!.rule.queries!.TW.find((q) => q.q === p.textQuery)!.est
+      expect(priceFit(est, [2]), p.textQuery).toBeGreaterThan(0)
+    }
+  })
+
+  it('吃「其他」：使用者的字＋基本詞就是關鍵字（餐廳／甜點／素食；日本レストラン），第二次保留同一個關鍵字', () => {
+    const one = (choices: Record<string, string | number>, country: 'TW' | 'JP' = 'TW') =>
+      pickLane(CARD_BY_ID.eat, choices, undefined, country, mulberry32(3), 12, undefined, sceneOf('eat', choices))
+    const p = one({ scene: SCENE_OTHER, sceneText: '吃到飽' })
+    expect(p).toMatchObject({ kind: 'text', textQuery: '吃到飽 餐廳', radius: 1000, restrict: true, lane: 'scene:其他' })
+    expect(one({ scene: SCENE_OTHER, sceneText: '芒果', taste: '甜食' })).toMatchObject({ textQuery: '芒果 甜點' })
+    expect(one({ scene: SCENE_OTHER, sceneText: '咖哩', diet: '素' })).toMatchObject({ textQuery: '咖哩 素食' })
+    expect(one({ scene: SCENE_OTHER, sceneText: '個室' }, 'JP')).toMatchObject({ textQuery: '個室 レストラン' })
+    expect(eatOtherQuery('安靜', {}, 'other')).toBe('安靜 restaurant')
+    const w = widenPlan(p, { country: 'TW', rng: mulberry32(1), words: ['不該用到'] })
+    expect(w).toMatchObject({ kind: 'text', textQuery: '吃到飽 餐廳', radius: 2500, openNow: true })
+  })
+
+  it('歇：每種預設都改查法（修飾詞或半徑）；「其他」＝使用者的字＋喝什麼', () => {
+    const drinks = ['咖啡', '酒吧', '居酒屋', '熱炒燒烤']
+    for (const id of sceneOptions('rest').filter((o) => o !== SCENE_OTHER)) {
+      // 至少咖啡（預設）時，查法跟沒選情境不一樣
+      const base = new Set(restPlans({ drink: '咖啡' }).map(sig))
+      expect(restPlans({ scene: id, drink: '咖啡' }).filter((p) => base.has(sig(p))), id).toHaveLength(0)
+      for (const d of drinks) for (const p of restPlans({ scene: id, drink: d }, 'TW', 5)) expect(p.radius, `${id} ${d}`).toBe(sceneOf('rest', { scene: id })!.rule.radius)
+    }
+    expect(restPlans({ scene: '工作讀書', drink: '咖啡' })[0]).toMatchObject({ textQuery: '不限時 咖啡廳' })
+    expect(restPlans({ scene: '工作讀書', drink: '咖啡' }, 'JP')[0]).toMatchObject({ textQuery: '電源 咖啡廳' })
+    expect(restPlans({ scene: '談事情', drink: '酒吧' })[0]).toMatchObject({ textQuery: '安靜 酒吧' })
+    // 不適合的組合不加修飾詞（熱炒不會「不限時」）
+    expect(restPlans({ scene: '工作讀書', drink: '熱炒燒烤' })[0]).toMatchObject({ textQuery: '熱炒 燒烤' })
+    expect(restPlans({ scene: SCENE_OTHER, sceneText: '有插座', drink: '咖啡' })[0]).toMatchObject({ textQuery: '有插座 咖啡廳' })
+    expect(restQuery(null, '咖啡', '咖啡廳', 'TW')).toBe('咖啡廳')
+  })
+
+  it('第二次（擴大）：一般餐廳的通用關鍵字換成情境自己的；400 退路仍用通用的「餐廳」', () => {
+    const scene = sceneOf('eat', { scene: '朋友聚餐' })
+    const first = eatPlans({ scene: '朋友聚餐' })[0]!
+    const words = sceneWiden(scene, 'TW')!
+    expect(words).toEqual(['餐廳', '熱炒', '火鍋'])
+    for (let s = 1; s <= 30; s++) {
+      const w = widenPlan(first, { country: 'TW', rng: mulberry32(s), words })
+      expect(w.kind === 'text' && words.includes(w.textQuery)).toBe(true)
+    }
+    const quick = widenPlan(eatPlans({ scene: '一個人快吃' })[0]!, { country: 'TW', rng: mulberry32(2), words: sceneWiden(sceneOf('eat', { scene: '一個人快吃' }), 'TW') })
+    expect(quick.kind === 'text' && ['小吃', '便當', '麵店'].includes(quick.textQuery)).toBe(true)
+    const forced = widenPlan(first, { country: 'TW', forceRestaurant: true, words })
+    expect(forced).toMatchObject({ textQuery: '餐廳' })
+    expect(sceneWiden(sceneOf('rest', { scene: '工作讀書' }), 'TW')).toBeUndefined()
+    expect(sceneWiden(scene, 'other')).toBeUndefined()
+  })
+
+  it('情境關鍵字有推估價位（laneEst 查得到，畫面才標得出「推估」）', async () => {
+    const { laneEst } = await import('../../src/lanes.ts')
+    for (const q of SCENE_QUERIES) expect(laneEst(`q:${q.q}`), q.q).toBeTypeOf('number')
+  })
+})
+
+describe('挑店前的情境篩選', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+
+  it('聚餐／約會排除主類別是速食、超商的店；只是 types 裡順帶有 fast_food 的正餐店不排除', () => {
+    const scene = sceneOf('eat', { scene: '朋友聚餐' })
+    const cands = [c('mc', { primaryType: 'fast_food_restaurant' }), c('711', { primaryType: 'convenience_store' }), c('ramen', { primaryType: 'ramen_restaurant', types: ['ramen_restaurant', 'fast_food_restaurant'] })]
+    expect(sceneFilter(cands, scene).kept.map((x) => x.id)).toEqual(['ramen'])
+  })
+
+  it('約會排除評分 < 4.3；快吃排除步行 > 8 分；沒有資料的不排除', () => {
+    const date = sceneOf('eat', { scene: '約會吃好一點' })
+    expect(scenePasses(c('a', { rating: 4.2 }), date)).toBe(false)
+    expect(scenePasses(c('b', { rating: 4.3 }), date)).toBe(true)
+    expect(scenePasses(c('c', { rating: undefined }), date)).toBe(true)
+    const quick = sceneOf('eat', { scene: '一個人快吃' })
+    expect(scenePasses(c('d', { walkMin: 9 }), quick)).toBe(false)
+    expect(scenePasses(c('e', { walkMin: 8 }), quick)).toBe(true)
+    expect(scenePasses(c('f', { walkMin: 30 }), null)).toBe(true)
+  })
+
+  it('篩完一家都不剩 → 整批放回（寧可派得到），relaxed=true', () => {
+    const quick = sceneOf('eat', { scene: '一個人快吃' })
+    const far = [c('x', { walkMin: 15 }), c('y', { walkMin: 12 })]
+    expect(sceneFilter(far, quick)).toEqual({ kept: far, relaxed: true })
+    expect(sceneFilter([], quick)).toEqual({ kept: [], relaxed: false })
+    expect(sceneFilter(far, null)).toEqual({ kept: far, relaxed: false })
+  })
+})
+
+describe('口令對得上情境', () => {
+  const pick = { place: { id: 'p1', name: '阿財魯肉飯', walkMin: 5 }, mode: 'new', visits: 1, pool: 5, afterFilter: 5, relaxed: [], exhausted: false, seen14d: false } as unknown as PickResult
+  const req = (choices: Record<string, string | number>, module: 'eat' | 'rest' = 'eat'): OrderRequest =>
+    ({ module, level: 1, choices, now: '2026-11-01T12:00:00+08:00', recentOrders: [] }) as OrderRequest
+
+  it('prompt 帶情境一行；「其他」帶使用者的字；沒選情境不帶', () => {
+    expect(buildOrderPrompt(req({ scene: '外帶' }), pick).user).toContain('情境：外帶')
+    expect(buildOrderPrompt(req({ scene: '工作讀書', drink: '咖啡' }, 'rest'), pick).user).toContain('插座')
+    expect(buildOrderPrompt(req({ scene: SCENE_OTHER, sceneText: '有插座' }), pick).user).toContain('「有插座」')
+    expect(buildOrderPrompt(req({}), pick).user).not.toContain('情境：')
+  })
+
+  it('模板口令（Claude 失敗時）也照情境寫：外帶不寫在店裡吃完、聚餐寫一起分、工作讀書寫插座', () => {
+    const tz = 'Asia/Taipei' as never
+    const now = new Date('2026-11-01T12:00:00+08:00')
+    const steps = (choices: Record<string, string | number>, module: 'eat' | 'rest' = 'eat') => templateOrder(req(choices, module), pick, now, tz).steps.join('／')
+    expect(steps({ scene: '外帶' })).toContain('外帶')
+    expect(steps({ scene: '外帶' })).not.toMatch(/店裡|內用/)
+    expect(steps({ scene: '朋友聚餐' })).toContain('一起分')
+    expect(steps({ scene: '一個人快吃' })).toContain('只點一道')
+    expect(steps({ scene: '工作讀書', drink: '咖啡' }, 'rest')).toContain('插座')
+    // 喝酒的安全規則優先於情境
+    expect(steps({ scene: '談事情', drink: '酒吧' }, 'rest')).toContain('不准開車騎車')
+    for (const id of [...sceneOptions('eat'), ...sceneOptions('rest')]) {
+      for (const s of templateOrder(req({ scene: id, drink: '咖啡' }, sceneOptions('eat').includes(id) ? 'eat' : 'rest'), pick, now, tz).steps) expect([...s].length, s).toBeLessThanOrEqual(22)
+    }
+  })
+})
+
+describe('沒做／不符合情境：不罰、不扣服從率，紀錄照記（STOP 4）', () => {
+  const e = (outcome: DiaryEntry['outcome'], i: number): DiaryEntry => ({ id: `e${i}`, ts: `2026-11-01T1${i}:00:00+08:00`, module: 'eat', level: 1, big: 'x', outcome })
+
+  it('服從率分母不含 mismatch；罰則不含 mismatch；口令數照算', () => {
+    const s = stats([e('done', 1), e('mismatch', 2), e('mismatch', 3), e('punished', 4)])
+    expect(s).toMatchObject({ orders: 4, complianceRate: 50, punishments: 1 })
+    expect(stats([e('mismatch', 1)])).toMatchObject({ orders: 1, complianceRate: 100, punishments: 0, weakestModule: null })
+  })
+
+  it('試用紀錄摘要：mismatch 次數、依情境分的成績', () => {
+    const t = (scene: string, outcome?: DiaryEntry['outcome'], module: 'eat' | 'rest' = 'eat'): TrialEntry =>
+      ({ at: '2026-11-01T12:00:00.000Z', module, level: 1, ok: true, placeId: 'p', choices: { scene }, ...(outcome ? { outcome } : {}) })
+    const s = summarize([t('外帶', 'done'), t('外帶', 'mismatch'), t('宵夜', 'punished'), t('工作讀書', 'mismatch', 'rest'), t('外帶')])
+    expect(s.mismatch).toBe(2)
+    expect(s.byScene['eat:外帶']).toEqual({ orders: 3, done: 1, reissued: 0, punished: 0, mismatch: 1 })
+    expect(s.byScene['eat:宵夜']).toMatchObject({ orders: 1, punished: 1 })
+    expect(s.byScene['rest:工作讀書']).toMatchObject({ orders: 1, mismatch: 1 })
+  })
+})
+
+// ── handler：情境真的接上伺服器 ─────────────────────────────────────
+const handler = api.fetch
+const ORDER_JSON = JSON.stringify({
+  verdict: 'do', meme: { top: '去吃', big: '店', bot: '照做' }, steps: ['點一道。'], place: { id: '', name: '' }, log: '12:00 口令。',
+})
+const claudeOk = () => new Response(JSON.stringify({ content: [{ type: 'text', text: ORDER_JSON }] }), { status: 200 })
+const LOC = { lat: 25.033, lng: 121.5654 }
+/** 往東 n 公尺的店（walkMin = ceil(n/80)）。 */
+const at = (id: string, meters: number, extra: Partial<RawPlace> = {}): RawPlace => ({
+  id, displayName: { text: `店${id}` }, location: { latitude: LOC.lat, longitude: LOC.lng + meters / (111_320 * Math.cos((LOC.lat * Math.PI) / 180)) },
+  currentOpeningHours: { openNow: true }, rating: 4.5, userRatingCount: 100, primaryType: 'restaurant', types: ['restaurant'], ...extra,
+})
+const post = (body: Partial<OrderRequest>) => new Request('http://localhost/api/order', {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ module: 'eat', level: 1, choices: {}, loc: LOC, now: '2026-11-01T12:00:00+08:00', recentOrders: [], ...body }),
+})
+type Body = Order & { debug: OrderDebug }
+
+describe('handler 接上情境', () => {
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    process.env.GOOGLE_PLACES_KEY = 'test-places-key'
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+
+  const stub = (pages: RawPlace[][]) => {
+    const bodies: Record<string, unknown>[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('anthropic')) return claudeOk()
+      bodies.push(JSON.parse(String(init?.body ?? '{}')))
+      return new Response(JSON.stringify({ places: pages[bodies.length - 1] ?? [] }), { status: 200 })
+    }))
+    return bodies
+  }
+
+  it('一個人快吃：第一次只查 ±500 m 方框；5 家都超過 8 分 → 仍打第二次（情境自己的關鍵字），派 8 分內的那家（20 個種子）', async () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const far = [1, 2, 3, 4, 5].map((n) => at(`far${n}`, 900 + n * 20))
+      const bodies = stub([far, [at('near', 400)]])
+      const res = await handler(post({ choices: { scene: '一個人快吃' }, seed }))
+      expect(res.status, `seed ${seed}`).toBe(200)
+      const body = (await res.json()) as Body
+      const [first, second] = bodies as { textQuery: string; locationRestriction: { rectangle: { high: { latitude: number } } } }[]
+      expect(first!.locationRestriction.rectangle.high.latitude - LOC.lat).toBeCloseTo(500 / 111_320, 5)
+      expect(['便當', '麵店', '小吃', '滷肉飯', '水餃 鍋貼', '丼飯', '咖哩飯']).toContain(first!.textQuery)
+      expect(['小吃', '便當', '麵店']).toContain(second!.textQuery)
+      expect(body.place?.id, `seed ${seed}`).toBe('near')
+      expect(body.place!.walkMin).toBeLessThanOrEqual(8)
+      expect(body.debug.scene).toMatchObject({ id: '一個人快吃', kept: 1, total: 6, relaxed: false })
+    }
+  })
+
+  it('朋友聚餐：速食店、超商 0 次被派（20 個種子）；只剩速食時才放回並標 relaxed', async () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const page = [at('mc', 200, { primaryType: 'fast_food_restaurant' }), at('711', 150, { primaryType: 'convenience_store' }), at('hotpot', 600, { primaryType: 'hot_pot_restaurant', rating: 4.1 })]
+      stub([page, []])
+      const body = (await (await handler(post({ choices: { scene: '朋友聚餐' }, seed }))).json()) as Body
+      expect(body.place?.id, `seed ${seed}`).toBe('hotpot')
+    }
+    stub([[at('mc', 200, { primaryType: 'fast_food_restaurant' })], []])
+    const body = (await (await handler(post({ choices: { scene: '朋友聚餐' }, seed: 1 }))).json()) as Body
+    expect(body.place?.id).toBe('mc')
+    expect(body.debug.scene).toMatchObject({ relaxed: true })
+  })
+
+  it('宵夜：第一次就帶 openNow', async () => {
+    const bodies = stub([[1, 2, 3, 4, 5].map((n) => at(`s${n}`, n * 50))])
+    const res = await handler(post({ choices: { scene: '宵夜' }, seed: 4, now: '2026-11-01T23:40:00+08:00' }))
+    expect(res.status).toBe(200)
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatchObject({ openNow: true })
+  })
+
+  it('「其他」：使用者的字進關鍵字、進口令的 prompt，不進伺服器 log；入口先清洗（控制字元、20 字）', async () => {
+    const bodies = stub([[1, 2, 3, 4, 5].map((n) => at(`o${n}`, n * 50))])
+    const prompts: string[] = []
+    const f = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const inner = f.getMockImplementation() as (url: string, init?: RequestInit) => Promise<Response>
+    f.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (String(url).includes('anthropic')) prompts.push(String(init?.body ?? ''))
+      return inner(url, init)
+    })
+    const text = `有插座\n${'安靜'.repeat(20)}`
+    const res = await handler(post({ choices: { scene: SCENE_OTHER, sceneText: text }, seed: 2 }))
+    expect(res.status).toBe(200)
+    const clean = sanitizeSceneText(text)
+    expect(bodies[0]).toMatchObject({ textQuery: `${clean} 餐廳` })
+    expect(prompts.join('')).toContain(clean)
+    const logs = [...(console.info as unknown as ReturnType<typeof vi.fn>).mock.calls, ...(console.warn as unknown as ReturnType<typeof vi.fn>).mock.calls].map((c) => String(c[0])).join('\n')
+    expect(logs).toContain('scene=其他')
+    expect(logs).not.toContain('有插座')
+    const body = (await res.json()) as Body
+    expect(body.debug.scene).toMatchObject({ id: SCENE_OTHER, text: clean })
+    expect(sanitizeRequest({ module: 'eat', choices: { scene: SCENE_OTHER, sceneText: ' \n ' } } as unknown as OrderRequest).choices).toEqual({ scene: SCENE_OTHER })
+  })
+
+  it('沒選情境：照舊（舊版前端相容），debug 沒有 scene', async () => {
+    stub([[1, 2, 3, 4, 5].map((n) => at(`n${n}`, n * 50))])
+    const res = await handler(post({ choices: { diet: '都可以' }, seed: 3 }))
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as Body).debug.scene).toBeUndefined()
+  })
+})

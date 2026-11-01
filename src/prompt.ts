@@ -3,6 +3,7 @@ import { OFFICER_BY_LEVEL, sampleCorpus } from './officers.ts'
 import { CARD_BY_ID } from './cards.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
 import { bandOf, estText, priceFit, priceText } from './price.ts'
+import { sceneOf } from './scene.ts'
 import type { Band, Country, Level, ModuleId, OrderRequest, PickResult } from './types.ts'
 
 // Round 3：PlaceCandidate 搬到 types.ts（DEV-PLAN-3 §B.1），這裡轉出口讓既有 import 不用動。
@@ -51,6 +52,8 @@ export function buildOrderPrompt(req: OrderRequest, pick: PickResult | null, cou
     req.loc ? `使用者人在${country === 'JP' ? '日本' : country === 'TW' ? '台灣' : '台灣與日本以外的地方'}。` : '使用者沒有給定位。依規則 6 降級，不得編造店名與距離。',
     country === 'JP' ? '使用者人在日本：交通講電車／地下鐵，不講捷運；金額只有日圓。' : '',
     `使用者的選擇：${JSON.stringify(req.choices, null, 0)}`,
+    // Round 5：情境一行（口令要對得上：外帶不寫內用、聚餐寫幾道一起分…）。
+    sceneOf(req.module, req.choices ?? {})?.rule.hint ?? '',
     pick ? decidedBlock(req, pick, country) : '',
     req.recentOrders.length
       ? `近 7 天口令：\n${req.recentOrders.map((r) => `・${r.at} ${r.module} ${r.big}`).join('\n')}`
@@ -135,6 +138,7 @@ function computedFacts(req: OrderRequest, now: Date): string {
 export const WEEKLY_SYSTEM_PROMPT = `${ORDER_SYSTEM_PROMPT}
 
 【本次任務】讀 entries（本週 DiaryEntry[]）。用同一位班長口吻寫 WeeklyReport.body（≤180 字）：
+outcome=mismatch 是班長派的店不符合使用者的情境，錯在班長：不罵、不算罰則。
 ① 數字：口令數、服從率、罰則次數 ② 一個規律（例：只在不用出門的事上偷懶／晚上意志最弱）③ 下週一個對策 ④ verdict 一句（≤14 字）。
 只輸出 WeeklyReport JSON：{"weekStart":"","level":0,"stats":{"orders":0,"complianceRate":0,"punishments":0,"weakestModule":null},"body":"","verdict":""}`
 

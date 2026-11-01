@@ -6,6 +6,7 @@
 import { betaSample, cuisineOf, type Rng } from './discovery.ts'
 import { WIDEN_FACTOR } from './places.ts'
 import { priceFit } from './price.ts'
+import { SCENE_OTHER, SCENE_QUERIES, eatOtherQuery, restQuery, type Scene } from './scene.ts'
 import type { Band, Country, CuisineStats, ModuleCard } from './types.ts'
 
 export interface Lane {
@@ -138,7 +139,7 @@ export const VEG_QUERIES: Record<'TW' | 'JP', QueryLane[]> = {
 
 /** 關鍵字 lane 的 id：`q:便當`。第二次呼叫與推估價位都靠這個前綴認。 */
 export const queryLaneId = (q: string) => `q:${q}`
-const ALL_QUERY = [...QUERY_LANES.TW, ...QUERY_LANES.JP, ...SWEET_QUERIES.TW, ...SWEET_QUERIES.JP, ...VEG_QUERIES.TW, ...VEG_QUERIES.JP]
+const ALL_QUERY = [...QUERY_LANES.TW, ...QUERY_LANES.JP, ...SWEET_QUERIES.TW, ...SWEET_QUERIES.JP, ...VEG_QUERIES.TW, ...VEG_QUERIES.JP, ...SCENE_QUERIES]
 /** lane id → 我方推估的價位檔；不是關鍵字 lane 就 undefined。 */
 export function laneEst(lane: string | undefined): number | undefined {
   if (!lane?.startsWith('q:')) return undefined
@@ -196,6 +197,9 @@ export function mealLanes(choices: Record<string, string | number>, country: Cou
  *   Nearby 的 rankPreference 在 POPULARITY／DISTANCE 交替；關鍵字在 DISTANCE／RELEVANCE 交替。
  * - 有預算（Round 4）：只走關鍵字 lane（Nearby 沒有價位篩選），只挑推估價位對得上的關鍵字，並帶 priceLevels。
  * hour = 當地小時（14 點後不排早午餐 lane，省得撈回一堆打烊的店、多花第二次呼叫）。
+ * - 情境（Round 5，src/scene.ts）：半徑照情境；吃的一般情況只在情境的關鍵字池裡挑（一個人快吃 → 便當、麵店…），
+ *   不排 Nearby lane；宵夜第一次就只要營業中；「其他」→ 使用者的字＋基本詞（餐廳／甜點／素食）。
+ *   甜食、吃素照原本的 lane，只換半徑。歇：情境改寫「喝什麼」的關鍵字（工作讀書 → 不限時 咖啡廳）。
  */
 export function pickLane(
   card: Pick<ModuleCard, 'id' | 'intake' | 'placesQuery'>,
@@ -205,26 +209,38 @@ export function pickLane(
   rng: Rng,
   hour?: number,
   budget?: Band[],
+  scene: Scene | null = null,
 ): LanePlan {
-  const radius = card.placesQuery?.radiusByTransport?.default ?? 800
+  const radius = scene?.rule.radius ?? card.placesQuery?.radiusByTransport?.default ?? 800
   const tq = card.placesQuery?.textQuery
   if (tq) {
     const fallback = card.intake.find((f) => f.key === tq.key)?.default
-    const q = tq.byOption[String(choices[tq.key] ?? '')] ?? tq.byOption[String(fallback ?? '')]
-    if (q) return { kind: 'text', lane: `text:${q}`, textQuery: q, radius, rank: rng() < 0.5 ? 'DISTANCE' : 'RELEVANCE' }
+    const drink = String(choices[tq.key] ?? '')
+    const base = tq.byOption[drink] ?? tq.byOption[String(fallback ?? '')]
+    if (base) {
+      const q = restQuery(scene, tq.byOption[drink] ? drink : String(fallback ?? ''), base, country)
+      // lane id 不放使用者打的字（會進伺服器 log）：有情境就標情境名。
+      return { kind: 'text', lane: scene ? `text:${base}@${scene.id}` : `text:${q}`, textQuery: q, radius, rank: rng() < 0.5 ? 'DISTANCE' : 'RELEVANCE' }
+    }
   }
   const nearbyRank = (): NearbyRank => (rng() < 0.5 ? 'POPULARITY' : 'DISTANCE')
   const plan = (l: Lane): LanePlan => ({ kind: 'nearby', lane: l.id, includedTypes: l.types, radius, rank: nearbyRank() })
   const levels = priceLevelsFor(budget)
+  const openNow = scene?.rule.openNow ? { openNow: true } : {}
   const query = (l: QueryLane): LanePlan => ({
     kind: 'text', lane: queryLaneId(l.q), textQuery: l.q, radius, rank: rng() < 0.5 ? 'DISTANCE' : 'RELEVANCE', restrict: true,
-    ...(levels ? { priceLevels: levels } : {}),
+    ...openNow, ...(levels ? { priceLevels: levels } : {}),
   })
   const local = country === 'TW' || country === 'JP' ? country : null
 
   if (card.id !== 'eat') {
     // 目前只有 eat 用 lane；其他需要 Places 的卡照卡片設定的 type。
     return { kind: 'nearby', lane: (card.placesQuery?.includedTypes ?? ['restaurant']).join('|'), includedTypes: card.placesQuery?.includedTypes ?? ['restaurant'], radius, rank: nearbyRank() }
+  }
+  if (scene?.id === SCENE_OTHER && scene.text) {
+    // 「其他」：使用者自己寫的需求就是關鍵字（第二次 widenPlan 也保留同一個關鍵字）。
+    const q = eatOtherQuery(scene.text, choices, country)
+    return { kind: 'text', lane: `scene:${SCENE_OTHER}`, textQuery: q, radius, rank: rng() < 0.5 ? 'DISTANCE' : 'RELEVANCE', restrict: true, ...(levels ? { priceLevels: levels } : {}) }
   }
   if (choices.taste === '甜食') {
     if (local && rng() < 0.5) { const qs = SWEET_QUERIES[local]; return query(qs[Math.floor(rng() * qs.length)]!) }
@@ -239,7 +255,9 @@ export function pickLane(
 
   const diet = String(choices.diet ?? '')
   const late = hour !== undefined && hour >= 14
-  let queries = local ? QUERY_LANES[local].filter((l) => !l.block?.includes(diet) && !(late && l.lunchOnly)) : []
+  const scenePool = local ? scene?.rule.queries?.[local].filter((l) => !l.block?.includes(diet)) : undefined
+  const sceneOnly = !!scenePool?.length
+  let queries = sceneOnly ? scenePool! : local ? QUERY_LANES[local].filter((l) => !l.block?.includes(diet) && !(late && l.lunchOnly)) : []
   // 有預算：只排推估價位對得上（命中或相鄰）的關鍵字；一個都沒有就不限關鍵字，價位交給 priceLevels 與 pickPlace。
   if (budget?.length && queries.length) {
     const fit = queries.filter((l) => priceFit(l.est, budget) > 0)
@@ -249,7 +267,8 @@ export function pickLane(
   const opts: Opt[] = [
     ...queries.map((l): Opt => ({ group: l.group, make: () => query(l) })),
     // 有預算時不排 Nearby lane：它沒有價位篩選，撈回來的價位未知店最多。
-    ...(budget?.length && queries.length ? [] : mealLanes(choices, country, hour).map((l): Opt => ({ group: l.group, make: () => plan(l) }))),
+    // 有情境關鍵字池時也不排：Nearby 的 type 分不出「快吃」「聚餐」。
+    ...((budget?.length && queries.length) || sceneOnly ? [] : mealLanes(choices, country, hour).map((l): Opt => ({ group: l.group, make: () => plan(l) }))),
   ]
   if (opts.length === 0) return plan(RESTAURANT_LANE)
   if (rng() < 0.75) {
@@ -278,16 +297,18 @@ const GENERIC: Record<Country, string[]> = { TW: ['餐廳', '美食', '小吃'],
  *   （深夜也查得到營業中的店）。帶 rng 就輪替關鍵字與排序；不帶（舊呼叫端）固定「餐廳＋依距離」。
  *   甜食／素食保留自己的 type 或關鍵字（不然會派甜食的人去吃牛排）。
  * - forceRestaurant：第一次回 400（lane 的 type 不被接受）→ 一律退回營業中的餐廳 Text Search。
- * - 預算的 priceLevels 第二次不帶：深夜預算內的店常常全關，交給 pickPlace 照預算挑、口令講清楚（budgetLine）。
+ * - 預算的 priceLevels 第二次保留（Round 4 實測）；只有 dropPrice（預算內一家都撈不到的後備）才拿掉。
+ * - 關鍵字不是 q: 開頭的 Text Search（歇、吃的「其他」）：同一個關鍵字擴大再查一次。
+ * - words（Round 5 情境）：一般餐廳的通用關鍵字換成情境自己的（朋友聚餐 → 餐廳／熱炒／火鍋）。
  */
-export function widenPlan(first: LanePlan, opts: { forceRestaurant?: boolean; country?: Country; rng?: Rng; dropPrice?: boolean } = {}): LanePlan {
+export function widenPlan(first: LanePlan, opts: { forceRestaurant?: boolean; country?: Country; rng?: Rng; dropPrice?: boolean; words?: string[] } = {}): LanePlan {
   const radius = Math.round(first.radius * WIDEN_FACTOR)
   const country = opts.country ?? 'TW'
   // Round 4 實測（2026-11-01 內湖 09:00）：第二次不帶 priceLevels → 撈回 20 家最近的平價早餐店，
   // 預算 3、4 檔四次錯三次。有預算就保留 priceLevels；只有「預算內一家都撈不到」的後備（dropPrice）才拿掉。
   const levels = first.kind === 'text' && first.priceLevels && !opts.dropPrice ? { priceLevels: first.priceLevels } : {}
   const generic = (): LanePlan => {
-    const words = GENERIC[country]
+    const words = opts.words?.length && !opts.forceRestaurant ? opts.words : GENERIC[country]
     const word = opts.rng ? words[Math.floor(opts.rng() * words.length)]! : words[0]!
     const rank: TextRank = opts.rng && opts.rng() < 0.5 ? 'RELEVANCE' : 'DISTANCE'
     return { kind: 'text', lane: 'text:open-now', textQuery: word, radius, rank, openNow: true, ...levels }

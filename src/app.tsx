@@ -1,6 +1,6 @@
 // 單頁狀態機 home→intake→cmd→(log|stand)；diary；weekly（第 4 節）。
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { CARD_BY_ID, MAJOR_IDS, MINOR_IDS, MODULE_BARKS } from './cards.ts'
+import { CARD_BY_ID, MAJOR_IDS, MINOR_IDS, MODULE_BARKS, SCENE_BARKS } from './cards.ts'
 import { OFFICER_BY_LEVEL } from './officers.ts'
 import { Avatar } from './avatar.tsx'
 import { InsigniaMark } from './insignia.tsx'
@@ -20,9 +20,10 @@ import {
 } from './placeMem.ts'
 import { clearTrial, exportTrial, readTrial, recordTrial, summarize, tagTrial } from './trial.ts'
 import {
-  effectiveBudget, loadBudget, loadCountry, loadNovelty, lunchHidesTop, nextNovelty, NOVELTY_LABEL,
-  saveBudget, saveCountry, saveNovelty, toggleBand,
+  effectiveBudget, loadBudget, loadCountry, loadLastScene, loadNovelty, lunchHidesTop, nextNovelty, NOVELTY_LABEL,
+  orderScenes, saveBudget, saveCountry, saveLastScene, saveNovelty, toggleBand,
 } from './prefs.ts'
+import { SCENE_KEY, SCENE_OTHER, SCENE_TEXT_KEY, SCENE_TEXT_MAX, sanitizeSceneText } from './scene.ts'
 import { bandLabels, countryOf } from './price.ts'
 import { Consent, CONSENT_KEY, CONSENT_VERSION } from './consent.tsx'
 import { Privacy } from './privacy.tsx'
@@ -31,7 +32,7 @@ import type {
   Band, Country, DiaryEntry, Level, ModuleCard, ModuleId, Novelty, Order, ReissueReason, WeeklyReport,
 } from './types.ts'
 
-type Screen = 'home' | 'intake' | 'waiting' | 'cmd' | 'log' | 'stand' | 'error' | 'diary' | 'weekly' | 'debug' | 'privacy'
+type Screen = 'home' | 'scene' | 'intake' | 'waiting' | 'cmd' | 'log' | 'stand' | 'error' | 'diary' | 'weekly' | 'debug' | 'privacy'
 
 const LEVEL_KEY = 'decide.level'
 
@@ -91,6 +92,8 @@ export function App() {
   /** 這次 intake 解析到的位置——只活在記憶體，用來判斷午餐時段（當地時間）；不存。 */
   const [geoLoc, setGeoLoc] = useState<Loc | undefined>(undefined)
   const [reasonOpen, setReasonOpen] = useState(false)
+  /** Round 5：「沒做」先問原因（不符合情境 → 不罰站；就是不想做 → 罰站）。 */
+  const [skipOpen, setSkipOpen] = useState(false)
   const [discovery, setDiscovery] = useState({ newPlaces: 0, revisits: 0 })
   const excluded = useRef<string[]>([])
   /** 這道口令已經說過「今天不想吃這類」的細類（換口令時送給伺服器降權）。 */
@@ -183,11 +186,13 @@ export function App() {
     setGeoDenied(false)
     setError(null)
     setReasonOpen(false)
+    setSkipOpen(false)
     excluded.current = []
     rejectedCuisines.current = []
     manualLoc.current = undefined
     issuedAt.current = ''
-    setScreen('intake')
+    // Round 5：吃／歇第一步先選情境（獨立一頁：原本的選單維持 ≤ 3 題、一屏放得下）。
+    setScreen(c.intake.some((f) => f.type === 'scene') ? 'scene' : 'intake')
   }, [])
 
   const fetchOrder = useCallback(async (c: ModuleCard, ch: Record<string, string | number>, locOverride?: Loc) => {
@@ -231,7 +236,12 @@ export function App() {
     const memModule = isMemModule(c.id) ? c.id : null
     const mem = memModule ? await safe(() => memSummary(memModule, now), []) : []
     const cuisine = memModule ? await safe(cuisineStats, {}) : {}
-    const clean = Object.fromEntries(Object.entries(ch).filter(([k]) => c.intake.some((f) => f.key === k && f.type !== 'bands')))
+    const hasScene = c.intake.some((f) => f.type === 'scene')
+    const clean = Object.fromEntries(Object.entries(ch).filter(([k]) =>
+      c.intake.some((f) => f.key === k && f.type !== 'bands')
+      // 情境「其他」的手動輸入跟著送（只在選了「其他」時）。
+      || (hasScene && k === SCENE_TEXT_KEY && ch[SCENE_KEY] === SCENE_OTHER)))
+    if (SCENE_TEXT_KEY in clean) clean[SCENE_TEXT_KEY] = sanitizeSceneText(clean[SCENE_TEXT_KEY])
 
     try {
       const o = await requestOrder({
@@ -263,7 +273,12 @@ export function App() {
     }
   }, [level, entries, country, budgets, novelty])
 
-  const submit = useCallback(() => { if (card) void fetchOrder(card, choices) }, [card, choices, fetchOrder])
+  const submit = useCallback(() => {
+    if (!card || !sceneReady(card, choices)) return
+    const sc = choices[SCENE_KEY]
+    if (typeof sc === 'string' && sc) saveLastScene(card.id, sc)
+    void fetchOrder(card, choices)
+  }, [card, choices, fetchOrder])
 
   /** C2：沒有定位時手動報地點。回傳錯誤文字（顯示在輸入列下面）；成功就直接重送，畫面會換掉。 */
   const reportLocation = useCallback(async (q: string): Promise<string | null> => {
@@ -323,9 +338,35 @@ export function App() {
     setScreen('log')
   }, [card, order, record])
 
+  /** 沒做：有情境的卡（吃／歇）先問原因；其他卡照舊直接罰站。 */
   const skip = useCallback(() => {
+    if (card?.intake.some((f) => f.type === 'scene')) { setSkipOpen(true); return }
     void record('punished', order, card)
     setScreen('stand')
+  }, [card, order, record])
+
+  const refuse = useCallback(() => {
+    setSkipOpen(false)
+    void record('punished', order, card)
+    setScreen('stand')
+  }, [card, order, record])
+
+  /**
+   * Round 5（Cross 2026-11-01「使用者按沒做很冤枉」）：派的不符合情境 → 不罰站、不算服從率，記進日記與試用紀錄；
+   * 回到選單、情境清空重選。這家這次排除（這一輪換口令之間），其他選項保留。
+   */
+  const mismatch = useCallback(() => {
+    setSkipOpen(false)
+    void record('mismatch', order, card)
+    const id = order?.place?.id
+    if (id && !excluded.current.includes(id)) excluded.current.push(id)
+    setChoices((c) => { const { [SCENE_TEXT_KEY]: _t, ...rest } = c; return { ...rest, [SCENE_KEY]: '' } })
+    setOrder(null)
+    setReissued(false)
+    setError(null)
+    issuedAt.current = '' // 重選情境後是新的一道口令，日記另記一筆
+    if (card?.needsPlaces && underPlacesCap()) geoAhead.current = getLocation()
+    setScreen('scene')
   }, [card, order, record])
 
   const goHome = useCallback(() => setScreen('home'), [])
@@ -373,11 +414,23 @@ export function App() {
           />
         )}
         {screen === 'privacy' && <Privacy onBack={goHome} />}
+        {screen === 'scene' && card && (
+          <ScenePick
+            card={card} level={level} value={String(choices[SCENE_KEY] ?? '')} text={String(choices[SCENE_TEXT_KEY] ?? '')}
+            onPick={(o) => {
+              setChoices((c) => { const { [SCENE_TEXT_KEY]: t, ...rest } = c; return o === SCENE_OTHER ? { ...rest, [SCENE_KEY]: o, ...(t !== undefined ? { [SCENE_TEXT_KEY]: t } : {}) } : { ...rest, [SCENE_KEY]: o } })
+              if (o !== SCENE_OTHER) setScreen('intake')
+            }}
+            onText={(t) => setChoices((c) => ({ ...c, [SCENE_TEXT_KEY]: t }))}
+            onNext={() => { if (sceneReady(card, choices)) setScreen('intake') }}
+            onBack={goHome}
+          />
+        )}
         {screen === 'intake' && card && (
           <Intake
             card={card} level={level} choices={choices}
             onChange={(k, v) => setChoices((c) => ({ ...c, [k]: v }))}
-            onBack={goHome} onSubmit={submit}
+            onBack={goHome} onSubmit={submit} onScene={() => setScreen('scene')}
             country={country} budget={effectiveBudget(country === 'TW' || country === 'JP' ? budgets[country] : [], hideTop)}
             hideTop={hideTop} onBudget={changeBudget}
           />
@@ -411,6 +464,17 @@ export function App() {
           />
         )}
         {screen === 'debug' && <Debug level={level} onHome={goHome} />}
+        {skipOpen && card && (
+          <Sheet title="為什麼沒做？" sub="照實報告，班長不冤枉人。" onClose={() => setSkipOpen(false)} testid="skip-sheet">
+            <button className="sheet-opt" data-testid="skip-mismatch" onClick={mismatch}>
+              <b>不符合我現在的情境</b><span>不罰站。重選情境，班長重派</span>
+            </button>
+            <button className="sheet-opt" data-testid="skip-refuse" onClick={refuse}>
+              <b>我就是不想做</b><span>照規矩罰站</span>
+            </button>
+            <button className="sheet-cancel" data-testid="skip-cancel" onClick={() => setSkipOpen(false)}>我再想想</button>
+          </Sheet>
+        )}
         {reasonOpen && card && (
           <Sheet title="報告原因，班長記下。" onClose={() => setReasonOpen(false)} testid="reason-sheet">
             <button className="sheet-opt" data-testid="reason-closed" onClick={() => void reissueWith('closed')}>
@@ -543,19 +607,92 @@ function breakAfterDash(label: string) {
 }
 function Wbr(key: number) { return <wbr key={`w${key}`} /> }
 
-function Intake({ card, level, choices, onChange, onBack, onSubmit, country = 'TW', budget = [], hideTop = false, onBudget }: {
+/** 有情境的卡（吃／歇）：情境必選；選「其他」要打字（Round 5）。沒有情境欄位的卡一律 true。 */
+export function sceneReady(card: Pick<ModuleCard, 'intake'>, choices: Record<string, string | number>): boolean {
+  if (!card.intake.some((f) => f.type === 'scene')) return true
+  const sc = choices[SCENE_KEY]
+  if (typeof sc !== 'string' || !sc) return false
+  return sc !== SCENE_OTHER || sanitizeSceneText(choices[SCENE_TEXT_KEY]) !== ''
+}
+
+/**
+ * Round 5 第一步：情境（吃／歇）。點一個預設就直接進下一步；「其他」展開輸入框（≤ 20 字）＋「下一步」。
+ * 上次選的排第一個，但不幫使用者選。順序在進畫面時決定，點選時不跳動。
+ */
+function ScenePick({ card, level, value, text, onPick, onText, onNext, onBack }: {
+  card: ModuleCard; level: Level; value: string; text: string
+  onPick: (o: string) => void; onText: (t: string) => void; onNext: () => void; onBack: () => void
+}) {
+  const field = card.intake.find((f) => f.type === 'scene')
+  const [opts] = useState(() => orderScenes(field?.options ?? [], loadLastScene(card.id), SCENE_OTHER))
+  const ready = sceneReady(card, { [SCENE_KEY]: value, [SCENE_TEXT_KEY]: text })
+  return (
+    <section className="screen" data-screen="scene">
+      <OfficerPlate level={level} mood="bark" />
+      <button className="back" onClick={onBack}>← 回報告</button>
+      <div className="bubble" data-testid="bubble">{SCENE_BARKS[level]}</div>
+      <div>
+        <p className="lab">{card.title} · 情境<small className="req">必選</small></p>
+        <div className="chips scene-chips" data-field={SCENE_KEY} role="group" aria-label="情境">
+          {opts.map((o) => (
+            <button key={o} className="chip" aria-pressed={value === o} onClick={() => onPick(o)}>{o}</button>
+          ))}
+        </div>
+        {value === SCENE_OTHER && (
+          <form className="manual-in scene-in" onSubmit={(e) => { e.preventDefault(); onNext() }}>
+            <input
+              data-testid="scene-text" type="text" enterKeyHint="next" autoComplete="off" maxLength={SCENE_TEXT_MAX}
+              aria-label="你的情境" placeholder="例如：有插座、安靜、吃到飽" value={text} autoFocus
+              onChange={(e) => onText(e.target.value)}
+            />
+            <button className="btn" type="submit" data-testid="scene-next" disabled={!ready}>下一步</button>
+          </form>
+        )}
+        {value === SCENE_OTHER && !ready && (
+          <p className="hint scene-need" data-testid="scene-required">寫一下你的情境（{SCENE_TEXT_MAX} 字內），班長才派得準。</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function Intake({ card, level, choices, onChange, onBack, onSubmit, onScene, country = 'TW', budget = [], hideTop = false, onBudget }: {
   card: ModuleCard; level: Level; choices: Record<string, string | number>
   onChange: (k: string, v: string | number) => void; onBack: () => void; onSubmit: () => void
+  /** Round 5：回第一步改情境（只有吃／歇）。 */
+  onScene?: () => void
   /** 預算 chips 的幣別看座標（不看手機語系）；other = 整列隱藏。 */
   country?: Country; budget?: Band[]; hideTop?: boolean; onBudget?: (n: Band | null) => void
 }) {
+  const ready = sceneReady(card, choices)
+  const hasScene = card.intake.some((f) => f.type === 'scene')
+  // Round 5：從情境頁進來時捲動位置是 0（情境頁比較短），375×667 的送出鍵會掉出第一屏約 20px。
+  // 進畫面時若送出鍵不在第一屏，就捲到剛好看得到（使用者不用自己捲）。
+  const submitRow = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = submitRow.current
+    if (!el) return
+    const over = el.getBoundingClientRect().bottom - window.innerHeight
+    if (over > 0) window.scrollBy(0, over + 8)
+  }, [])
+  const sc = String(choices[SCENE_KEY] ?? '')
+  const scLabel = sc === SCENE_OTHER ? sanitizeSceneText(choices[SCENE_TEXT_KEY]) || SCENE_OTHER : sc
   return (
     <section className="screen" data-screen="intake">
       <OfficerPlate level={level} mood="bark" />
-      <button className="back" onClick={onBack}>← 回報告</button>
+      {/* 情境標籤跟返回鍵同一行：不加高度（選單仍要一屏放得下）。 */}
+      <div className="intake-top">
+        <button className="back" onClick={onBack}>← 回報告</button>
+        {hasScene && (
+          <button className="scene-tag" data-testid="scene-change" onClick={onScene}>
+            情境：{scLabel || '未選'}<span aria-hidden="true">　改</span>
+          </button>
+        )}
+      </div>
       <div className="bubble" data-testid="bubble">{MODULE_BARKS[card.id][level]}</div>
       <div>
         {card.intake.map((f) => {
+          if (f.type === 'scene') return null // 第一步（ScenePick）選過了
           if (f.type === 'bands' && bandLabels(country).length === 0) return null // 台日以外：沒有幣別，整列隱藏
           return (
           <div key={f.key}>
@@ -594,7 +731,7 @@ function Intake({ card, level, choices, onChange, onBack, onSubmit, country = 'T
           )
         })}
       </div>
-      <div className="row"><button className="btn" onClick={onSubmit}>是！班長</button></div>
+      <div className="row" ref={submitRow}><button className="btn" onClick={onSubmit} disabled={!ready}>是！班長</button></div>
     </section>
   )
 }
@@ -757,6 +894,7 @@ const OUTCOME_LABEL: Record<DiaryEntry['outcome'], [string, string]> = {
   done: ['完成', 'ok'],
   reissued: ['換口令', 're'],
   punished: ['罰則', 'bad'],
+  mismatch: ['不符情境', 'mis'],
 }
 
 const entryLabel = (e: DiaryEntry): string => e.placeName ?? e.big
@@ -921,7 +1059,7 @@ function Sheet({ title, sub, onClose, children, testid }: {
 }
 
 // 僅供獨立設計預覽入口使用；正式 App 入口與狀態機不變。
-export { Home, Intake, Cmd, LogScreen, Stand, Diary, Weekly }
+export { Home, ScenePick, Intake, Cmd, LogScreen, Stand, Diary, Weekly }
 
 /**
  * 除錯畫面（長按班長名牌進來）。顯示最近 10 次 /api/order 的真實經過：
@@ -988,6 +1126,7 @@ function Debug({ level, onHome }: { level: Level; onHome: () => void }) {
       <div className="notice" data-testid="trial-summary">
         試用紀錄 {trial.days} 天 · {trial.orders} 道 · 給出口令 {trial.ok} · 7 天內重複 {pct(trial.repeat7d)} · 預算命中 {pct(trial.budgetHit)}
         {trial.rescue + trial.fallback > 0 ? ` · 救援 ${trial.rescue}／模板 ${trial.fallback}` : ''}
+        {trial.mismatch > 0 ? ` · 不符情境 ${trial.mismatch}` : ''}
       </div>
       <div className="row">
         <button className="btn line" data-testid="trial-export" onClick={exportFile}>{exported || '匯出 60 天紀錄'}</button>

@@ -103,6 +103,10 @@ export interface TrialSummary {
   budgetUnknown: number
   priceEstShare: number | null
   reasons: Record<string, number>
+  /** Round 5：沒做、因為派的不符合情境的次數。 */
+  mismatch: number
+  /** Round 5：依情境分（吃／歇的 choices.scene；「其他」不分使用者打的字）。 */
+  byScene: Record<string, { orders: number; done: number; reissued: number; punished: number; mismatch: number }>
 }
 
 /** 匯出時附的摘要：一眼看出「空手」「重複」「價位」三件事這段期間怎麼樣。 */
@@ -110,9 +114,16 @@ export function summarize(entries: TrialEntry[]): TrialSummary {
   const asc = [...entries].sort((a, b) => a.at.localeCompare(b.at))
   const errors: Record<string, number> = {}
   const reasons: Record<string, number> = {}
+  const byScene: TrialSummary['byScene'] = {}
   for (const e of asc) {
     if (!e.ok) errors[e.error ?? 'unknown'] = (errors[e.error ?? 'unknown'] ?? 0) + 1
     if (e.reason) reasons[e.reason] = (reasons[e.reason] ?? 0) + 1
+    const sc = e.choices?.scene
+    if (typeof sc === 'string' && sc) {
+      const b = (byScene[`${e.module}:${sc}`] ??= { orders: 0, done: 0, reissued: 0, punished: 0, mismatch: 0 })
+      b.orders++
+      if (e.outcome) b[e.outcome]++
+    }
   }
   const placed = asc.filter((e) => e.ok && e.placeId)
   let rep = 0
@@ -138,6 +149,8 @@ export function summarize(entries: TrialEntry[]): TrialSummary {
     budgetUnknown: budgeted.length - known.length,
     priceEstShare: placed.length ? +(placed.filter((e) => e.priceEst).length / placed.length).toFixed(3) : null,
     reasons,
+    mismatch: asc.filter((e) => e.outcome === 'mismatch').length,
+    byScene,
   }
 }
 

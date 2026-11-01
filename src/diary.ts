@@ -64,9 +64,13 @@ export interface DiaryStats {
   weakestModule: ModuleId | null
 }
 
-/** 第 10 節：服從率 =（done + reissued）÷ 全部。 */
+/**
+ * 第 10 節：服從率 =（done + reissued）÷ 全部。
+ * Round 5：mismatch（派的不符合情境）不是使用者的錯，不算進分母、不算罰則；口令數仍照算。
+ */
 export function stats(entries: DiaryEntry[]): DiaryStats {
   const orders = entries.length
+  const judged = entries.filter((e) => e.outcome !== 'mismatch').length
   if (orders === 0) return { orders: 0, complianceRate: 0, punishments: 0, weakestModule: null }
 
   const compliant = entries.filter((e) => e.outcome === 'done' || e.outcome === 'reissued').length
@@ -91,7 +95,7 @@ export function stats(entries: DiaryEntry[]): DiaryStats {
 
   return {
     orders,
-    complianceRate: Math.round((compliant / orders) * 100),
+    complianceRate: judged ? Math.round((compliant / judged) * 100) : 100,
     punishments,
     weakestModule: weakest,
   }

@@ -668,7 +668,7 @@ describe('Round 3：Places 呼叫規則', () => {
     const res = await handler(post({ seed: 5 }))
     const body = (await res.json()) as Body
     const pickLine = info.mock.calls.map((c) => String(c[0])).find((l) => l.startsWith('[pick]'))!
-    expect(pickLine).toMatch(/^\[pick\] module=eat mode=\w+ lane=\S+ pool=\d+ kept=\d+ known_price=[\d.]+ country=TW seen14d=(true|false) relaxed=\S+$/)
+    expect(pickLine).toMatch(/^\[pick\] module=eat scene=- mode=\w+ lane=\S+ pool=\d+ kept=\d+ known_price=[\d.]+ country=TW seen14d=(true|false) relaxed=\S+$/)
     const logs = info.mock.calls.map((c) => String(c[0])).join('\n')
     expect(logs).not.toContain(body.place!.id)
     expect(logs).not.toContain('25.033')

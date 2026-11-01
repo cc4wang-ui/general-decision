@@ -4,6 +4,7 @@
 // 純函式，無 I/O。
 import { budgetBot } from './prompt.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
+import { sceneOf } from './scene.ts'
 import { hhmmIn, type Tz } from './tz.ts'
 import type { Order, OrderRequest, PickResult } from './types.ts'
 
@@ -25,15 +26,26 @@ export function templateOrder(req: Pick<OrderRequest, 'module' | 'choices' | 're
     log: `${at(0)} 口令：${big}。`,
   })
 
+  // Round 5：口令跟情境對得上（外帶不寫在店裡吃完、聚餐寫一起分、工作讀書寫插座）。「其他」用通用句。
+  const scene = sceneOf(req.module, req.choices ?? {})?.id
   switch (req.module) {
     case 'eat':
       if (rescue) return base(name, [walk, '拿一個熱的主食，加一瓶水。', `${at(20)} 前吃完，回報。`])
+      if (scene === '一個人快吃') return base(name, [walk, '只點一道，不加點。', `${at(25)} 前吃完，回報。`])
+      if (scene === '外帶') return base(name, [walk, '點一份，外帶。', `${at(30)} 前帶回去吃完。`])
+      if (scene === '朋友聚餐') return base(name, [walk, '點三道一起分，不要各點各的。', `${at(100)} 前散會。`])
+      if (scene === '約會吃好一點') return base(name, [walk, '點店裡的招牌，慢慢吃。', '手機收進包包。'])
+      if (scene === '宵夜') return base(name, [walk, '點一份小的，不加點。', `${at(30)} 前吃完回家。`])
       return base(name, [walk, '點店裡賣最多的那一道。', `${at(40)} 前吃完，回報。`])
     case 'rest':
       if (rescue) return base(name, [walk, '買一瓶熱飲。', '店外站 10 分鐘，喝完回家。'])
       if (DRINKS.has(String(req.choices.drink ?? ''))) {
         return base(name, ['最多兩杯，不准續攤。', `${at(90)} 前離開。`, '搭車或走路回家，不准開車騎車。'])
       }
+      if (scene === '工作讀書') return base(name, ['找有插座的位子，點一杯。', '專心 50 分鐘再起來走動。', `${at(150)} 前收工。`])
+      if (scene === '朋友聊天') return base(name, ['找坐得下的位子，一起點。', '手機面朝下。', `${at(120)} 前散。`])
+      if (scene === '談事情') return base(name, ['找角落的位子。', '先點好，再開始談。', `${at(90)} 前談完。`])
+      if (scene === '等人') return base(name, ['點一杯。', '坐 20 分鐘，不滑手機。', `${at(20)} 前起身。`])
       return base(name, ['點一杯熱的。', '坐 30 分鐘。', '手機面朝下。'])
     case 'go':
       return base('附近公園', [`${String(req.choices.transport ?? '走路')}出門，單程不超過 15 分鐘。`, '到了走一圈，不看手機。', `${at(60)} 前回家。`])

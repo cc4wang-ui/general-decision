@@ -1,7 +1,7 @@
 // Round 3 B18、T10：口令畫面 375×667 不捲動就看得到
 // 店名連結、步行分鐘、營業到幾點（或幾點開）、價位文字（或「價位未知」）、Google Maps 歸屬。
 import { expect, test, type Page } from '@playwright/test'
-import { FIXED_ORDER, mockOrder, prime } from './fixtures.ts'
+import { FIXED_ORDER, mockOrder, prime, openCard } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => {
   await prime(page)
@@ -15,7 +15,7 @@ const withPlace = (place: Record<string, unknown>) => ({ ...FIXED_ORDER, place: 
 async function toCmd(page: Page, level = 1) {
   if (level !== 1) await page.addInitScript((l) => localStorage.setItem('decide.level', String(l)), level)
   await page.goto('/')
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
 }
