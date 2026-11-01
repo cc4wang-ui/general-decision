@@ -62,7 +62,8 @@ src＋api 約 +620／-50 行。拆開看：
 | R5 preview-1 | `dpl_GDQjtxBK13CjwwutZ7xzmw7JsCYT` | `bfd72e7`。直傳：Round 4 的 0a–0i、2a–2c ＋ 新的 3a–3e 覆蓋包＋新 `api/probe.ts` |
 | R5 preview-2 | `dpl_CDUmF5UKV3LG7hQ8KWodjwukuV5A` | `c3a9a13`。preview-1 ＋ 4a（cards.ts、scene.ts：聚餐、約會不催時間） |
 | R5 preview-3 | `dpl_D6YquYypkLNLG69ZdKW6TkpErdxT` | `f6845d6`。preview-2 ＋ 4b（scene.ts、prompt.ts：checker 第 1 輪修正） |
-| R5 preview-4（上線候選） | `dpl_AtRKD5zycDb8RHLRYUMSYe2ArubQ`（general-decision-f8nlv6ns0-cc4wang-uis-projects.vercel.app） | `3c47c39`。preview-3 ＋ 4c（rules.ts：鐘點進位） |
+| R5 preview-4 | `dpl_AtRKD5zycDb8RHLRYUMSYe2ArubQ`（general-decision-f8nlv6ns0-cc4wang-uis-projects.vercel.app） | `3c47c39`。preview-3 ＋ 4c（rules.ts：鐘點進位） |
+| R5 preview-5（上線候選） | `dpl_AUA4cVmeXVTfWxM6XCReKLnokZM4`（general-decision-amn14xjcw-cc4wang-uis-projects.vercel.app） | `b9b7b61`。preview-4 ＋ 4d（orderHandler.ts、places.ts）＋ 4e（scene.ts、probe.ts、types.ts）：久坐情境的最短營業時間、快吃排除燒肉火鍋 |
 
 ## 實測中發現並修掉的問題
 
@@ -82,6 +83,11 @@ src＋api 約 +620／-50 行。拆開看：
    - 東京「一個人快吃」查「牛丼」派到燒肉店。
    - 條件 1、2、4、5 與 Cross 規則 2 都 PASS。
    - 兩輪都卡在條件 3 → 依 checker 規則停下，交 Cross 決定。
+5. Cross 決定（2026-11-01）：「加規則再量一次」。已做（`b9b7b61`）：
+   - Places 多拿 `nextCloseTime`，算每家店還剩幾分鐘關門（沒有就用營業到 HH:MM，跨午夜 +24h）。
+   - 走到店後至少還要營業：放空 40、聊天 60、談事情 60、工作讀書 90、聚餐 90、約會 90、宵夜 30、快吃 25、等人 25、外帶 10、其他 45 分。沒有關門資料或 24 小時營業不限。
+   - 一個人快吃排除燒肉、韓式烤肉、火鍋、吃到飽、牛排、居酒屋、酒吧。
+   - 歇的提示寫最短停留：放空 30、聊天 60、工作讀書 90 分以上，不准催人走。
 
 ## 已知風險
 
