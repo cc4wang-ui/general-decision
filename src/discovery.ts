@@ -114,7 +114,9 @@ export const PARAMS = {
   //   理由：「熟門熟路」的語意就是不怕回訪，曝光懲罰本來就該接近 0；
   //   連續派同一家仍由 cooldown（最近 3 次出過的店不再出）擋住，不靠 λ。
   //   0.05 低於 R3§2.4 建議範圍下緣，是裁定後的例外，不是調參漂移；balanced／recon 仍在範圍內。
-  lambda: { familiar: 0.05, balanced: 0.8, recon: 1.2 } as Record<Novelty, number>,
+  // balanced 0.8 → 1.5（Round 4，2026-11-01 preview 60 天模擬：信義 30 天內只有 38 家，門檻 40）。
+  //   仍在 R3§2.4 範圍 0.8–2.0；離線重播 oracleGap 0.070 → 0.061（≤0.08）、7 天重複率 0.07 → 0.023、平均評分降 0.02。
+  lambda: { familiar: 0.05, balanced: 1.5, recon: 1.2 } as Record<Novelty, number>,
   wildcard: { familiar: 0, balanced: 0.2, recon: 1 } as Record<Novelty, number>,
 }
 
@@ -126,7 +128,7 @@ const LN2 = Math.LN2
 /**
  * Σ exp(−ln2·Δt/半衰期)：被出成口令（shown）半衰期 PARAMS.halfShownDays（目前 3 天）、
  * 去過（done）半衰期 PARAMS.halfDoneDays（目前 7 天）。未來的時間戳當作現在。
- * 打分時乘上 PARAMS.lambda[方針]（familiar 0.05／balanced 0.8／recon 1.2）。
+ * 打分時乘上 PARAMS.lambda[方針]（familiar 0.05／balanced 1.5／recon 1.2）。
  */
 export function exposure(entry: Pick<PlaceMemSummary, 'sh' | 'dn'> | undefined, now: number): number {
   if (!entry) return 0
