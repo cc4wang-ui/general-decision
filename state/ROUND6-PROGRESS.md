@@ -22,8 +22,8 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 | 1 | 地下沒定位：不再叫人開定位；錯誤頁和選單都能一鍵報最近的站 | ✅ e2e `r6-station.spec.ts`：錯誤訊息「地下收不到定位。報你要下車的站。」、最近站 chips 一鍵派 |
 | 2 | 10 個日文站名換得到座標，誤差 ≤ 300 m | ✅ 真資料 10/10，最大 95 m（六本木駅），其餘 ≤ 40 m |
 | 3 | 舊或粗的定位不直接派店 | ✅ 單元 `geo.test.ts`＋e2e：超過 60 秒或誤差 > 300 m → 先問「你在車上？」 |
-| 4 | 選了站，派出的店離該站 ≤ 情境半徑，口令以該站為起點 | ✅ 距離：新宿駅 01:15 真資料 12/12 符合情境規則。⚠️ 「口令從出站寫起」只有單元測試驗 prompt 文字，真模型輸出未量（量測工具沒帶站名） |
-| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview ✅；checker 待跑 |
+| 4 | 選了站，派出的店離該站 ≤ 情境半徑，口令以該站為起點 | ✅ preview-2（`83a92ba`）新宿駅 02:47 真資料：12/12 距離 ≤ 半徑（量測工具現在帶 distM／radiusM）、12/12 口令第一步「出站後走 N 分」（伺服器保證，probe 的 loc 帶站名） |
+| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview-2 ✅；checker 第 1 輪 FAIL（條件 4，見下）→ 修完 → 第 2 輪待判 |
 
 ## 做了什麼（`edf8948`）
 
@@ -47,7 +47,8 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 
 | 名稱 | deployment | 內容 |
 |---|---|---|
-| R6 preview-1（上線候選） | `dpl_2D81dE7dmgPJNpngiEAYA7aThsyS`（general-decision-cu77vqn6m-cc4wang-uis-projects.vercel.app） | `edf8948`。正式站的檔＋6a–6d（src 8 個檔）＋新 api/geocode.ts、api/probe.ts |
+| R6 preview-1 | `dpl_2D81dE7dmgPJNpngiEAYA7aThsyS`（general-decision-cu77vqn6m-cc4wang-uis-projects.vercel.app） | `edf8948`。正式站的檔＋6a–6d（src 8 個檔）＋新 api/geocode.ts、api/probe.ts |
+| R6 preview-2（上線候選） | `dpl_4mZZRHxWPGznKoYnRPQiKupJqnJW`（general-decision-qiw16vmid-cc4wang-uis-projects.vercel.app） | `83a92ba`。preview-1 ＋ 6e–6i（checker 第 1 輪修正：orderHandler、rules、probe、places、types、geocode） |
 
 直傳做法同 Round 4／5；打包腳本在 scratchpad `tools/pack-r6.mjs`（從上一版 bundle 重建、跟 HEAD 比、差異打成 6*，驗證 bad=0）。
 
@@ -57,10 +58,19 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 - `mode=scene&loc=shinjuku`（深夜 01:15）：12/12 符合情境規則，鐘點都對（01:17 到店等）。這也是 Round 5 第一次深夜量測。
 - 量測費：10 次 Places（geocode）＋約 15 次 Places＋12 次 Claude（scene）。約 US$1。
 
+## 獨立 checker
+
+1. 第 1 輪（2026-11-02 02:00，preview-1）FAIL，條件 4：
+   - 4a 距離：rest「其他／有插座」派到步行 14 分的麥當勞，直線 1099 m > 情境半徑 1000 m。原因：Text Search 的 locationRestriction 只收方框，角落可到半徑 1.41 倍；量測工具只驗 maxWalk，沒驗距離。
+   - 4b 口令起點：只有單元測試驗 prompt 文字，真模型輸出零筆（probe 的 loc 沒帶站名）→ Rule 6 不算證據。
+   - 其餘條件 1、2、3、5 與既有規則（T5 一屏、只存站名、站名不進 log、改動 ≤ 300 行）PASS。
+   - 已修（`83a92ba`）：候選帶 distM，方框查到、距離 > 半徑的切掉；`stationStart()` 伺服器保證第一步從出站寫起；probe 帶站名、驗距離與出站；查詞含「駅」用 ja（標籤回「新宿駅」不是「新宿」）。單元 583 條、e2e 26 條（r6／manual-location／budget／r5-scene）全過。
+   - preview-2 真資料（新宿駅 02:47）：12/12 距離 ≤ 半徑、12/12 口令從出站寫起。存檔 scratchpad `r6check/scene-shinjuku-label.json`。
+
 ## 已知風險／下一輪候選
 
-- ⚠️ 「口令從出站寫起」的真模型輸出沒量過（量測工具的地點沒有 label）。單元測試只驗 prompt 有那一句。
-- 站名回中文（zh-TW）：使用者打「新宿駅」，標籤顯示「新宿」。Cross 看中文沒問題；要日文得改成「有漢字＋駅」也用 ja。
+- 站名：查詞含假名或「駅」用 ja 查（回「新宿駅」）；打中文「新宿站」用 zh-TW（回「新宿」）。改了之後沒再重量 10 站的 geocode（省 10 次 Places；查法只差 languageCode）。
+- 方框切回圓之後，候選會少一些（角落的店不算）；單元測試裡「一個人快吃」的 total 從 6 變 1。
 - 深夜東京「歇」派到水煙吧（hookah_bar）×2、購物中心（新宿サザンテラス）×2、麥當勞 ×1。原因是 Round 4 就有的「東京歇關鍵字是中文咖啡廳」。不是這輪造成；下一輪候選：rest 在日本用日文關鍵字、排除 hookah_bar／shopping_mall。
 - 深夜「約會」派到酒吧（Bar Vier，type=bar）：約會的排除清單沒有酒吧類。下一輪候選。
 - 「去」卡的交通選項（走路／捷運／計程車／開車）仍然沒有作用。
