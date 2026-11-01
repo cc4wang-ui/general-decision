@@ -27,6 +27,8 @@ export interface PlaceCandidate {
   openUntil?: string
   /** 尚未開門但 60 分內會開：HH:MM（當地時間）。 */
   opensAt?: string
+  /** Round 5：營業中的店還剩幾分鐘關門（沒資料或 24 小時營業 → 沒有）。 */
+  closeInMin?: number
   primaryType?: string
   types?: string[]
   rating?: number
@@ -181,7 +183,7 @@ export interface OrderDebug {
     how: string // 'lane=ramen_restaurant rank=DISTANCE' 或 'text="居酒屋"'
     tries: { r: number; raw: number; kept: number }[]
     /** type＝Google 的主類別（Round 5：量測情境「排除速食」用）。 */
-    candidates: { name: string; rating?: number; count?: number; walkMin?: number; openUntil?: string; opensAt?: string; band?: number | null; type?: string }[]
+    candidates: { name: string; rating?: number; count?: number; walkMin?: number; openUntil?: string; opensAt?: string; band?: number | null; type?: string; closeIn?: number }[]
   }
   /** Round 3：發掘引擎的決定過程。不含 place_id。 */
   pick?: { mode: PickMode; lane: string; pool: number; afterFilter: number; relaxed: string[]; exhausted: boolean; seed?: number }

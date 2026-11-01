@@ -9,6 +9,8 @@ export const FIELD_MASK = [
   'places.location',
   'places.currentOpeningHours.openNow',
   'places.currentOpeningHours.nextOpenTime',
+  // Round 5（checker 2026-11-01）：還剩多久關門。久坐的情境不派快打烊的店。
+  'places.currentOpeningHours.nextCloseTime',
   'places.regularOpeningHours.weekdayDescriptions',
   'places.primaryType',
   'places.rating',
@@ -34,7 +36,7 @@ export interface RawPlace {
   id?: string
   displayName?: { text?: string }
   location?: { latitude?: number; longitude?: number }
-  currentOpeningHours?: { openNow?: boolean; nextOpenTime?: string }
+  currentOpeningHours?: { openNow?: boolean; nextOpenTime?: string; nextCloseTime?: string }
   regularOpeningHours?: { weekdayDescriptions?: string[] }
   primaryType?: string
   rating?: number
@@ -140,6 +142,25 @@ function minutesUntilOpen(p: RawPlace, now: Date): number | undefined {
 }
 
 /**
+ * 營業中的店還剩幾分鐘關門。優先用 Google 的 nextCloseTime；沒有就用今天營業時間的最後一個 HH:MM
+ * （比現在早就當作跨過午夜）。24 小時營業或沒資料 → undefined（不限制）。
+ */
+export function minutesUntilClose(p: RawPlace, now: Date, openUntil: string | undefined, tz: Tz): number | undefined {
+  const t = p.currentOpeningHours?.nextCloseTime
+  if (t) {
+    const ms = new Date(t).getTime() - now.getTime()
+    if (Number.isFinite(ms) && ms >= 0) return Math.round(ms / 60000)
+  }
+  if (!openUntil) return undefined
+  const [ch, cm] = openUntil.split(':').map(Number)
+  const [nh, nm] = hhmmIn(now.toISOString(), tz).split(':').map(Number)
+  if (![ch, cm, nh, nm].every((x) => Number.isFinite(x))) return undefined
+  let d = (ch! * 60 + cm!) - (nh! * 60 + nm!)
+  if (d < 0) d += 24 * 60
+  return d
+}
+
+/**
  * 評價分數：貝氏平均，把「5 顆星但只有 3 則」壓下去、「4.4 顆星 800 則」抬上來。
  * 先驗 4.0 分、權重 20 則。沒有評分視為 0，排最後。
  */
@@ -192,6 +213,10 @@ export function toCandidates(
         primaryType: p.primaryType,
         rating: p.rating,
         ratingCount: p.userRatingCount,
+      }
+      if (open) {
+        const closeIn = minutesUntilClose(p, now, c.openUntil, tz)
+        if (closeIn !== undefined) c.closeInMin = closeIn
       }
       if (p.types?.length) c.types = p.types
       if (p.priceLevel) c.priceLevel = p.priceLevel

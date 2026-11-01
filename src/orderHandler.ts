@@ -224,7 +224,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     dbg.places = {
       how: hows.join(' → '),
       tries,
-      candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}) })),
+      candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })),
     }
     dbg.price = { country, known: cands.filter((c) => bandOf(c, country) !== null).length, total: cands.length }
     const choose = (budget: OrderRequest['budget'], pool: PlaceCandidate[] = cands) => pool.length
@@ -250,7 +250,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       await call(rescuePlan(country))
       placesMs = Date.now() - t0
       dbg.places.how = hows.join(' → ')
-      dbg.places.candidates.push(...cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}) })))
+      dbg.places.candidates.push(...cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })))
       pick = choose(undefined)
       if (pick) console.warn(`[rescue] module=${req.module}：前兩次派不出店，改派超商`)
     }

@@ -435,3 +435,73 @@ describe('不合法的鐘點自動進位（內湖：「19:67分一到立刻起�
     expect(o.meme.bot).toBe('20:07 收隊')
   })
 })
+
+describe('checker 第 2 輪：快打烊的店、快吃派到燒肉店', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.6, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
+
+  it('還剩幾分鐘關門：優先用 nextCloseTime；沒有就用營業到 HH:MM（跨午夜 +24h）；沒資料 → undefined', async () => {
+    const { minutesUntilClose, toCandidates } = await import('../../src/places.ts')
+    const now = new Date('2026-11-01T11:53:00Z') // 台北 19:53
+    expect(minutesUntilClose({ currentOpeningHours: { openNow: true, nextCloseTime: '2026-11-01T12:00:00Z' } }, now, '20:00', 'Asia/Taipei')).toBe(7)
+    expect(minutesUntilClose({}, now, '20:00', 'Asia/Taipei')).toBe(7)
+    expect(minutesUntilClose({}, now, '02:00', 'Asia/Taipei')).toBe(367)
+    expect(minutesUntilClose({}, now, undefined, 'Asia/Taipei')).toBeUndefined()
+    const [cand] = toCandidates([{ id: 'r', displayName: { text: 'RUFOUS' }, location: { latitude: 25.0265, longitude: 121.543 }, currentOpeningHours: { openNow: true, nextCloseTime: '2026-11-01T12:00:00Z' } }], { lat: 25.0265, lng: 121.543 }, now, [], 'Asia/Taipei')
+    expect(cand!.closeInMin).toBe(7)
+  })
+
+  it('久坐的情境：走到店後至少還要營業夠久（放空 40、聊天 60、談事情 60、工作讀書 90、聚餐 90、約會 90）', () => {
+    const need: [string, 'eat' | 'rest', number][] = [['一個人放空', 'rest', 40], ['朋友聊天', 'rest', 60], ['談事情', 'rest', 60], ['工作讀書', 'rest', 90], ['朋友聚餐', 'eat', 90], ['約會吃好一點', 'eat', 90], ['宵夜', 'eat', 30], ['一個人快吃', 'eat', 25], ['等人', 'rest', 25]]
+    for (const [id, m, min] of need) {
+      const scene = sceneOf(m, { scene: id, drink: '咖啡' })
+      const base = m === 'eat' ? { primaryType: 'restaurant', types: ['restaurant'] } : {}
+      expect(scenePasses(c('short', { ...base, closeInMin: min + 5 - 1, walkMin: 5 }), scene), `${id} 差 1 分`).toBe(false)
+      expect(scenePasses(c('ok', { ...base, closeInMin: min + 5, walkMin: 5 }), scene), `${id} 剛好`).toBe(true)
+      expect(scenePasses(c('unknown', { ...base, walkMin: 5 }), scene), `${id} 沒資料`).toBe(true)
+    }
+  })
+
+  it('一個人快吃不派燒肉、火鍋、吃到飽、居酒屋', () => {
+    const quick = sceneOf('eat', { scene: '一個人快吃' })
+    for (const t of ['yakiniku_restaurant', 'korean_barbecue_restaurant', 'hot_pot_restaurant', 'buffet_restaurant', 'japanese_izakaya_restaurant']) {
+      expect(scenePasses(c(t, { primaryType: t, walkMin: 5 }), quick), t).toBe(false)
+    }
+    expect(scenePasses(c('udon', { primaryType: 'japanese_restaurant', walkMin: 5 }), quick)).toBe(true)
+  })
+
+  it('prompt 的情境提示寫久坐的最短時間', () => {
+    const pick = { place: { id: 'p', name: 'x' }, mode: 'new', visits: 1, pool: 1, afterFilter: 1, relaxed: [], exhausted: false, seen14d: false } as unknown as PickResult
+    const u = (scene: string) => buildOrderPrompt({ module: 'rest', level: 1, choices: { scene, drink: '咖啡' }, now: '2026-11-01T11:53:00Z', recentOrders: [] } as unknown as OrderRequest, pick).user
+    expect(u('工作讀書')).toContain('90 分鐘以上')
+    expect(u('朋友聊天')).toContain('60 分鐘以上')
+    expect(u('一個人放空')).toContain('30 分鐘以上')
+  })
+})
+
+describe('handler：快打烊的店不派給久坐的情境', () => {
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    process.env.GOOGLE_PLACES_KEY = 'test-places-key'
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+
+  it('工作讀書：5 家 20 分後關、1 家 3 小時後關 → 派 3 小時那家（20 個種子）', async () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const soon = [1, 2, 3, 4, 5].map((n) => at(`soon${n}`, n * 60, { primaryType: 'cafe', types: ['cafe'], currentOpeningHours: { openNow: true, nextCloseTime: '2026-11-01T12:20:00Z' } }))
+      const late = at('late', 400, { primaryType: 'cafe', types: ['cafe'], currentOpeningHours: { openNow: true, nextCloseTime: '2026-11-01T15:00:00Z' } })
+      const bodies: string[] = []
+      vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).includes('anthropic')) return claudeOk()
+        bodies.push(String(init?.body ?? ''))
+        return new Response(JSON.stringify({ places: bodies.length === 1 ? [...soon, late] : [] }), { status: 200 })
+      }))
+      const res = await handler(post({ module: 'rest', choices: { scene: '工作讀書', drink: '咖啡' }, now: '2026-11-01T12:00:00Z', seed }))
+      const body = (await res.json()) as Body
+      expect(body.place?.id, `seed ${seed}`).toBe('late')
+      expect(bodies.length, 'fitCount 只算營業夠久的 → 打第二次').toBe(2)
+    }
+  })
+})

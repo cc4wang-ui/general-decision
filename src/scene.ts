@@ -41,6 +41,8 @@ export interface SceneRule {
   minRating?: number
   /** 挑店前先排除步行超過這個分鐘的店（不夠就放回）。 */
   maxWalk?: number
+  /** 走到店之後至少還要營業幾分鐘（checker 2026-11-01：快打烊的店，口令只能叫人坐 2–30 分鐘）。 */
+  minOpen?: number
   /** 寫進 prompt 的一行，讓口令對得上情境。 */
   hint: string
 }
@@ -54,12 +56,14 @@ const DESSERTISH = ['cake_shop', 'dessert_shop', 'dessert_restaurant', 'pastry_s
 const SWEET_OK = new Set([...DESSERTISH, 'bakery'])
 /** 喝酒的店（checker 2026-11-01：選咖啡＋談事情，「安靜 咖啡廳」撞到店名「安靜小酒館」）。選咖啡時排除。 */
 const BARISH = ['bar', 'pub', 'wine_bar', 'cocktail_bar', 'lounge_bar', 'sports_bar', 'night_club', 'bar_and_grill', 'beer_hall', 'japanese_izakaya_restaurant']
-type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt'>
+type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'>
+/** 一個人快吃不派要久坐、要多人的店（checker 2026-11-01：東京查「牛丼」派到燒肉店）。 */
+const SLOW_MEAL = ['yakiniku_restaurant', 'korean_barbecue_restaurant', 'barbecue_restaurant', 'hot_pot_restaurant', 'fine_dining_restaurant', 'buffet_restaurant', 'steak_house', 'japanese_izakaya_restaurant', 'bar', 'pub', 'wine_bar', 'bar_and_grill']
 
 /** 吃：一個人快吃、外帶、朋友聚餐、約會吃好一點、宵夜、其他。 */
 const EAT: SceneRule[] = [
   {
-    id: '一個人快吃', radius: 500, maxWalk: 8,
+    id: '一個人快吃', radius: 500, maxWalk: 8, minOpen: 25, avoidTypes: SLOW_MEAL,
     queries: {
       TW: [q('便當', 'tw', 1), q('麵店', 'noodle', 1), q('小吃', 'tw', 1), q('滷肉飯', 'tw', 1), q('水餃 鍋貼', 'cn', 1), q('丼飯', 'jp', 2), q('咖哩飯', 'jp', 2)],
       JP: [q('定食', 'jp', 1.5), q('そば', 'jp', 1), q('うどん', 'jp', 1), q('牛丼', 'fast', 1, BEEF), q('ラーメン', 'ramen', 1.5), q('カレー', 'jp', 1)],
@@ -68,7 +72,7 @@ const EAT: SceneRule[] = [
     hint: '情境：一個人、趕時間。steps 只點一道，20 分鐘內吃完。',
   },
   {
-    id: '外帶', radius: 600,
+    id: '外帶', radius: 600, minOpen: 10,
     queries: {
       TW: [q('便當', 'tw', 1), q('滷味', 'tw', 1), q('鹽酥雞', 'tw', 1), q('水餃 鍋貼', 'cn', 1), q('港式 燒臘', 'cn', 1.5), q('小吃', 'tw', 1)],
       JP: [q('弁当', 'jp', 1), q('テイクアウト', 'fast', 1.5), q('おにぎり', 'jp', 1), q('惣菜', 'jp', 1)],
@@ -77,7 +81,7 @@ const EAT: SceneRule[] = [
     hint: '情境：外帶。steps 寫點什麼、外帶回去吃，不要寫內用、不要寫幾分鐘內在店裡吃完。',
   },
   {
-    id: '朋友聚餐', radius: 1200, avoidTypes: [...FASTISH, ...DESSERTISH],
+    id: '朋友聚餐', radius: 1200, minOpen: 90, avoidTypes: [...FASTISH, ...DESSERTISH],
     queries: {
       TW: [q('熱炒', 'tw', 2.5), q('火鍋', 'hotpot', 2.5), q('燒肉', 'jp', 3, BEEF), q('餐酒館', 'western', 3), q('韓式料理', 'kr', 2, HOT), q('泰式料理', 'other', 2, HOT)],
       JP: [q('居酒屋', 'jp', 2.5), q('焼肉', 'jp', 3, BEEF), q('焼き鳥', 'jp', 2.5), q('お好み焼き', 'jp', 2), q('中華料理', 'cn', 1.5), q('韓国料理', 'kr', 2, HOT)],
@@ -86,7 +90,7 @@ const EAT: SceneRule[] = [
     hint: '情境：朋友聚餐，一群人。steps 寫點幾道一起分，不要寫一個人的份量；時間寫 90 分鐘以上，不准催。',
   },
   {
-    id: '約會吃好一點', radius: 1500, avoidTypes: [...FASTISH, ...DESSERTISH], minRating: 4.3,
+    id: '約會吃好一點', radius: 1500, minOpen: 90, avoidTypes: [...FASTISH, ...DESSERTISH], minRating: 4.3,
     queries: {
       TW: [q('義大利麵', 'western', 2.5), q('餐酒館', 'western', 3), q('日式料理', 'jp', 3), q('牛排', 'western', 3, BEEF), q('鐵板燒', 'jp', 2.5), q('法式料理', 'western', 3.5)],
       JP: [q('イタリアン', 'western', 2.5), q('フレンチ', 'western', 3.5), q('寿司', 'jp', 2.5), q('天ぷら', 'jp', 2.5), q('和食', 'jp', 3)],
@@ -95,7 +99,7 @@ const EAT: SceneRule[] = [
     hint: '情境：約會或想吃好一點。steps 寫點招牌、慢慢吃；時間寫 90 分鐘以上，不准催。',
   },
   {
-    id: '宵夜', radius: 1000, openNow: true,
+    id: '宵夜', radius: 1000, openNow: true, minOpen: 30,
     queries: {
       TW: [q('宵夜', 'tw', 1), q('鹽酥雞', 'tw', 1), q('清粥小菜', 'tw', 1), q('滷味', 'tw', 1), q('拉麵', 'ramen', 2), q('麵店', 'noodle', 1)],
       JP: [q('ラーメン', 'ramen', 1.5), q('牛丼', 'fast', 1, BEEF), q('居酒屋', 'jp', 2.5), q('そば', 'jp', 1)],
@@ -110,11 +114,11 @@ const EAT: SceneRule[] = [
  * 不是只改口令。修飾詞加在「喝什麼」的關鍵字前面（REST_MOD）。
  */
 const REST: SceneRule[] = [
-  { id: '一個人放空', radius: 600, maxWalk: 10, hint: '情境：一個人放空。steps 寫坐下、點一杯、不看手機。' },
-  { id: '工作讀書', radius: 1000, maxWalk: 15, hint: '情境：要工作或讀書，會坐很久。steps 寫找有插座的位子、點一杯、專心多久後休息。' },
-  { id: '朋友聊天', radius: 1000, maxWalk: 15, hint: '情境：跟朋友聊天。steps 寫找能坐幾個人的位子、點什麼一起喝。' },
-  { id: '談事情', radius: 1000, minRating: 4.2, maxWalk: 15, hint: '情境：要談事情，需要安靜。steps 寫找角落的位子、先點好再開始談。' },
-  { id: '等人', radius: 400, maxWalk: 6, hint: '情境：等人或空檔，待不久。steps 寫點一杯、坐 20 分鐘、時間到就走。' },
+  { id: '一個人放空', radius: 600, maxWalk: 10, minOpen: 40, hint: '情境：一個人放空。steps 寫坐下、點一杯、不看手機；坐 30 分鐘以上。' },
+  { id: '工作讀書', radius: 1000, maxWalk: 15, minOpen: 90, hint: '情境：要工作或讀書，會坐很久。steps 寫找有插座的位子、點一杯、專心多久後休息；坐 90 分鐘以上，不准催人走。' },
+  { id: '朋友聊天', radius: 1000, maxWalk: 15, minOpen: 60, hint: '情境：跟朋友聊天。steps 寫找能坐幾個人的位子、點什麼一起喝；坐 60 分鐘以上，不准催人走。' },
+  { id: '談事情', radius: 1000, minRating: 4.2, maxWalk: 15, minOpen: 60, hint: '情境：要談事情，需要安靜。steps 寫找角落的位子、先點好再開始談；預留 60 分鐘以上。' },
+  { id: '等人', radius: 400, maxWalk: 6, minOpen: 25, hint: '情境：等人或空檔，待不久。steps 寫點一杯、坐 20 分鐘、時間到就走。' },
 ]
 /** 歇的情境修飾詞：只加在咖啡（酒吧、居酒屋不適合「不限時」）。 */
 const REST_MOD: Record<string, Partial<Record<string, Words>>> = {
@@ -158,7 +162,7 @@ export function sceneOf(module: ModuleId, choices: Record<string, string | numbe
     if (!text) return null
     return {
       id, text,
-      rule: withChoices(module, choices, { id, radius: 1000, hint: `情境：使用者自己寫的需求是「${text}」。口令要對得上這個需求，做不到的部分不要假裝做得到。` }),
+      rule: withChoices(module, choices, { id, radius: 1000, minOpen: 45, hint: `情境：使用者自己寫的需求是「${text}」。口令要對得上這個需求，做不到的部分不要假裝做得到。` }),
     }
   }
   const rule = rules.find((r) => r.id === id)
@@ -206,6 +210,8 @@ function passes(c: Cand, r: SceneRule): boolean {
   if (r.maxWalk !== undefined && typeof c.walkMin === 'number' && c.walkMin > r.maxWalk) return false
   // 宵夜：還沒開門的店（「HH:MM 開」）不算。Nearby 的查法沒有 openNow，這裡補上（checker 2026-11-01）。
   if (r.openNow && c.opensAt) return false
+  // 走過去之後還要營業夠久（沒有關門資料或 24 小時營業 → 不限制）。
+  if (r.minOpen !== undefined && typeof c.closeInMin === 'number' && c.closeInMin - (c.walkMin ?? 0) < r.minOpen) return false
   return true
 }
 
