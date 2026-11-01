@@ -3,9 +3,9 @@
 export const GEOCODE_FIELD_MASK = 'places.location,places.displayName'
 export const GEOCODE_MAX_Q = 60
 
-/** 有日文假名 → 用 ja 查（站名回日文「新宿駅」）；其餘 zh-TW。純漢字兩邊都查得到。 */
+/** 有日文假名或「駅」→ 用 ja 查（站名回日文「新宿駅」，不是「新宿」）；其餘 zh-TW（「台北車站」「新宿站」）。 */
 export function geocodeLanguage(q: string): 'ja' | 'zh-TW' {
-  return /[぀-ヿ]/.test(q) ? 'ja' : 'zh-TW'
+  return /[぀-ヿ]|駅/.test(q) ? 'ja' : 'zh-TW'
 }
 
 export type GeocodeLookup =

@@ -24,6 +24,8 @@ export interface PlaceCandidate {
   id: string
   name: string
   walkMin?: number
+  /** Round 6：到起點的直線距離（公尺）。方框查詢的角落可到半徑的 1.41 倍，用這個切回圓。 */
+  distM?: number
   openUntil?: string
   /** 尚未開門但 60 分內會開：HH:MM（當地時間）。 */
   opensAt?: string
@@ -171,6 +173,8 @@ export interface EnforceCtx {
   level: Level
   country: Country
   pick?: PickResult | null
+  /** Round 6：使用者報的「下車的站」站名。有的話口令第一步要從出站寫起（伺服器保證）。 */
+  origin?: string
 }
 
 export interface OrderDebug {
@@ -183,7 +187,7 @@ export interface OrderDebug {
     how: string // 'lane=ramen_restaurant rank=DISTANCE' 或 'text="居酒屋"'
     tries: { r: number; raw: number; kept: number }[]
     /** type＝Google 的主類別（Round 5：量測情境「排除速食」用）。 */
-    candidates: { name: string; rating?: number; count?: number; walkMin?: number; openUntil?: string; opensAt?: string; band?: number | null; type?: string; closeIn?: number }[]
+    candidates: { name: string; rating?: number; count?: number; walkMin?: number; distM?: number; openUntil?: string; opensAt?: string; band?: number | null; type?: string; closeIn?: number }[]
   }
   /** Round 3：發掘引擎的決定過程。不含 place_id。 */
   pick?: { mode: PickMode; lane: string; pool: number; afterFilter: number; relaxed: string[]; exhausted: boolean; seed?: number }

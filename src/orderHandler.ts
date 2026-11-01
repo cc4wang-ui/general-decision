@@ -195,6 +195,8 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
         const raw = await fetchPlaces(io, loc, p, placesLanguage(countryOf(loc)))
         const est = laneEst(p.lane)
         let got = toCandidates(raw, loc, now, req.exclude ?? [], tz).map((c) => ({ ...c, lane: p.lane, ...(est !== undefined ? { estBand: est } : {}) }))
+        // Round 6 checker：Text Search 的 locationRestriction 只收方框，角落的店離起點可到半徑 1.41 倍（新宿→東新宿 1099 m vs 半徑 1000）。方框查到的切回圓。
+        if (p.kind === 'text' && p.restrict) got = got.filter((c) => c.distM === undefined || c.distM <= p.radius)
         if (veg && p.lane !== 'rescue') got = got.filter(looksVeg) // 忌口「素」：關鍵字查詢會混進葷食店
         cands = mergeCandidates(cands, got)
         tries.push({ r: p.radius, raw: raw.length, kept: got.length })
@@ -226,7 +228,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     dbg.places = {
       how: hows.join(' → '),
       tries,
-      candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })),
+      candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })),
     }
     dbg.price = { country, known: cands.filter((c) => bandOf(c, country) !== null).length, total: cands.length }
     const choose = (budget: OrderRequest['budget'], pool: PlaceCandidate[] = cands) => pool.length
@@ -252,7 +254,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       await call(rescuePlan(country))
       placesMs = Date.now() - t0
       dbg.places.how = hows.join(' → ')
-      dbg.places.candidates.push(...cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })))
+      dbg.places.candidates.push(...cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })))
       pick = choose(undefined)
       if (pick) console.warn(`[rescue] module=${req.module}：前兩次派不出店，改派超商`)
     }
@@ -305,7 +307,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     const claudeMs = Date.now() - t1
     // 加速方案第一步是量：每一次都留一行，Vercel log 直接看時間花在哪、模型吐了幾個 token。
     console.info(`[timing] places=${placesMs}ms claude=${claudeMs}ms total=${Date.now() - t0}ms model=${MODEL} out=${outputTokens} module=${req.module} level=${req.level}`)
-    const order = enforceRules(parsed, req.module, req.choices ?? {}, now, req.recentOrders, { level: req.level, country, pick })
+    const order = enforceRules(parsed, req.module, req.choices ?? {}, now, req.recentOrders, { level: req.level, country, pick, ...(req.loc?.label ? { origin: req.loc.label } : {}) })
     const final = withPlace(order, pick, country)
     dbg.model = MODEL
     dbg.outTokens = outputTokens
@@ -322,7 +324,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     // Round 4：Claude 失敗不再回「班長在開會」——店已經挑好、規則算得出來，伺服器用模板出口令（src/template.ts）。
     // 模板一樣經過 enforceRules（禁詞、mode 語料、用語守門）。模板本身失敗才回錯誤。
     try {
-      const order = enforceRules(templateOrder(req, pick, now, tz), req.module, req.choices ?? {}, now, req.recentOrders, { level: req.level, country, pick })
+      const order = enforceRules(templateOrder(req, pick, now, tz), req.module, req.choices ?? {}, now, req.recentOrders, { level: req.level, country, pick, ...(req.loc?.label ? { origin: req.loc.label } : {}) })
       const final = withPlace(order, pick, country)
       dbg.fallback = 'template'
       dbg.picked = final.place?.name

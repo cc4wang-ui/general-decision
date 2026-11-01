@@ -78,7 +78,22 @@ export function enforceRules(
   if (pick) order = enforceMode(order, level, pick, now)
   order = fixClocks(order)
   if (pick) order = fixSceneClocks(order, module, choices, pick, now, ctx?.country ?? 'TW')
+  if (pick && ctx?.origin) order = stationStart(order, ctx.origin, pick.place.walkMin)
   return localizeOrder(order, ctx?.country ?? 'TW')
+}
+
+/**
+ * Round 6：使用者報了「下車的站」→ 口令第一步一定從出站寫起（Round 6 checker：只靠 prompt 不算證據，伺服器保證）。
+ * 模型已經寫到站／出站／站名就不動；沒有就在第一步前面補「從 X 出站走 N 分，」。
+ */
+export const STATION_RE = /出站|車站|駅|站/
+export function stationStart(order: Order, origin: string, walkMin?: number): Order {
+  const label = origin.trim()
+  if (!label) return order
+  const steps = order.steps ?? []
+  if (steps.some((s) => STATION_RE.test(s) || s.includes(label))) return order
+  const head = walkMin ? `從${label}出站走 ${walkMin} 分，` : `從${label}出站後，`
+  return { ...order, steps: steps.length ? [head + steps[0]!, ...steps.slice(1)] : [head.replace(/，$/, '。')] }
 }
 
 /**

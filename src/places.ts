@@ -199,15 +199,14 @@ export function toCandidates(
     })
     .map((p) => {
       const loc = p.location
-      const walkMin =
-        loc?.latitude != null && loc?.longitude != null
-          ? walkMinutes(haversineMeters(origin, { lat: loc.latitude, lng: loc.longitude }))
-          : undefined
+      const meters = loc?.latitude != null && loc?.longitude != null ? haversineMeters(origin, { lat: loc.latitude, lng: loc.longitude }) : undefined
+      const walkMin = meters !== undefined ? walkMinutes(meters) : undefined
       const open = p.currentOpeningHours?.openNow === true
       const c: PlaceCandidate = {
         id: p.id!,
         name: p.displayName!.text!,
         walkMin,
+        ...(meters !== undefined ? { distM: Math.round(meters) } : {}),
         openUntil: open ? closingTime(p.regularOpeningHours?.weekdayDescriptions, now, tz) : undefined,
         opensAt: open ? undefined : hhmmIn(p.currentOpeningHours!.nextOpenTime!, tz),
         primaryType: p.primaryType,

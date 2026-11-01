@@ -5,22 +5,23 @@
 //   sim   ：一個地點 × N 天 × 每天 2 餐，記憶照前端的規則累積。Places 用真資料但同一個請求只打一次（快取），
 //           Claude 換成固定假回應（店由程式決定，Claude 不影響挑哪一家）。量「反覆推同一家」。
 // 回傳裡的店名只給人看報表，不寫進 repo（Google 條款：店家資料不落地，R4）。
-import { FIELD_MASK, haversineMeters } from './places.ts'
+import { FIELD_MASK, WIDEN_FACTOR, haversineMeters } from './places.ts'
 import { geocodeLookup } from './geocode.ts'
 import { mealLanes, widenPlan, type LanePlan, type NearbyRank } from './lanes.ts'
 import { countryOf } from './price.ts'
 import { hourIn, tzOf } from './tz.ts'
 import { handleOrder, placesLanguage, placesRequest, type OrderIo } from './orderHandler.ts'
 import { SCENE_OTHER, sceneOf, sceneOptions, scenePasses } from './scene.ts'
+import { STATION_RE } from './rules.ts'
 import type { Band, ModuleId, Order, OrderDebug, OrderRequest, PlaceMemSummary } from './types.ts'
 
-export const PROBE_LOCS: Record<string, { lat: number; lng: number; label: string }> = {
+export const PROBE_LOCS: Record<string, { lat: number; lng: number; label: string; station?: string }> = {
   xinyi: { lat: 25.0408, lng: 121.565, label: '台北信義（市府）' },
   neihu: { lat: 25.079, lng: 121.575, label: '台北內湖科學園區' },
   daan: { lat: 25.0265, lng: 121.543, label: '台北大安住宅區' },
   banqiao: { lat: 25.0137, lng: 121.4627, label: '新北板橋' },
   tokyo: { lat: 35.6795, lng: 139.77, label: '東京八重洲' },
-  shinjuku: { lat: 35.6896, lng: 139.7006, label: '東京新宿駅' },
+  shinjuku: { lat: 35.6896, lng: 139.7006, label: '東京新宿駅', station: '新宿駅' }, // Round 6：當「下車的站」送（loc.label）
 }
 
 interface Scenario { id: string; module: ModuleId; choices: Record<string, string>; budget?: Band[] }
@@ -153,6 +154,8 @@ export interface SceneRow {
   type?: string
   rating?: number
   walkMin?: number
+  distM?: number
+  radiusM?: number
   opensAt?: string
   closeIn?: number
   how?: string
@@ -172,7 +175,7 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
     const choices: Record<string, string> = m === 'eat' ? { scene, diet: '都可以', taste: '都可以' } : { scene, drink: '咖啡' }
     if (scene === SCENE_OTHER) choices.sceneText = SCENE_TEXT_PROBE[m]
     const res = await handleOrder(post({
-      module: m, level: 1, choices, loc: { lat: loc.lat, lng: loc.lng }, now: now.toISOString(), recentOrders: [], novelty: 'balanced',
+      module: m, level: 1, choices, loc: { lat: loc.lat, lng: loc.lng, ...(loc.station ? { label: loc.station } : {}) }, now: now.toISOString(), recentOrders: [], novelty: 'balanced',
     }), io)
     const b = (await res.json().catch(() => ({}))) as Body
     const d = b.debug
@@ -184,12 +187,17 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
     if (b.place && c && !scenePasses({ primaryType: c.type, rating: c.rating, walkMin: c.walkMin, closeInMin: c.closeIn }, rule)) fails.push(`不符規則（${c.type ?? '?'}／${c.rating ?? '?'}★／${c.walkMin ?? '?'}分／剩 ${c.closeIn ?? '?'} 分關門）`)
     if (rule?.rule.openNow && c?.opensAt) fails.push(`還沒開（${c.opensAt}）`)
     if (scene === SCENE_OTHER && !d?.places?.how.includes(SCENE_TEXT_PROBE[m])) fails.push('關鍵字沒用到手動輸入')
+    // Round 6 checker：店離起點要 ≤ 情境半徑（第二次查詢用擴大後的半徑）；報了站，口令第一步要從出站寫起。
+    const widened = (d?.places?.how.split('→').length ?? 1) > 1
+    const radiusM = rule ? Math.round(rule.rule.radius * (widened ? WIDEN_FACTOR : 1)) : undefined
+    if (c?.distM !== undefined && radiusM !== undefined && !d?.rescue && c.distM > radiusM) fails.push(`超出半徑（${c.distM} m > ${radiusM} m）`)
+    if (loc.station && b.place?.id && !(b.steps ?? []).some((s) => STATION_RE.test(s) || s.includes(loc.station!))) fails.push('口令沒從出站寫起')
     return {
       id: `${m}:${scene}`, module: m, scene, status: res.status, ok: res.status === 200 && !!b.place?.id,
       pass: fails.length === 0, ...(fails.length ? { why: fails.join('；') } : {}),
       ...(b.error ? { error: b.error } : {}),
       ...(b.place ? { picked: b.place.name } : {}),
-      ...(c ? { type: c.type, rating: c.rating, walkMin: c.walkMin, ...(c.opensAt ? { opensAt: c.opensAt } : {}), ...(c.closeIn !== undefined ? { closeIn: c.closeIn } : {}) } : {}),
+      ...(c ? { type: c.type, rating: c.rating, walkMin: c.walkMin, ...(c.distM !== undefined ? { distM: c.distM } : {}), ...(radiusM !== undefined ? { radiusM } : {}), ...(c.opensAt ? { opensAt: c.opensAt } : {}), ...(c.closeIn !== undefined ? { closeIn: c.closeIn } : {}) } : {}),
       ...(d?.places ? { how: d.places.how } : {}),
       ...(d?.scene ? { dbg: d.scene } : {}),
       ...(b.steps ? { steps: b.steps, bot: b.meme?.bot } : {}),

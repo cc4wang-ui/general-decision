@@ -316,7 +316,8 @@ describe('handler 接上情境', () => {
       expect(['小吃', '便當', '麵店']).toContain(second!.textQuery)
       expect(body.place?.id, `seed ${seed}`).toBe('near')
       expect(body.place!.walkMin).toBeLessThanOrEqual(8)
-      expect(body.debug.scene).toMatchObject({ id: '一個人快吃', kept: 1, total: 6, relaxed: false })
+      // Round 6 checker：方框查到但離起點 > 半徑（500 m）的 5 家在進情境篩選前就被切掉（切回圓），所以 total 從 6 變 1。
+      expect(body.debug.scene).toMatchObject({ id: '一個人快吃', kept: 1, total: 1, relaxed: false })
     }
   })
 

@@ -75,8 +75,9 @@ describe('/api/geocode', () => {
 // Round 6：日文站名用 ja 查；查詢本體在 src/geocode.ts。
 import { geocodeLanguage, geocodeLookup } from '../../src/geocode.ts'
 describe('Round 6：日文站名', () => {
-  it('有假名 → ja；純漢字／中文 → zh-TW', () => {
-    expect(geocodeLanguage('新宿駅')).toBe('zh-TW') // 「駅」是漢字：兩邊都查得到
+  it('有假名或「駅」→ ja；中文 → zh-TW', () => {
+    expect(geocodeLanguage('新宿駅')).toBe('ja') // checker：zh-TW 會回「新宿」，標籤要日文站名
+    expect(geocodeLanguage('新宿站')).toBe('zh-TW')
     expect(geocodeLanguage('しんじゅく')).toBe('ja')
     expect(geocodeLanguage('東京スカイツリー')).toBe('ja')
     expect(geocodeLanguage('台北車站')).toBe('zh-TW')
