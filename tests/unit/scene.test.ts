@@ -371,3 +371,52 @@ describe('handler 接上情境', () => {
     expect(((await res.json()) as Body).debug.scene).toBeUndefined()
   })
 })
+
+describe('checker 2026-11-01 第 1 輪的修正', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.6, primaryType: 'restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+
+  it('約會、聚餐排除甜點蛋糕店（內湖：法式料理 → 法式甜點蛋糕店）；選「甜食」時不排除', () => {
+    const cake = c('aposo', { primaryType: 'cake_shop' })
+    for (const id of ['約會吃好一點', '朋友聚餐']) {
+      expect(scenePasses(cake, sceneOf('eat', { scene: id })), id).toBe(false)
+      expect(scenePasses(cake, sceneOf('eat', { scene: id, taste: '甜食' })), `${id}＋甜食`).toBe(true)
+      expect(scenePasses(c('bakery', { primaryType: 'bakery' }), sceneOf('eat', { scene: id, taste: '甜食' })), `${id}＋甜食 bakery`).toBe(true)
+      // 速食、超商照樣排除
+      expect(scenePasses(c('mc', { primaryType: 'fast_food_restaurant' }), sceneOf('eat', { scene: id, taste: '甜食' })), id).toBe(false)
+    }
+  })
+
+  it('歇選咖啡：排除酒吧類（板橋：「安靜 咖啡廳」撞到「安靜小酒館」）；選酒吧、居酒屋時不排除', () => {
+    const bar = c('quiet-bar', { primaryType: 'bar' })
+    for (const id of sceneOptions('rest')) {
+      const ch = { scene: id, drink: '咖啡', ...(id === SCENE_OTHER ? { sceneText: '安靜' } : {}) }
+      expect(scenePasses(bar, sceneOf('rest', ch)), id).toBe(false)
+      expect(scenePasses(c('cafe', { primaryType: 'cafe' }), sceneOf('rest', ch)), id).toBe(true)
+      expect(scenePasses(bar, sceneOf('rest', { ...ch, drink: '酒吧' })), `${id}＋酒吧`).toBe(true)
+    }
+    expect(scenePasses(c('izakaya', { primaryType: 'japanese_izakaya_restaurant' }), sceneOf('rest', { scene: '談事情', drink: '居酒屋' }))).toBe(true)
+  })
+
+  it('歇的工作讀書、朋友聊天、談事情：步行 > 15 分不算（內湖：工作讀書派到步行 34 分）', () => {
+    for (const id of ['工作讀書', '朋友聊天', '談事情']) {
+      expect(scenePasses(c('far', { walkMin: 34, primaryType: 'cafe' }), sceneOf('rest', { scene: id, drink: '咖啡' })), id).toBe(false)
+      expect(scenePasses(c('near', { walkMin: 15, primaryType: 'cafe' }), sceneOf('rest', { scene: id, drink: '咖啡' })), id).toBe(true)
+    }
+  })
+
+  it('宵夜：還沒開門的店（有 opensAt）不算；其他情境不管', () => {
+    expect(scenePasses(c('later', { opensAt: '23:00' }), sceneOf('eat', { scene: '宵夜' }))).toBe(false)
+    expect(scenePasses(c('open'), sceneOf('eat', { scene: '宵夜' }))).toBe(true)
+    expect(scenePasses(c('later', { opensAt: '23:00' }), sceneOf('eat', { scene: '外帶' }))).toBe(true)
+  })
+
+  it('prompt 給當地時間，不給 UTC（內湖：當地 19:32 卻寫「11:52 前吃完」）', () => {
+    const base = { module: 'eat', level: 1, choices: { scene: '宵夜' }, recentOrders: [] } as unknown as OrderRequest
+    const tw = buildOrderPrompt({ ...base, now: '2026-11-01T11:32:00.000Z', loc: { lat: 25.079, lng: 121.575 } }, null).user
+    expect(tw).toContain('現在時間：2026-11-01 19:32（台灣當地時間）')
+    expect(tw).not.toContain('11:32:00')
+    const jp = buildOrderPrompt({ ...base, now: '2026-11-01T11:32:00.000Z', loc: { lat: 35.6795, lng: 139.77 } }, null, 'JP').user
+    expect(jp).toContain('現在時間：2026-11-01 20:32（日本當地時間）')
+  })
+})

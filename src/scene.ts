@@ -49,6 +49,12 @@ const q = (q: string, group: string, est: number, block?: string[]): SceneQuery 
 const BEEF = ['不吃牛']
 const HOT = ['不辣']
 const FASTISH = ['fast_food_restaurant', 'convenience_store', 'food_court', 'sandwich_shop', 'bakery']
+/** 甜點店（checker 2026-11-01：內湖「約會吃好一點」查「法式料理」派到法式甜點蛋糕店）。選「甜食」時不排除。 */
+const DESSERTISH = ['cake_shop', 'dessert_shop', 'dessert_restaurant', 'pastry_shop', 'confectionery', 'ice_cream_shop', 'donut_shop', 'chocolate_shop', 'candy_store']
+const SWEET_OK = new Set([...DESSERTISH, 'bakery'])
+/** 喝酒的店（checker 2026-11-01：選咖啡＋談事情，「安靜 咖啡廳」撞到店名「安靜小酒館」）。選咖啡時排除。 */
+const BARISH = ['bar', 'pub', 'wine_bar', 'cocktail_bar', 'lounge_bar', 'sports_bar', 'night_club', 'bar_and_grill', 'beer_hall', 'japanese_izakaya_restaurant']
+type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt'>
 
 /** 吃：一個人快吃、外帶、朋友聚餐、約會吃好一點、宵夜、其他。 */
 const EAT: SceneRule[] = [
@@ -71,7 +77,7 @@ const EAT: SceneRule[] = [
     hint: '情境：外帶。steps 寫點什麼、外帶回去吃，不要寫內用、不要寫幾分鐘內在店裡吃完。',
   },
   {
-    id: '朋友聚餐', radius: 1200, avoidTypes: FASTISH,
+    id: '朋友聚餐', radius: 1200, avoidTypes: [...FASTISH, ...DESSERTISH],
     queries: {
       TW: [q('熱炒', 'tw', 2.5), q('火鍋', 'hotpot', 2.5), q('燒肉', 'jp', 3, BEEF), q('餐酒館', 'western', 3), q('韓式料理', 'kr', 2, HOT), q('泰式料理', 'other', 2, HOT)],
       JP: [q('居酒屋', 'jp', 2.5), q('焼肉', 'jp', 3, BEEF), q('焼き鳥', 'jp', 2.5), q('お好み焼き', 'jp', 2), q('中華料理', 'cn', 1.5), q('韓国料理', 'kr', 2, HOT)],
@@ -80,7 +86,7 @@ const EAT: SceneRule[] = [
     hint: '情境：朋友聚餐，一群人。steps 寫點幾道一起分，不要寫一個人的份量；時間寫 90 分鐘以上，不准催。',
   },
   {
-    id: '約會吃好一點', radius: 1500, avoidTypes: FASTISH, minRating: 4.3,
+    id: '約會吃好一點', radius: 1500, avoidTypes: [...FASTISH, ...DESSERTISH], minRating: 4.3,
     queries: {
       TW: [q('義大利麵', 'western', 2.5), q('餐酒館', 'western', 3), q('日式料理', 'jp', 3), q('牛排', 'western', 3, BEEF), q('鐵板燒', 'jp', 2.5), q('法式料理', 'western', 3.5)],
       JP: [q('イタリアン', 'western', 2.5), q('フレンチ', 'western', 3.5), q('寿司', 'jp', 2.5), q('天ぷら', 'jp', 2.5), q('和食', 'jp', 3)],
@@ -105,9 +111,9 @@ const EAT: SceneRule[] = [
  */
 const REST: SceneRule[] = [
   { id: '一個人放空', radius: 600, maxWalk: 10, hint: '情境：一個人放空。steps 寫坐下、點一杯、不看手機。' },
-  { id: '工作讀書', radius: 1000, hint: '情境：要工作或讀書，會坐很久。steps 寫找有插座的位子、點一杯、專心多久後休息。' },
-  { id: '朋友聊天', radius: 1000, hint: '情境：跟朋友聊天。steps 寫找能坐幾個人的位子、點什麼一起喝。' },
-  { id: '談事情', radius: 1000, minRating: 4.2, hint: '情境：要談事情，需要安靜。steps 寫找角落的位子、先點好再開始談。' },
+  { id: '工作讀書', radius: 1000, maxWalk: 15, hint: '情境：要工作或讀書，會坐很久。steps 寫找有插座的位子、點一杯、專心多久後休息。' },
+  { id: '朋友聊天', radius: 1000, maxWalk: 15, hint: '情境：跟朋友聊天。steps 寫找能坐幾個人的位子、點什麼一起喝。' },
+  { id: '談事情', radius: 1000, minRating: 4.2, maxWalk: 15, hint: '情境：要談事情，需要安靜。steps 寫找角落的位子、先點好再開始談。' },
   { id: '等人', radius: 400, maxWalk: 6, hint: '情境：等人或空檔，待不久。steps 寫點一杯、坐 20 分鐘、時間到就走。' },
 ]
 /** 歇的情境修飾詞：只加在咖啡（酒吧、居酒屋不適合「不限時」）。 */
@@ -152,11 +158,18 @@ export function sceneOf(module: ModuleId, choices: Record<string, string | numbe
     if (!text) return null
     return {
       id, text,
-      rule: { id, radius: 1000, hint: `情境：使用者自己寫的需求是「${text}」。口令要對得上這個需求，做不到的部分不要假裝做得到。` },
+      rule: withChoices(module, choices, { id, radius: 1000, hint: `情境：使用者自己寫的需求是「${text}」。口令要對得上這個需求，做不到的部分不要假裝做得到。` }),
     }
   }
   const rule = rules.find((r) => r.id === id)
-  return rule ? { id, rule } : null
+  return rule ? { id, rule: withChoices(module, choices, rule) } : null
+}
+
+/** 規則再依其他選項調整：吃選甜食就不排除甜點店；歇選咖啡就排除酒吧類（關鍵字會撞到店名）。 */
+function withChoices(module: ModuleId, choices: Record<string, string | number>, rule: SceneRule): SceneRule {
+  if (module === 'eat' && choices.taste === '甜食' && rule.avoidTypes) return { ...rule, avoidTypes: rule.avoidTypes.filter((t) => !SWEET_OK.has(t)) }
+  if (module === 'rest' && String(choices.drink ?? '咖啡') === '咖啡') return { ...rule, avoidTypes: [...(rule.avoidTypes ?? []), ...BARISH] }
+  return rule
 }
 
 /** 歇：情境改寫「喝什麼」的關鍵字（工作讀書 → 不限時 咖啡廳；其他 → 使用者的字＋咖啡廳）。 */
@@ -170,27 +183,29 @@ export function restQuery(scene: Scene | null, drink: string, base: string, coun
 }
 
 /**
- * 情境的硬一點的偏好（排除速食、評分、步行）：先篩，篩完一家都不剩就整批放回（寧可派得到，也不要空手）。
+ * 情境的硬一點的偏好（排除速食／甜點店／酒吧、評分、步行、宵夜要營業中）：先篩，篩完一家都不剩就整批放回（寧可派得到，也不要空手）。
  * relaxed＝一家都不剩、整批放回了。
  */
-export function sceneFilter<T extends Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin'>>(cands: T[], scene: Scene | null): { kept: T[]; relaxed: boolean } {
+export function sceneFilter<T extends Cand>(cands: T[], scene: Scene | null): { kept: T[]; relaxed: boolean } {
   if (!scene) return { kept: cands, relaxed: false }
   const kept = cands.filter((c) => passes(c, scene.rule))
   return kept.length ? { kept, relaxed: false } : { kept: cands, relaxed: cands.length > 0 }
 }
 
 /** 單一店家是否符合情境偏好（handler 算「夠不夠 5 家」用）。 */
-export function scenePasses(c: Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin'>, scene: Scene | null): boolean {
+export function scenePasses(c: Cand, scene: Scene | null): boolean {
   return !scene || passes(c, scene.rule)
 }
 
-function passes(c: Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin'>, r: SceneRule): boolean {
+function passes(c: Cand, r: SceneRule): boolean {
   if (r.avoidTypes && [c.primaryType, ...(c.types ?? [])].some((t) => t !== undefined && r.avoidTypes!.includes(t))) {
     // 主類別是速食才排除；types 裡順帶有 fast_food 的正餐店（例：拉麵店也標 fast_food）不排除。
     if (c.primaryType && r.avoidTypes.includes(c.primaryType)) return false
   }
   if (r.minRating !== undefined && typeof c.rating === 'number' && c.rating < r.minRating) return false
   if (r.maxWalk !== undefined && typeof c.walkMin === 'number' && c.walkMin > r.maxWalk) return false
+  // 宵夜：還沒開門的店（「HH:MM 開」）不算。Nearby 的查法沒有 openNow，這裡補上（checker 2026-11-01）。
+  if (r.openNow && c.opensAt) return false
   return true
 }
 

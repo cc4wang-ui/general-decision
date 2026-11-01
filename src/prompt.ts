@@ -4,6 +4,7 @@ import { CARD_BY_ID } from './cards.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
 import { bandOf, estText, priceFit, priceText } from './price.ts'
 import { sceneOf } from './scene.ts'
+import { tzOf } from './tz.ts'
 import type { Band, Country, Level, ModuleId, OrderRequest, PickResult } from './types.ts'
 
 // Round 3：PlaceCandidate 搬到 types.ts（DEV-PLAN-3 §B.1），這裡轉出口讓既有 import 不用動。
@@ -47,7 +48,8 @@ export function buildOrderPrompt(req: OrderRequest, pick: PickResult | null, cou
   ].filter(Boolean).join('\n')
 
   const user = [
-    `現在時間：${req.now}`,
+    // checker 2026-11-01：以前給 UTC 的 ISO 字串，模型照 UTC 寫鐘點（當地 19:32 寫「11:52 前吃完」）。改給當地時間。
+    `現在時間：${localStamp(req.now, tzOf(req.loc))}（${tzOf(req.loc) === 'Asia/Tokyo' ? '日本' : '台灣'}當地時間）。steps 裡的鐘點一律從這個時間往後算。`,
     // 資料最小化（Team Lead，2026-10-22）：店已由伺服器挑好，模型用不到座標——只告訴它在哪個國家，不送經緯度、不送地點名稱。
     req.loc ? `使用者人在${country === 'JP' ? '日本' : country === 'TW' ? '台灣' : '台灣與日本以外的地方'}。` : '使用者沒有給定位。依規則 6 降級，不得編造店名與距離。',
     country === 'JP' ? '使用者人在日本：交通講電車／地下鐵，不講捷運；金額只有日圓。' : '',
@@ -62,6 +64,13 @@ export function buildOrderPrompt(req: OrderRequest, pick: PickResult | null, cou
   ].filter(Boolean).join('\n\n')
 
   return { system, user }
+}
+
+/** ISO → 當地「YYYY-MM-DD HH:MM」。 */
+export function localStamp(iso: string, tz: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(d).replace('T', ' ')
 }
 
 /**
