@@ -331,7 +331,8 @@ export function rescuePlan(country: Country): LanePlan {
 }
 
 const VEG_TYPES = new Set(VEG_LANE.types)
-const VEG_NAME = /素|蔬|齋|斋|vegan|vegetarian|veggie|plant[- ]?based|ヴィーガン|ベジ|精進/i
+// 只認明確的詞（checker 2026-11-01）：單字「素／蔬／齋」會誤中元素、樸素、素描、鮮蔬火鍋、時蔬熱炒、齋藤。
+const VEG_NAME = /素食|蔬食|素菜|純素|全素|蛋奶素|奶蛋素|五辛素|齋菜|齋食|斋菜|vegan|vegetarian|veggie|plant[- ]?based|ヴィーガン|ベジタリアン|ベジ料理|精進料理/i
 
 /**
  * 忌口「素」的硬過濾（Round 4 checker 2026-11-01）：關鍵字 Text Search（素食、蔬食…）沒有店家類型限制，

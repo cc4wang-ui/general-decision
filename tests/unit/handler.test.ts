@@ -132,12 +132,27 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect(res.status).toBe(503)
     expect(res.headers.get('x-places-calls')).toBe('2')
     const body = (await res.json()) as { error: string; message: string; debug: OrderDebug }
-    expect(body.error).toBe('upstream')
+    expect(body.error).toBe('places_down')
     expect(body.message).toContain('地圖服務暫時連不上')
     expect(body.message).not.toContain('查不到營業中的店')
     expect(body.debug.error).toBe('places_down')
     expect(claude).not.toHaveBeenCalled()
   }, 15_000)
+
+  it('部分失敗（第一次 0 家、第二次 500、超商 0 家）→ 沒查完，回 503 places_down，不說附近沒店（checker 2026-11-01）', async () => {
+    let n = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('anthropic')) return claudeOk(ORDER_JSON)
+      n++
+      return n === 2 ? new Response('boom', { status: 500 }) : new Response(JSON.stringify({ places: [] }), { status: 200 })
+    }))
+    const res = await handler(post({}))
+    expect(res.status).toBe(503)
+    expect(res.headers.get('x-places-calls')).toBe('3')
+    const body = (await res.json()) as { error: string; message: string }
+    expect(body.error).toBe('places_down')
+    expect(body.message).not.toContain('查不到營業中的店')
+  })
 
   it('Places 正常但方圓 3 km 都沒營業中的店（含超商）→ 三次都查過才回 502 no_places，訊息講 3 公里', async () => {
     const bodies: string[] = []

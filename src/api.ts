@@ -5,7 +5,7 @@ import { fromDebug, recordTrial } from './trial.ts'
 import type { GeocodeResponse, Order, OrderDebug, OrderRequest, WeeklyReport, WeeklyRequest } from './types.ts'
 
 export type ApiErrorKind =
-  'offline' | 'rate_limited' | 'upstream' | 'bad_request' | 'no_location' | 'no_places' | 'not_found' | 'over_cap'
+  'offline' | 'rate_limited' | 'upstream' | 'bad_request' | 'no_location' | 'no_places' | 'places_down' | 'not_found' | 'over_cap'
 
 export class ApiError extends Error {
   kind: ApiErrorKind
@@ -28,6 +28,8 @@ export const ERROR_TEXT: Record<ApiErrorKind, { line: string; sub?: string }> = 
   // 2026-09-18：吃／歇一定要點真店。沒定位、附近沒開著的店 → 直接說，不用類別糊過去。
   no_location: { line: '不報座標，班長就點不了店。開定位再報告。' },
   no_places: { line: '方圓 3 公里內查不到營業中的店，連超商都沒有。換個地方再報告。' },
+  // Round 4 checker（2026-11-01）：地圖服務掛掉或沒查完，不能說成「附近沒店」。試用紀錄也要分得出來。
+  places_down: { line: '地圖服務暫時連不上，班長沒查完。30 秒後再報告。' },
   // Round 3 C2：手動報座標查不到。
   not_found: { line: '找不到這個地方。報個車站或地標。' },
   // 每日 Places 呼叫上限（含手動報座標換來的那一次）用完：不是沒定位，不能叫人去開定位。
@@ -110,7 +112,7 @@ async function post<T>(path: string, body: unknown): Promise<{ data: T; res: Res
       debug = body.debug
     } catch { /* 沒 body 就看狀態碼 */ }
     const kind: ApiErrorKind =
-      code === 'no_location' || code === 'no_places' || code === 'not_found' ? code
+      code === 'no_location' || code === 'no_places' || code === 'places_down' || code === 'not_found' ? code
       : res.status === 429 ? 'rate_limited' : res.status === 400 ? 'bad_request' : 'upstream'
     throw new ApiError(kind, ERROR_TEXT[kind].line, debug)
   }

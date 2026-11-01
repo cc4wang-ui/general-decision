@@ -181,7 +181,10 @@ describe('looksVeg（忌口「素」硬過濾，checker 2026-11-01）', () => {
   it('素食／純素類型，或店名有素、蔬、齋、vegan、ヴィーガン → 留；壽司關東煮、牛肉麵 → 不留', () => {
     expect(looksVeg({ name: '湖水灣', primaryType: 'vegetarian_restaurant' })).toBe(true)
     expect(looksVeg({ name: 'Plants', types: ['vegan_restaurant', 'restaurant'] })).toBe(true)
-    for (const name of ['明珠素食', '布衣蔬食', '吉祥齋', 'Vegan Kitchen', 'T’s たんたん ヴィーガン', '精進料理 醍醐']) expect(looksVeg({ name }), name).toBe(true)
-    for (const name of ['大月壽司 關東煮黃石店', '老王牛肉麵', '燒肉本舖']) expect(looksVeg({ name, primaryType: 'restaurant' }), name).toBe(false)
+    for (const name of ['明珠素食', '布衣蔬食', '佛光素菜館', '吉祥齋菜', '綠意純素', 'Vegan Kitchen', 'T’s たんたん ヴィーガン', '精進料理 醍醐']) expect(looksVeg({ name }), name).toBe(true)
+    // checker 2026-11-01：單字「素／蔬／齋」的誤中
+    for (const name of ['大月壽司 關東煮黃石店', '老王牛肉麵', '燒肉本舖', '元素餐廳', '樸素咖啡', '素描咖啡館', '素顏咖啡', '鮮蔬火鍋', '時蔬小館 熱炒', '蔬菜蛋餅早餐店', '齋藤ラーメン']) {
+      expect(looksVeg({ name, primaryType: 'restaurant' }), name).toBe(false)
+    }
   })
 })

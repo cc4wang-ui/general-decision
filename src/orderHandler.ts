@@ -195,8 +195,10 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     // 一次一次來，不並行。第一次 lane；不夠 5 家或失敗才第二次（半徑 ×2.5、只要營業中；lane 回 400 → 退回營業中的餐廳）。
     // 平常 ≤ 2 次；有預算且兩次都撈不到才有預算後備（不帶價位）；之後仍一家都派不出去，才有救援（下面）。
     const veg = String(req.choices?.diet ?? '') === '素'
-    /** 每一次都查失敗（HTTP 錯誤或逾時）＝ Places 掛掉，不是附近沒店。 */
+    /** 每一次都查失敗（HTTP 錯誤或逾時）＝ Places 掛掉，不是附近沒店：不再多打。 */
     const allFailed = () => tries.length > 0 && tries.every((t) => t.raw === -1)
+    /** 有任何一次查失敗 → 沒查完。派不出店時不准說「附近沒店」（checker 2026-11-01）。 */
+    const anyFailed = () => tries.some((t) => t.raw === -1)
     const firstStatus = await call(first)
     // Round 4 實測（2026-11-01）：有預算時「候選夠 5 家」不夠，要「預算內夠 5 家」，不然第二次不會打、只能補預算外的店。
     const budget = card.id === 'eat' && req.budget?.length ? req.budget : undefined
@@ -236,12 +238,12 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       pick = choose(undefined)
       if (pick) console.warn(`[rescue] module=${req.module}：前兩次派不出店，改派超商`)
     }
-    if (!pick && allFailed()) {
-      // Round 4 checker（2026-11-01）：Places 掛掉時不能說「附近查不到營業中的店」，那不是實話。
+    if (!pick && anyFailed()) {
+      // Round 4 checker（2026-11-01）：Places 掛掉或某一次沒查完時不能說「附近查不到營業中的店」，那不是實話。
       dbg.error = 'places_down'
       dbg.ms = { places: placesMs, claude: 0, total: Date.now() - t0 }
       return json(
-        { error: 'upstream', message: '地圖服務暫時連不上，班長查不到店。30 秒後再報告。', debug: dbg },
+        { error: 'places_down', message: '地圖服務暫時連不上，班長沒查完。30 秒後再報告。', debug: dbg },
         503,
         { 'x-places-calls': String(placesCalled), 'x-timing': `places=${placesMs};claude=0` },
       )
