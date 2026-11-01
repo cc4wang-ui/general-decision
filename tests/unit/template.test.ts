@@ -36,6 +36,23 @@ describe('templateOrder（Claude 失敗時的口令）', () => {
     expect(templateOrder({ module: 'buy', choices: {}, recentOrders: [] }, null, now, 'Asia/Taipei').verdict).toBe('stop')
   })
 
+  it('實話（checker 2026-11-01）：派超商 → bot 講「附近都收了，去超商」；預算對不上 → bot 講跟 Claude 同一句', () => {
+    const store: PickResult = { ...pick, place: { ...pick.place, id: 's7', name: '7-ELEVEN 府前門市', lane: 'rescue', primaryType: 'convenience_store' } }
+    const r = templateOrder({ module: 'eat', choices: {}, recentOrders: [], budget: [3] }, store, now, 'Asia/Taipei')
+    expect(r.meme.bot).toBe('附近都收了，去超商')
+    expect(r.meme.big).toBe('7-ELEVEN 府前門市')
+    const pricey: PickResult = { ...pick, band: 4 }
+    expect(templateOrder({ module: 'eat', choices: {}, recentOrders: [], budget: [1] }, pricey, now, 'Asia/Taipei').meme.bot).toBe('預算內的沒開，這家比較貴')
+    const cheaper: PickResult = { ...pick, band: 3 }
+    expect(templateOrder({ module: 'eat', choices: {}, recentOrders: [], budget: [4] }, cheaper, now, 'Asia/Taipei').meme.bot).toBe('比預算省一點，我准了')
+    const fit: PickResult = { ...pick, band: 1 }
+    expect(templateOrder({ module: 'eat', choices: {}, recentOrders: [], budget: [1] }, fit, now, 'Asia/Taipei').meme.bot).toBe('不准挑，照做')
+    for (const o of [r]) {
+      const e = enforceRules(o, 'eat', {}, now, [], { level: 1, country: 'TW', pick: store })
+      expect(findBanned([e.meme.top, e.meme.big, e.meme.bot, ...e.steps, e.log].join('\n'))).toEqual([])
+    }
+  })
+
   it('喝酒：兩杯上限、幾點前離開、不准開車', () => {
     const o = templateOrder({ module: 'rest', choices: { drink: '居酒屋' }, recentOrders: [] }, pick, now, 'Asia/Taipei')
     expect(o.steps.join('')).toMatch(/兩杯/)

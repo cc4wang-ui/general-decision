@@ -2,6 +2,7 @@
 // Cross 2026-09-18：不吐口令是不被允許的；Cross 2026-10-30：很多情境沒辦法給任何解答。
 // 這裡只放算得出來的句子：店名、步行、營業時間、熄燈時間、買不買都由程式決定；回傳後照樣經過 enforceRules（禁詞、mode 語料、用語守門）。
 // 純函式，無 I/O。
+import { budgetBot } from './prompt.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
 import { hhmmIn, type Tz } from './tz.ts'
 import type { Order, OrderRequest, PickResult } from './types.ts'
@@ -9,13 +10,16 @@ import type { Order, OrderRequest, PickResult } from './types.ts'
 const DRINKS = new Set(['酒吧', '居酒屋', '熱炒燒烤'])
 
 /** 回一道合法的 Order。pick 由伺服器挑好（吃／歇），其他卡為 null。 */
-export function templateOrder(req: Pick<OrderRequest, 'module' | 'choices' | 'recentOrders'>, pick: PickResult | null, now: Date, tz: Tz): Order {
+export function templateOrder(req: Pick<OrderRequest, 'module' | 'choices' | 'recentOrders' | 'budget'>, pick: PickResult | null, now: Date, tz: Tz): Order {
   const name = pick?.place.name ?? ''
   const walk = pick?.place.walkMin ? `走 ${pick.place.walkMin} 分鐘過去。` : '現在出發。'
   const at = (min: number) => hhmmIn(new Date(now.getTime() + min * 60_000).toISOString(), tz)
+  // 跟 Claude 口令同一套實話（Round 4 checker 2026-11-01）：派超商要說附近都收了；預算對不上要說。
+  const rescue = pick?.place.lane === 'rescue'
+  const honest = rescue ? '附近都收了，去超商' : pick && req.module === 'eat' ? budgetBot(pick.band ?? null, req.budget) : ''
   const base = (big: string, steps: string[], verdict: Order['verdict'] = 'do'): Order => ({
     verdict,
-    meme: { top: '班長下令', big, bot: '不准挑，照做' },
+    meme: { top: '班長下令', big, bot: honest || '不准挑，照做' },
     steps,
     ...(pick ? { place: { id: pick.place.id, name } } : {}),
     log: `${at(0)} 口令：${big}。`,
@@ -23,8 +27,10 @@ export function templateOrder(req: Pick<OrderRequest, 'module' | 'choices' | 're
 
   switch (req.module) {
     case 'eat':
+      if (rescue) return base(name, [walk, '拿一個熱的主食，加一瓶水。', `${at(20)} 前吃完，回報。`])
       return base(name, [walk, '點店裡賣最多的那一道。', `${at(40)} 前吃完，回報。`])
     case 'rest':
+      if (rescue) return base(name, [walk, '買一瓶熱飲。', '店外站 10 分鐘，喝完回家。'])
       if (DRINKS.has(String(req.choices.drink ?? ''))) {
         return base(name, ['最多兩杯，不准續攤。', `${at(90)} 前離開。`, '搭車或走路回家，不准開車騎車。'])
       }

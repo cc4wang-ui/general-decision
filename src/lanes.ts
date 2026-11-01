@@ -326,5 +326,18 @@ const KEEP_QUERY: Record<string, true> = Object.fromEntries(
  */
 export function rescuePlan(country: Country): LanePlan {
   const q = country === 'JP' ? 'コンビニ' : country === 'TW' ? '便利商店' : 'convenience store'
-  return { kind: 'text', lane: 'rescue', textQuery: q, radius: 1500, rank: 'DISTANCE', openNow: true }
+  // 半徑 3000（Round 4 checker 2026-11-01）：STOP 1「方圓 3 km 內真的沒有營業中的店」才准空手，救援就要查到 3 km。
+  return { kind: 'text', lane: 'rescue', textQuery: q, radius: 3000, rank: 'DISTANCE', openNow: true }
+}
+
+const VEG_TYPES = new Set(VEG_LANE.types)
+const VEG_NAME = /素|蔬|齋|斋|vegan|vegetarian|veggie|plant[- ]?based|ヴィーガン|ベジ|精進/i
+
+/**
+ * 忌口「素」的硬過濾（Round 4 checker 2026-11-01）：關鍵字 Text Search（素食、蔬食…）沒有店家類型限制，
+ * 實測板橋「蔬食」撈到壽司關東煮店。只留 Google 類型是素食／純素、或店名看得出是素的店。超商救援不過濾。
+ */
+export function looksVeg(c: { name: string; primaryType?: string; types?: string[] }): boolean {
+  if ([c.primaryType, ...(c.types ?? [])].some((t) => t !== undefined && VEG_TYPES.has(t))) return true
+  return VEG_NAME.test(c.name)
 }

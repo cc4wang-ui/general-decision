@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { CARD_BY_ID } from '../../src/cards.ts'
 import { mulberry32 } from '../../src/discovery.ts'
-import { LANES, QUERY_LANES, SWEET_QUERIES, VEG_QUERIES, laneEst, mealLanes, pickLane, priceLevelsFor, rescuePlan, widenPlan, type LanePlan } from '../../src/lanes.ts'
+import { LANES, QUERY_LANES, SWEET_QUERIES, VEG_QUERIES, laneEst, looksVeg, mealLanes, pickLane, priceLevelsFor, rescuePlan, widenPlan, type LanePlan } from '../../src/lanes.ts'
 import { priceFit } from '../../src/price.ts'
 
 const many = (n: number, f: (seed: number) => LanePlan) => Array.from({ length: n }, (_, s) => f(s + 1))
@@ -152,8 +152,8 @@ describe('widenPlan（第二次呼叫）', () => {
     // 沒預算的第一次 → 第二次也不會憑空多出 priceLevels
     expect(widenPlan({ kind: 'text', lane: 'q:便當', textQuery: '便當', radius: 800, rank: 'DISTANCE', restrict: true })).not.toHaveProperty('priceLevels')
   })
-  it('Round 4 救援：營業中的便利商店（台灣／日本／其他）', () => {
-    expect(rescuePlan('TW')).toMatchObject({ kind: 'text', lane: 'rescue', textQuery: '便利商店', openNow: true })
+  it('Round 4 救援：3 km 內營業中的便利商店（台灣／日本／其他）', () => {
+    expect(rescuePlan('TW')).toMatchObject({ kind: 'text', lane: 'rescue', textQuery: '便利商店', openNow: true, radius: 3000, rank: 'DISTANCE' })
     expect(rescuePlan('JP')).toMatchObject({ textQuery: 'コンビニ' })
     expect(rescuePlan('other')).toMatchObject({ textQuery: 'convenience store' })
   })
@@ -174,5 +174,14 @@ describe('budgetLine：店跟預算對不上時，方向要講對（PR #22 紅�
     expect(budgetLine(1, [4])).toContain('比較便宜')
     expect(budgetLine(1, [4])).not.toContain('貴')
     expect(budgetLine(3, [4])).toContain('省一點')
+  })
+})
+
+describe('looksVeg（忌口「素」硬過濾，checker 2026-11-01）', () => {
+  it('素食／純素類型，或店名有素、蔬、齋、vegan、ヴィーガン → 留；壽司關東煮、牛肉麵 → 不留', () => {
+    expect(looksVeg({ name: '湖水灣', primaryType: 'vegetarian_restaurant' })).toBe(true)
+    expect(looksVeg({ name: 'Plants', types: ['vegan_restaurant', 'restaurant'] })).toBe(true)
+    for (const name of ['明珠素食', '布衣蔬食', '吉祥齋', 'Vegan Kitchen', 'T’s たんたん ヴィーガン', '精進料理 醍醐']) expect(looksVeg({ name }), name).toBe(true)
+    for (const name of ['大月壽司 關東煮黃石店', '老王牛肉麵', '燒肉本舖']) expect(looksVeg({ name, primaryType: 'restaurant' }), name).toBe(false)
   })
 })

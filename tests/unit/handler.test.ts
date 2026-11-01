@@ -5,7 +5,7 @@ import { findBanned } from '../../src/banned.ts'
 import { CARD_BY_ID } from '../../src/cards.ts'
 import { clusterKeys } from '../../src/chains.ts'
 import { mulberry32, pickPlace } from '../../src/discovery.ts'
-import { pickLane } from '../../src/lanes.ts'
+import { SWEET_QUERIES, VEG_QUERIES, pickLane } from '../../src/lanes.ts'
 import { toCandidates, type RawPlace } from '../../src/places.ts'
 import { hourIn } from '../../src/tz.ts'
 import type { Order, OrderDebug, OrderRequest, PlaceMemSummary } from '../../src/types.ts'
@@ -125,14 +125,54 @@ describe('/api/order handler（第 12 節 S5）', () => {
 
   // 2026-09-18 斷言改了（Cross：只講類別一律視為失敗）。以下兩條原本是「降級仍出口令」，現在是明確的失敗碼。
   // Round 4：兩個半徑之後再查一次營業中的超商（救援），三次都掛才回 no_places。
-  it('Places 掛掉 → 兩個半徑加超商救援都試過後回 502 no_places，不打 Claude', async () => {
+  it('Places 掛掉 → 兩次都失敗就停（不打超商救援），回 503 upstream「地圖服務暫時連不上」，不說附近沒店、不打 Claude', async () => {
     const claude = vi.fn(() => claudeOk(ORDER_JSON))
     vi.stubGlobal('fetch', routed(claude, () => new Response('boom', { status: 500 })))
-    const res = await handler(post({}))
-    expect(res.status).toBe(502)
-    expect((await res.json()).error).toBe('no_places')
+    const res = await handler(post({ budget: [3] }))
+    expect(res.status).toBe(503)
+    expect(res.headers.get('x-places-calls')).toBe('2')
+    const body = (await res.json()) as { error: string; message: string; debug: OrderDebug }
+    expect(body.error).toBe('upstream')
+    expect(body.message).toContain('地圖服務暫時連不上')
+    expect(body.message).not.toContain('查不到營業中的店')
+    expect(body.debug.error).toBe('places_down')
     expect(claude).not.toHaveBeenCalled()
   }, 15_000)
+
+  it('Places 正常但方圓 3 km 都沒營業中的店（含超商）→ 三次都查過才回 502 no_places，訊息講 3 公里', async () => {
+    const bodies: string[] = []
+    const claude = vi.fn(() => claudeOk(ORDER_JSON))
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('anthropic')) return claude()
+      bodies.push(String(init?.body ?? ''))
+      return new Response(JSON.stringify({ places: [] }), { status: 200 })
+    }))
+    const res = await handler(post({}))
+    expect(res.status).toBe(502)
+    expect(res.headers.get('x-places-calls')).toBe('3')
+    const body = (await res.json()) as { error: string; message: string }
+    expect(body.error).toBe('no_places')
+    expect(body.message).toContain('方圓 3 公里內查不到營業中的店')
+    expect(JSON.parse(bodies[2]!)).toMatchObject({ textQuery: '便利商店', locationBias: { circle: { radius: 3000 } } })
+    expect(claude).not.toHaveBeenCalled()
+  })
+
+  it('忌口「素」：關鍵字查詢混進的葷食店（壽司關東煮）0 次被派；只派素食類型或店名有素／蔬的店（30 個種子）', async () => {
+    const mk = (id: string, name: string, primaryType: string, n = 0): RawPlace => ({
+      id, displayName: { text: name }, location: { latitude: 25.0335, longitude: 121.5658 + n * 0.0002 }, currentOpeningHours: { openNow: true },
+      rating: 4.8, userRatingCount: 900, primaryType, types: [primaryType, 'restaurant'],
+    })
+    const places = [
+      mk('meat1', '大月壽司 關東煮黃石店', 'sushi_restaurant', 1), mk('meat2', '老王牛肉麵', 'noodle_shop', 2), mk('meat3', '燒肉本舖', 'barbecue_restaurant', 3),
+      mk('veg1', '明珠素食', 'restaurant', 4), mk('veg2', '湖水灣', 'vegetarian_restaurant', 5), mk('veg3', '布衣蔬食', 'restaurant', 6),
+    ]
+    for (let seed = 1; seed <= 30; seed++) {
+      vi.stubGlobal('fetch', routed(() => claudeOk(ORDER_JSON), () => new Response(JSON.stringify({ places }), { status: 200 })))
+      const body = (await (await handler(post({ choices: { diet: '素' }, seed }))).json()) as Order & { debug: OrderDebug }
+      expect(body.place?.id, `seed ${seed}`).toMatch(/^veg/)
+      expect(JSON.stringify(body.debug.places?.candidates ?? [])).not.toContain('壽司')
+    }
+  })
 
   it('沒有定位 → 400 no_location，不打 Places 也不打 Claude（吃／歇一定要真店）', async () => {
     const f = routed(() => claudeOk(ORDER_JSON))
@@ -143,29 +183,34 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect(f).not.toHaveBeenCalled()
   })
 
-  it('lane 有效候選 < 5 → 第二次 Text Search 通用關鍵字＋ openNow、半徑 2000，第二次有就用', async () => {
-    const bodies: string[] = []
-    const places = vi.fn((init?: RequestInit) => {
-      bodies.push(String(init?.body ?? ''))
-      return bodies.length === 1
-        ? new Response(JSON.stringify({ places: [] }), { status: 200 })
-        : placesOk()
-    })
-    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) =>
-      String(url).includes('anthropic') ? claudeOk(ORDER_JSON) : places(init)))
-    const res = await handler(post({}))
-    expect(res.status).toBe(200)
-    expect(res.headers.get('x-places-calls')).toBe('2')
-    const first = JSON.parse(bodies[0]!)
-    // 第一次：Nearby 圓（800m）或關鍵字 lane 的方框（約 ±800m）
-    if (first.locationRestriction.circle) expect(first.locationRestriction.circle.radius).toBe(800)
-    else expect(first.locationRestriction.rectangle.high.latitude - 25.033).toBeCloseTo(800 / 111_320, 5)
-    const second = JSON.parse(bodies[1]!)
-    expect(second.locationBias.circle.radius).toBe(2000)
-    expect(['餐廳', '美食', '小吃']).toContain(second.textQuery)
-    expect(second.openNow).toBe(true)
-    expect(['DISTANCE', 'RELEVANCE']).toContain(second.rankPreference)
-    expect(second.priceLevels).toBeUndefined()
+  it('lane 有效候選 < 5 → 第二次 Text Search 通用關鍵字（素食／甜食關鍵字保留自己）＋ openNow、半徑 2000，第二次有就用（40 個種子）', async () => {
+    // checker 2026-11-01：原本沒固定種子，第一次抽到 q:素食（2.7%）時第二次照規則保留「素食」→ 測試偶發失敗。
+    const KEEP = new Set([...SWEET_QUERIES.TW, ...VEG_QUERIES.TW].map((l) => l.q))
+    for (let seed = 1; seed <= 40; seed++) {
+      const bodies: string[] = []
+      const places = vi.fn((init?: RequestInit) => {
+        bodies.push(String(init?.body ?? ''))
+        return bodies.length === 1
+          ? new Response(JSON.stringify({ places: [] }), { status: 200 })
+          : placesOk()
+      })
+      vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) =>
+        String(url).includes('anthropic') ? claudeOk(ORDER_JSON) : places(init)))
+      const res = await handler(post({ seed }))
+      expect(res.status, `seed ${seed}`).toBe(200)
+      expect(res.headers.get('x-places-calls'), `seed ${seed}`).toBe('2')
+      const first = JSON.parse(bodies[0]!)
+      // 第一次：Nearby 圓（800m）或關鍵字 lane 的方框（約 ±800m）
+      if (first.locationRestriction.circle) expect(first.locationRestriction.circle.radius).toBe(800)
+      else expect(first.locationRestriction.rectangle.high.latitude - 25.033).toBeCloseTo(800 / 111_320, 5)
+      const second = JSON.parse(bodies[1]!)
+      expect(second.locationBias.circle.radius).toBe(2000)
+      if (first.textQuery && KEEP.has(first.textQuery)) expect(second.textQuery, `seed ${seed}`).toBe(first.textQuery)
+      else expect(['餐廳', '美食', '小吃'], `seed ${seed}`).toContain(second.textQuery)
+      expect(second.openNow).toBe(true)
+      expect(['DISTANCE', 'RELEVANCE']).toContain(second.rankPreference)
+      expect(second.priceLevels).toBeUndefined()
+    }
   })
 
   it('Round 4 救援：前兩次都沒有營業中的店 → 第三次查營業中的超商，照樣出口令', async () => {
@@ -293,14 +338,14 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect(body.debug.retry).toBeUndefined()
   })
 
-  it('失敗時回應也帶 debug：no_places 看得到兩圈半徑各查到什麼', async () => {
+  it('失敗時回應也帶 debug：Places 掛掉看得到兩圈半徑各查到什麼', async () => {
     vi.stubGlobal('fetch', routed(() => claudeOk(ORDER_JSON), () => new Response('boom', { status: 500 })))
     const res = await handler(post({}))
     const body = (await res.json()) as { error: string; debug: OrderDebug }
-    expect(body.debug.error).toBe('no_places')
-    expect(body.debug.rescue).toBe(true)
-    // 第一次 800、第二次 2000、第三次（超商救援）1500
-    expect(body.debug.places?.tries).toEqual([{ r: 800, raw: -1, kept: 0 }, { r: 2000, raw: -1, kept: 0 }, { r: 1500, raw: -1, kept: 0 }])
+    expect(body.debug.error).toBe('places_down')
+    expect(body.debug.rescue).toBeUndefined()
+    // Places 掛掉：第一次 800、第二次 2000 都失敗就停，不打超商救援（checker 2026-11-01）
+    expect(body.debug.places?.tries).toEqual([{ r: 800, raw: -1, kept: 0 }, { r: 2000, raw: -1, kept: 0 }])
   }, 15_000)
 
   it('模型寫別家店 → 不重打（retry 只給 nonanswer），forced 記下來', async () => {

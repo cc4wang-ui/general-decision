@@ -1,14 +1,15 @@
 // /api/order 的實作（Vercel 入口是 api/order.ts 的薄殼）：定位+卡片+選項 → Places(可選) → 發掘引擎挑店 → Claude 寫口令 → Order JSON（第 4、8、11 節；DEV-PLAN-3 W1.7）。
 // key 只在這裡存在，前端永遠不碰。
-// Round 3：店由 src/discovery.ts pickPlace 決定（T2），Claude 只看得到那一家；每次 ≤ 2 次 Places 呼叫、不並行。
-// Round 4（Cross 2026-10-30「很多情境沒辦法給任何解答」）：前兩次之後一家都派不出去 → 第三次查營業中的超商（rescue）；
-// Claude 失敗 → 伺服器用模板出口令（src/template.ts）。除了沒定位，吃／歇不再空手。
+// Round 3：店由 src/discovery.ts pickPlace 決定（T2），Claude 只看得到那一家；Places 呼叫一次一次來、不並行。
+// Round 4（Cross 2026-10-30「很多情境沒辦法給任何解答」）：平常 ≤ 2 次；有預算且兩次都撈不到 → 拿掉價位再撈一次；
+// 仍一家都派不出去 → 查 3 km 內營業中的超商（rescue）。最多 4 次。前兩次都連不上 Places → 不再試，直接說地圖服務連不上。
+// Claude 失敗 → 伺服器用模板出口令（src/template.ts）。除了沒定位、Places 掛掉，吃／歇不再空手。
 import { CARD_BY_ID } from './cards.ts'
 import { buildOrderPrompt } from './prompt.ts'
 import { parseOrder, ParseError } from './orderParse.ts'
 import { enforceRules, isNonAnswer } from './rules.ts'
 import { FETCH_COUNT, FIELD_MASK, matchPlace, mergeCandidates, placeMapUrl, toCandidates, type RawPlace } from './places.ts'
-import { laneEst, pickLane, rescuePlan, widenPlan, type LanePlan } from './lanes.ts'
+import { laneEst, looksVeg, pickLane, rescuePlan, widenPlan, type LanePlan } from './lanes.ts'
 import { cuisineOf, mulberry32, pickPlace, type PickOutcome } from './discovery.ts'
 import { bandOf, countryOf, currencyCountry, effectiveBand, estText, priceFit, priceText } from './price.ts'
 import { brandKeyOf, clusterKeys } from './chains.ts'
@@ -179,7 +180,8 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       try {
         const raw = await fetchPlaces(io, loc, p, placesLanguage(countryOf(loc)))
         const est = laneEst(p.lane)
-        const got = toCandidates(raw, loc, now, req.exclude ?? [], tz).map((c) => ({ ...c, lane: p.lane, ...(est !== undefined ? { estBand: est } : {}) }))
+        let got = toCandidates(raw, loc, now, req.exclude ?? [], tz).map((c) => ({ ...c, lane: p.lane, ...(est !== undefined ? { estBand: est } : {}) }))
+        if (veg && p.lane !== 'rescue') got = got.filter(looksVeg) // 忌口「素」：關鍵字查詢會混進葷食店
         cands = mergeCandidates(cands, got)
         tries.push({ r: p.radius, raw: raw.length, kept: got.length })
         console.info(`[places] ok ${how} r=${p.radius} raw=${raw.length} candidates=${got.length}`)
@@ -192,13 +194,16 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     }
     // 一次一次來，不並行。第一次 lane；不夠 5 家或失敗才第二次（半徑 ×2.5、只要營業中；lane 回 400 → 退回營業中的餐廳）。
     // 平常 ≤ 2 次；有預算且兩次都撈不到才有預算後備（不帶價位）；之後仍一家都派不出去，才有救援（下面）。
+    const veg = String(req.choices?.diet ?? '') === '素'
+    /** 每一次都查失敗（HTTP 錯誤或逾時）＝ Places 掛掉，不是附近沒店。 */
+    const allFailed = () => tries.length > 0 && tries.every((t) => t.raw === -1)
     const firstStatus = await call(first)
     // Round 4 實測（2026-11-01）：有預算時「候選夠 5 家」不夠，要「預算內夠 5 家」，不然第二次不會打、只能補預算外的店。
     const budget = card.id === 'eat' && req.budget?.length ? req.budget : undefined
     const fitCount = () => budget ? cands.filter((c) => priceFit(effectiveBand(c, country).band, budget, true) === 1).length : cands.length
     if (cands.length < MIN_VALID || fitCount() < MIN_VALID) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng }))
     // 有預算、兩次都帶 priceLevels 卻一家都沒撈到 → 拿掉價位再撈一次營業中的餐廳（派預算外的真店，比改派超商強）。
-    if (budget && cands.length === 0) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng, dropPrice: true }))
+    if (budget && cands.length === 0 && !allFailed()) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng, dropPrice: true }))
     placesMs = Date.now() - t0
     country = cands.map((c) => currencyCountry(c.priceRange?.currency)).find(Boolean) ?? country
     dbg.places = {
@@ -220,7 +225,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       })
       : null
     pick = choose(req.budget)
-    if (!pick) {
+    if (!pick && !allFailed()) {
       // 第三次（救援）：附近營業中的都派不出去 → 營業中的超商。預算不適用（超商就是超商），口令會講清楚（prompt rescue 行）。
       dbg.rescue = true
       cands = []
@@ -231,11 +236,21 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       pick = choose(undefined)
       if (pick) console.warn(`[rescue] module=${req.module}：前兩次派不出店，改派超商`)
     }
+    if (!pick && allFailed()) {
+      // Round 4 checker（2026-11-01）：Places 掛掉時不能說「附近查不到營業中的店」，那不是實話。
+      dbg.error = 'places_down'
+      dbg.ms = { places: placesMs, claude: 0, total: Date.now() - t0 }
+      return json(
+        { error: 'upstream', message: '地圖服務暫時連不上，班長查不到店。30 秒後再報告。', debug: dbg },
+        503,
+        { 'x-places-calls': String(placesCalled), 'x-timing': `places=${placesMs};claude=0` },
+      )
+    }
     if (!pick) {
       dbg.error = 'no_places'
       dbg.ms = { places: placesMs, claude: 0, total: Date.now() - t0 }
       return json(
-        { error: 'no_places', message: '附近查不到營業中的店。換個地方再報告。', debug: dbg },
+        { error: 'no_places', message: '方圓 3 公里內查不到營業中的店，連超商都沒有。換個地方再報告。', debug: dbg },
         502,
         { 'x-places-calls': String(placesCalled), 'x-timing': `places=${placesMs};claude=0` },
       )

@@ -27,7 +27,7 @@ export const ERROR_TEXT: Record<ApiErrorKind, { line: string; sub?: string }> = 
   bad_request: { line: '這個口令班長聽不懂。回報告。' },
   // 2026-09-18：吃／歇一定要點真店。沒定位、附近沒開著的店 → 直接說，不用類別糊過去。
   no_location: { line: '不報座標，班長就點不了店。開定位再報告。' },
-  no_places: { line: '附近查不到營業中的店。換個地方再報告。' },
+  no_places: { line: '方圓 3 公里內查不到營業中的店，連超商都沒有。換個地方再報告。' },
   // Round 3 C2：手動報座標查不到。
   not_found: { line: '找不到這個地方。報個車站或地標。' },
   // 每日 Places 呼叫上限（含手動報座標換來的那一次）用完：不是沒定位，不能叫人去開定位。

@@ -66,11 +66,25 @@ export function buildOrderPrompt(req: OrderRequest, pick: PickResult | null, cou
  * 差一檔 → 准了；差兩檔以上 → 附近預算內的沒得挑（深夜打烊最常見）。對得上或沒資料 → 不講。
  */
 export function budgetLine(band: number | null, budget: Band[] | undefined): string {
+  const bot = budgetBot(band, budget)
+  if (!bot) return ''
+  const why: Record<string, string> = {
+    '超出預算一檔，我准了': '這家超出使用者選的預算一檔',
+    '預算內的沒開，這家比較貴': '附近預算內的店現在沒得挑，這家比使用者選的預算貴',
+    '比預算省一點，我准了': '這家比使用者選的預算便宜一檔',
+    '預算內的沒開，這家比較便宜': '附近預算內的店現在沒得挑，這家比使用者選的預算便宜',
+  }
+  const verb = bot.startsWith('預算內') ? '直說' : '講'
+  return `${why[bot]}：在 meme.bot ${verb}「${bot}」。`
+}
+
+/** 預算對不上時 meme.bot 要講的那句（模板口令也用，Claude 失敗時一樣講實話）。對得上或沒資料 → ''。 */
+export function budgetBot(band: number | null, budget: Band[] | undefined): string {
   if (!budget?.length || band === null || priceFit(band, budget) === 1) return ''
   const pricier = Math.floor(band) > Math.max(...budget)
   const near = priceFit(band, budget) > 0
-  if (pricier) return near ? '這家超出使用者選的預算一檔：在 meme.bot 講「超出預算一檔，我准了」。' : '附近預算內的店現在沒得挑，這家比使用者選的預算貴：在 meme.bot 直說「預算內的沒開，這家比較貴」。'
-  return near ? '這家比使用者選的預算便宜一檔：在 meme.bot 講「比預算省一點，我准了」。' : '附近預算內的店現在沒得挑，這家比使用者選的預算便宜：在 meme.bot 直說「預算內的沒開，這家比較便宜」。'
+  if (pricier) return near ? '超出預算一檔，我准了' : '預算內的沒開，這家比較貴'
+  return near ? '比預算省一點，我准了' : '預算內的沒開，這家比較便宜'
 }
 
 /** 附錄 2 的【店已決定】段落。數字（步行、營業、價位、第 N 次）全部是伺服器算好的，模型照講不准改（T6）。 */
