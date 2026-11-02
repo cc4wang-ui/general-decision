@@ -1,6 +1,6 @@
 # Round 6 進度（接手用）
 
-> 最後更新：2026-11-02 11:20（東京）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`（舊網址 crosswang-collab 會自動轉）。
+> 最後更新：2026-11-02 11:35（東京）。checker 第 3 輪 PASS，等 Cross 決定上線 🔒。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`（舊網址 crosswang-collab 會自動轉）。
 > 正式站是 Round 5（`dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`，`3c5018d`）。Round 6 只在 preview。
 > ⚠️ Vercel 接在 repo：合併到 `main` 會部署正式站。Round 6 上線由 Cross 決定 🔒。
 > 新的 session 先讀 `state/ROUND4-PROGRESS.md`（直傳做法）、`state/ROUND5-PROGRESS.md`，再讀這份。
@@ -23,7 +23,7 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 | 2 | 10 個日文站名換得到座標，誤差 ≤ 300 m | ✅ preview-3（`fe698f4`，含「駅 → ja」查法）真資料 10/10，最大 95 m（六本木駅），其餘 ≤ 40 m；標籤全回「○○駅」。preview-1 的舊查法也是 10/10 |
 | 3 | 舊或粗的定位不直接派店 | ✅ 單元 `geo.test.ts`＋e2e：超過 60 秒或誤差 > 300 m → 先問「你在車上？」 |
 | 4 | 選了站，派出的店離該站 ≤ 情境半徑（附近沒有時 ≤ 2.5 倍，Cross 2026-11-02 接受），口令以該站為起點 | preview-3 真資料（新宿駅 11:13）：12/12 距離 ≤ 情境半徑（含 2 筆放大查詢也在原半徑內）、12/12 口令從出站寫起 ✅。前兩輪 FAIL 的原因（放大後的店、「歇」的查詢沒切圓）→ Cross 接受放大＋`withinRadius` 對所有關鍵字查詢生效（`fe698f4`）。待 checker 第 3 輪 |
-| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview-3 ✅（上線候選）；checker 第 3 輪：只有條件 2 FAIL（受驗版本沒重量 geocode）→ 已補量 10/10（見下）；其餘全 PASS。上線由 Cross 決定 🔒 |
+| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview-3 ✅（上線候選）；checker 第 3 輪 PASS（條件 2 補量後重驗）。上線由 Cross 決定 🔒 |
 
 ## 做了什麼（`edf8948`）
 
@@ -99,6 +99,11 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
    - 條件 4 證據限制：preview-3 是白天。「放大後派到 > 原半徑、≤ 2.5 倍」這條路在 `fe698f4` 沒有真資料（只有修正前 preview-2 深夜 4 筆，都 ≤ 2.5 倍）。checker 判條件文字成立 → PASS，但建議上線前補一次深夜新宿量測（約 US$1）。交 Cross 決定。
    - Rule 7：`git diff --numstat 3c5018d..fe698f4 -- src api` = +333／−66，跟文件的四塊理由對得上。
    - 範圍外紀錄：救援路徑（3 km 超商）不在 STOP 4 文字內、沒人量過；文件行數表沒列 `styles.css` +5；條件 1、3 的證據是 Chromium e2e，不是東京真手機（前兩輪同樣收法）。
+   - 條件 2 補量後重驗（11:35）：PASS。10/10 ≤ 300 m，label 全部以「駅」結尾（ja 查法生效）。**總判定 PASS**。
+
+## 上線做法（Cross 說「上線」後）
+
+用 preview-3 的檔案清單（同一組 sha，`deploy/bundle-0a`…`6j`＋4 個 api 檔＋package.json、scripts/unpack.mjs、vercel.json）呼叫 create_deployment 加 `target: "production"`，meta `round6=production`。上線後驗：首頁回新 JS、`/api/probe` 404、`/api/order` GET 405、runtime error 0。回復點：Round 5 `dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`。
 
 ## Cross 決定（2026-11-02 06:00）
 
