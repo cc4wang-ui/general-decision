@@ -195,8 +195,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
         const raw = await fetchPlaces(io, loc, p, placesLanguage(countryOf(loc)))
         const est = laneEst(p.lane)
         let got = toCandidates(raw, loc, now, req.exclude ?? [], tz).map((c) => ({ ...c, lane: p.lane, ...(est !== undefined ? { estBand: est } : {}) }))
-        // Round 6 checker：Text Search 的 locationRestriction 只收方框，角落的店離起點可到半徑 1.41 倍（新宿→東新宿 1099 m vs 半徑 1000）。方框查到的切回圓。
-        if (p.kind === 'text' && p.restrict) got = got.filter((c) => c.distM === undefined || c.distM <= p.radius)
+        got = withinRadius(got, p)
         if (veg && p.lane !== 'rescue') got = got.filter(looksVeg) // 忌口「素」：關鍵字查詢會混進葷食店
         cands = mergeCandidates(cands, got)
         tries.push({ r: p.radius, raw: raw.length, kept: got.length })
@@ -439,6 +438,17 @@ async function callClaude(io: OrderIo, system: string, user: string, maxTokens: 
  * （「Toriichizu Yurakucho」），跟招牌「鳥一途」對不上，人站在店門口找不到。日本座標改用 ja，招牌寫什麼就叫什麼；
  * 班長台詞仍是台灣繁中（prompt 與 localizeOrder 不變）。
  */
+/**
+ * Round 6 checker（兩輪）：關鍵字查詢（Text Search）回來的店可能超出半徑——locationRestriction 只收方框，角落到半徑 1.41 倍；
+ * locationBias 更只是「偏好」，冷門關鍵字會撈回幾公里外的店（第 2 輪：「歇」走 bias，第 1 輪的修正沒管到）。
+ * 所有關鍵字查詢一律切回圓：距離 > 這次查詢的半徑就丟掉。第二次查詢（widenPlan）的半徑是 2.5 倍，所以「附近沒有時 ≤ 2.5 倍」
+ * 是 Cross 2026-11-02 接受的規則。Nearby 查詢用 circle restriction，Google 已經限在圓內。沒有座標的候選保留。
+ */
+export function withinRadius<T extends { distM?: number }>(cands: T[], plan: LanePlan): T[] {
+  if (plan.kind !== 'text') return cands
+  return cands.filter((c) => c.distM === undefined || c.distM <= plan.radius)
+}
+
 export function placesLanguage(country: Country): string {
   return country === 'JP' ? 'ja' : 'zh-TW'
 }

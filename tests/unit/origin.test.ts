@@ -61,3 +61,22 @@ describe('distM：候選帶到起點的直線距離', () => {
     expect(c?.walkMin).toBe(14)
   })
 })
+
+// Round 6 checker 第 2 輪：距離上限要對所有關鍵字查詢成立（含「歇」的 locationBias 查詢），不是只有方框。
+import { withinRadius } from '../../src/orderHandler.ts'
+import type { LanePlan } from '../../src/lanes.ts'
+describe('withinRadius：關鍵字查詢一律切回圓', () => {
+  const cands = [{ id: 'a', distM: 400 }, { id: 'b', distM: 1000 }, { id: 'c', distM: 1106 }, { id: 'd' }]
+  const text = (restrict: boolean, radius = 1000): LanePlan => ({ kind: 'text', lane: 'x', textQuery: '咖啡廳', radius, rank: 'DISTANCE', restrict })
+  it('方框（restrict）與偏好（bias）兩種 text 查詢都切；剛好等於半徑留下；沒座標的留下', () => {
+    expect(withinRadius(cands, text(true)).map((c) => c.id)).toEqual(['a', 'b', 'd'])
+    expect(withinRadius(cands, text(false)).map((c) => c.id)).toEqual(['a', 'b', 'd'])
+  })
+  it('第二次查詢半徑放大 2.5 倍 → 1106 m 的店留下（Cross 2026-11-02 接受的規則）', () => {
+    expect(withinRadius(cands, text(false, 2500)).map((c) => c.id)).toEqual(['a', 'b', 'c', 'd'])
+  })
+  it('Nearby 查詢（circle restriction）不動', () => {
+    const nearby: LanePlan = { kind: 'nearby', lane: 'n', includedTypes: ['cafe'], radius: 500, rank: 'DISTANCE' }
+    expect(withinRadius(cands, nearby)).toBe(cands)
+  })
+})
