@@ -1,8 +1,10 @@
 # Round 6 進度（接手用）
 
-> 最後更新：2026-11-02 11:35（東京）。checker 第 3 輪 PASS，等 Cross 決定上線 🔒。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`（舊網址 crosswang-collab 會自動轉）。
-> 正式站是 Round 5（`dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`，`3c5018d`）。Round 6 只在 preview。
-> ⚠️ Vercel 接在 repo：合併到 `main` 會部署正式站。Round 6 上線由 Cross 決定 🔒。
+> 最後更新：2026-11-02 13:55（東京）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`（舊網址 crosswang-collab 會自動轉）。
+> **2026-11-02 13:52 正式站上線 Round 6**（Cross 回「上線」）：`dpl_EFM2ouyUzAqQC1KEzJaxCK1bh7i5`，程式碼 `fe698f4`，檔案跟 preview-3 相同，直傳 target production。別名 general-decision.vercel.app。
+> 上線驗證：首頁回 `index-Bhx1KeXk.js`（跟 preview-3 同一份）、`/api/probe` 404、`/api/order` GET 405、`/api/geocode` GET 405、runtime error 0。
+> 回復點：Round 5 `dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`（Vercel rollback 一鍵）。
+> ⚠️ Vercel 接在 repo：合併到 `main` 會從 git 重新部署正式站（程式碼相同）。合併時機由 Cross 決定 🔒。
 > 新的 session 先讀 `state/ROUND4-PROGRESS.md`（直傳做法）、`state/ROUND5-PROGRESS.md`，再讀這份。
 
 ## 起因
@@ -23,7 +25,7 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 | 2 | 10 個日文站名換得到座標，誤差 ≤ 300 m | ✅ preview-3（`fe698f4`，含「駅 → ja」查法）真資料 10/10，最大 95 m（六本木駅），其餘 ≤ 40 m；標籤全回「○○駅」。preview-1 的舊查法也是 10/10 |
 | 3 | 舊或粗的定位不直接派店 | ✅ 單元 `geo.test.ts`＋e2e：超過 60 秒或誤差 > 300 m → 先問「你在車上？」 |
 | 4 | 選了站，派出的店離該站 ≤ 情境半徑（附近沒有時 ≤ 2.5 倍，Cross 2026-11-02 接受），口令以該站為起點 | preview-3 真資料（新宿駅 11:13）：12/12 距離 ≤ 情境半徑（含 2 筆放大查詢也在原半徑內）、12/12 口令從出站寫起 ✅。前兩輪 FAIL 的原因（放大後的店、「歇」的查詢沒切圓）→ Cross 接受放大＋`withinRadius` 對所有關鍵字查詢生效（`fe698f4`）。待 checker 第 3 輪 |
-| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview-3 ✅（上線候選）；checker 第 3 輪 PASS（條件 2 補量後重驗）。上線由 Cross 決定 🔒 |
+| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview-3 ✅；checker 第 3 輪 PASS；Cross 2026-11-02 13:50「上線」→ 正式站 `dpl_EFM2ouyUzAqQC1KEzJaxCK1bh7i5` ✅ |
 
 ## 做了什麼（`edf8948`）
 
@@ -49,7 +51,7 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 |---|---|---|
 | R6 preview-1 | `dpl_2D81dE7dmgPJNpngiEAYA7aThsyS`（general-decision-cu77vqn6m-cc4wang-uis-projects.vercel.app） | `edf8948`。正式站的檔＋6a–6d（src 8 個檔）＋新 api/geocode.ts、api/probe.ts |
 | R6 preview-2 | `dpl_4mZZRHxWPGznKoYnRPQiKupJqnJW`（general-decision-qiw16vmid-cc4wang-uis-projects.vercel.app） | `83a92ba`。preview-1 ＋ 6e–6i（checker 第 1 輪修正：orderHandler、rules、probe、places、types、geocode） |
-| R6 preview-3（上線候選） | `dpl_BczjRMsGvQNzoE386mdq6GnGGY3D`（general-decision-dp4tfp3kw-cc4wang-uis-projects.vercel.app） | `fe698f4`。preview-2 ＋ 6j（只有 `src/orderHandler.ts`：`withinRadius` 對所有 text 查詢生效）。meta `round6=preview-3`。要上線時用這個 deployment 的檔案清單加 `target: production` 重建 |
+| R6 preview-3（= 正式站） | `dpl_BczjRMsGvQNzoE386mdq6GnGGY3D`（general-decision-dp4tfp3kw-cc4wang-uis-projects.vercel.app） | `fe698f4`。preview-2 ＋ 6j（只有 `src/orderHandler.ts`：`withinRadius` 對所有 text 查詢生效）。meta `round6=preview-3`。要上線時用這個 deployment 的檔案清單加 `target: production` 重建 |
 
 直傳做法同 Round 4／5；打包腳本在 scratchpad `tools/pack-r6.mjs`（從上一版 bundle 重建、跟 HEAD 比、差異打成 6*，驗證 bad=0）。
 
@@ -101,7 +103,7 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
    - 範圍外紀錄：救援路徑（3 km 超商）不在 STOP 4 文字內、沒人量過；文件行數表沒列 `styles.css` +5；條件 1、3 的證據是 Chromium e2e，不是東京真手機（前兩輪同樣收法）。
    - 條件 2 補量後重驗（11:35）：PASS。10/10 ≤ 300 m，label 全部以「駅」結尾（ja 查法生效）。**總判定 PASS**。
 
-## 上線做法（Cross 說「上線」後）
+## 上線做法（已執行，2026-11-02 13:52）
 
 用 preview-3 的檔案清單（同一組 sha，`deploy/bundle-0a`…`6j`＋4 個 api 檔＋package.json、scripts/unpack.mjs、vercel.json）呼叫 create_deployment 加 `target: "production"`，meta `round6=production`。上線後驗：首頁回新 JS、`/api/probe` 404、`/api/order` GET 405、runtime error 0。回復點：Round 5 `dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`。
 
@@ -131,4 +133,6 @@ src＋api 新增約 330 行（含 checker 兩輪的修正）。拆開看：
 - 深夜「約會」派到酒吧（Bar Vier，type=bar）：約會的排除清單沒有酒吧類。下一輪候選。
 - 「去」卡的交通選項（走路／捷運／計程車／開車）仍然沒有作用。
 - 定位可疑的判斷用 60 秒／300 m：沒有實機數據，可能太常問或太少問。要看 Cross 在東京實際用的感覺。
+- 深夜「附近沒有 → 放大 2.5 倍」在 `fe698f4` 沒有真資料（上線時 Cross 接受這個缺口；preview-3 的 probe 仍可補量，正式站 404）。
+- 救援路徑（3 km 超商）不在 STOP 4 的距離規則內，沒量過。
 - 最近 5 站存 localStorage，清網站資料就沒了。
