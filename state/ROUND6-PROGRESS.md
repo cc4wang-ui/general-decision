@@ -1,6 +1,6 @@
 # Round 6 進度（接手用）
 
-> 最後更新：2026-11-02 01:20（東京）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`（舊網址 crosswang-collab 會自動轉）。
+> 最後更新：2026-11-02 11:20（東京）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`（舊網址 crosswang-collab 會自動轉）。
 > 正式站是 Round 5（`dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`，`3c5018d`）。Round 6 只在 preview。
 > ⚠️ Vercel 接在 repo：合併到 `main` 會部署正式站。Round 6 上線由 Cross 決定 🔒。
 > 新的 session 先讀 `state/ROUND4-PROGRESS.md`（直傳做法）、`state/ROUND5-PROGRESS.md`，再讀這份。
@@ -22,8 +22,8 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 | 1 | 地下沒定位：不再叫人開定位；錯誤頁和選單都能一鍵報最近的站 | ✅ e2e `r6-station.spec.ts`：錯誤訊息「地下收不到定位。報你要下車的站。」、最近站 chips 一鍵派 |
 | 2 | 10 個日文站名換得到座標，誤差 ≤ 300 m | ✅ 真資料 10/10，最大 95 m（六本木駅），其餘 ≤ 40 m |
 | 3 | 舊或粗的定位不直接派店 | ✅ 單元 `geo.test.ts`＋e2e：超過 60 秒或誤差 > 300 m → 先問「你在車上？」 |
-| 4 | 選了站，派出的店離該站 ≤ 情境半徑（附近沒有時 ≤ 2.5 倍，Cross 2026-11-02 接受），口令以該站為起點 | 口令 12/12 從出站寫起 ✅。距離：checker 兩輪 FAIL（4 筆超過情境本身的半徑，都是放大 2.5 倍後找到的；且「歇」的查詢沒被切圓）→ Cross 接受放大 → 距離上限改成對所有關鍵字查詢生效（`withinRadius`）→ preview-3 重量，見下 |
-| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview-2 ✅；checker 兩輪都 FAIL 在條件 4a（見下）→ 依規則停下，交 Cross 決定 |
+| 4 | 選了站，派出的店離該站 ≤ 情境半徑（附近沒有時 ≤ 2.5 倍，Cross 2026-11-02 接受），口令以該站為起點 | preview-3 真資料（新宿駅 11:13）：12/12 距離 ≤ 情境半徑（含 2 筆放大查詢也在原半徑內）、12/12 口令從出站寫起 ✅。前兩輪 FAIL 的原因（放大後的店、「歇」的查詢沒切圓）→ Cross 接受放大＋`withinRadius` 對所有關鍵字查詢生效（`fe698f4`）。待 checker 第 3 輪 |
+| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview-3 ✅（上線候選）；checker 第 3 輪見下；上線由 Cross 決定 🔒 |
 
 ## 做了什麼（`edf8948`）
 
@@ -40,7 +40,7 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 
 ## 閘門（2026-11-02）
 
-- typecheck ✅、單元 580 條 ✅（`TZ=Asia/Taipei`）、build ✅、check:bundle ✅、smoke ✅。
+- typecheck ✅、單元 586 條 ✅（`TZ=Asia/Taipei`；`fe698f4` 重跑）、build ✅、check:bundle ✅、smoke ✅。
 - e2e（Chromium）：108 過、5 不過（cmd-layout ×4、memory ×1，正式版本一樣不過，既有的 Chromium 差異）。新增 `r6-station.spec.ts` 7 條全過。`manual-location.spec.ts` B17 改成預期 loc 帶 label。
 
 ## Preview
@@ -48,7 +48,8 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 | 名稱 | deployment | 內容 |
 |---|---|---|
 | R6 preview-1 | `dpl_2D81dE7dmgPJNpngiEAYA7aThsyS`（general-decision-cu77vqn6m-cc4wang-uis-projects.vercel.app） | `edf8948`。正式站的檔＋6a–6d（src 8 個檔）＋新 api/geocode.ts、api/probe.ts |
-| R6 preview-2（上線候選） | `dpl_4mZZRHxWPGznKoYnRPQiKupJqnJW`（general-decision-qiw16vmid-cc4wang-uis-projects.vercel.app） | `83a92ba`。preview-1 ＋ 6e–6i（checker 第 1 輪修正：orderHandler、rules、probe、places、types、geocode） |
+| R6 preview-2 | `dpl_4mZZRHxWPGznKoYnRPQiKupJqnJW`（general-decision-qiw16vmid-cc4wang-uis-projects.vercel.app） | `83a92ba`。preview-1 ＋ 6e–6i（checker 第 1 輪修正：orderHandler、rules、probe、places、types、geocode） |
+| R6 preview-3（上線候選） | `dpl_BczjRMsGvQNzoE386mdq6GnGGY3D`（general-decision-dp4tfp3kw-cc4wang-uis-projects.vercel.app） | `fe698f4`。preview-2 ＋ 6j（只有 `src/orderHandler.ts`：`withinRadius` 對所有 text 查詢生效）。meta `round6=preview-3`。要上線時用這個 deployment 的檔案清單加 `target: production` 重建 |
 
 直傳做法同 Round 4／5；打包腳本在 scratchpad `tools/pack-r6.mjs`（從上一版 bundle 重建、跟 HEAD 比、差異打成 6*，驗證 bad=0）。
 
@@ -57,6 +58,23 @@ Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法�
 - `mode=geocode`：10/10 在 300 m 內。新宿 3、東京 11、渋谷 5、池袋 0、品川 10、上野 8、秋葉原 3、銀座 40、六本木 95、恵比寿 2 m。
 - `mode=scene&loc=shinjuku`（深夜 01:15）：12/12 符合情境規則，鐘點都對（01:17 到店等）。這也是 Round 5 第一次深夜量測。
 - 量測費：10 次 Places（geocode）＋約 15 次 Places＋12 次 Claude（scene）。約 US$1。
+
+## 實測 preview-3（2026-11-02 11:13 東京，`fe698f4`）
+
+`mode=scene&loc=shinjuku`，起點「新宿駅」。原始回應逐字存在 scratchpad `r6check/scene-shinjuku-preview3.json`（旁邊的 `.meta.txt` 記 URL、時間、x-vercel-id）。
+
+| 項目 | 結果 |
+|---|---|
+| 情境規則 | 12/12 pass |
+| 距離 ≤ 查詢半徑 | 12/12 |
+| 距離 ≤ 情境本身的半徑（放大前） | 12/12（最遠 874 m／1000 m，rest 談事情） |
+| 放大 2.5 倍的查詢 | 2 筆（rest 談事情、rest 其他），兩筆派到的店都在原半徑內 |
+| 口令第一步從出站寫起 | 12/12（全部「出站後走 N 分…」） |
+| 最慢一筆 | 3.6 秒 |
+
+- 這次是白天（11:13），店多，幾乎不需要放大。「附近沒有 → 放大 → 收 ≤ 2.5 倍」這條路只有單元測試（`origin.test.ts` withinRadius）＋ preview-2 深夜資料（當時 4 筆靠放大找到，距離 538–1106 m，都在 2.5 倍內）。沒有在 preview-3 深夜重量。
+- 首頁 200，`data-deployment-id` 對得上 preview-3。
+- 本輪量測費：約 15 次 Places＋12 次 Claude。
 
 ## 獨立 checker
 
