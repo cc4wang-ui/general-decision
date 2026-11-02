@@ -1,7 +1,10 @@
 # Round 7 進度（接手用）
 
-> 最後更新：2026-11-02 14:50（東京）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`。
-> 正式站是 Round 6（`dpl_EFM2ouyUzAqQC1KEzJaxCK1bh7i5`，`fe698f4`）。Round 7 只在 preview，上線由 Cross 決定 🔒。
+> 最後更新：2026-11-02 15:55（東京）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`。
+> **2026-11-02 15:48 正式站上線 Round 7**（Cross 回「麥當勞不用排除 直接上線」）：`dpl_GRtU7onjopNWnQ1YrXRnQ9rM6eyA`，程式碼 `94b4e0b`，檔案跟 R7 preview-1 相同，直傳 target production。別名 general-decision.vercel.app。
+> 上線驗證：首頁回 `index-Bhx1KeXk.js`、`/api/probe` 404、`/api/order` GET 405、runtime error 0。
+> 回復點：Round 6 `dpl_EFM2ouyUzAqQC1KEzJaxCK1bh7i5`（Vercel rollback 一鍵）。
+> ⚠️ Vercel 接在 repo：合併到 `main` 會從 git 重新部署正式站（程式碼相同）。合併時機由 Cross 決定 🔒。
 > 新的 session 先讀 `state/ROUND4-PROGRESS.md`（直傳做法）、`state/ROUND6-PROGRESS.md`，再讀這份。
 
 ## 目標契約｜R7 東京歇關鍵字
@@ -30,9 +33,9 @@
 |---|---|---|
 | 1 | 日文關鍵字 | ✅ 單元 `scene.test.ts`「Round 7」；preview-1 真資料 6/6 查詞日文（カフェ／電源 カフェ／静か カフェ／有插座 カフェ） |
 | 2 | 排除水煙吧／購物中心 | ✅ 單元：type hookah_bar／shopping_mall／department_store、店名シーシャ／shisha 不派；只剩這些才放回 |
-| 3 | 真資料 0 筆水煙吧／購物中心 | 白天 ✅（14:40，6/6 咖啡店）；深夜待量（東京 01:00，session 自己排了喚醒） |
+| 3 | 真資料 0 筆水煙吧／購物中心 | 白天 ✅（14:40，6/6 咖啡店）；深夜：Cross 決定不等，直接上線。東京 01:00 仍會量一次當上線後驗證（不是閘門） |
 | 4 | 台灣不變 | ✅ 單元 590 全過（含 Round 5 的 TW 查詞測試原樣） |
-| 5 | 閘門 → preview → checker → Cross 🔒 | 閘門 ✅；preview-1 ✅；checker 等深夜資料到齊再跑一次 |
+| 5 | 閘門 → preview → checker → Cross 🔒 | 閘門 ✅；preview-1 ✅；**checker 沒跑**：Cross 2026-11-02 15:45 決定直接上線（Cross 原話「麥當勞不用排除 直接上線」）。這是 Cross 的決定，不是 maker 跳過 |
 
 ## 做了什麼（`94b4e0b`）
 
@@ -50,7 +53,7 @@ typecheck ✅、單元 590 條 ✅（`TZ=Asia/Taipei`）、build ✅（前端 JS
 
 | 名稱 | deployment | 內容 |
 |---|---|---|
-| R7 preview-1 | `dpl_9jUthkLRmM64Zy1y1t1SKE9kCvJd`（general-decision-3jj8zlppn-cc4wang-uis-projects.vercel.app） | `94b4e0b`。正式站（Round 6）的檔＋7a–7c（lanes、scene、probe）。直傳做法同前；打包腳本 scratchpad `tools/pack-r7.mjs` |
+| R7 preview-1（= 正式站） | `dpl_9jUthkLRmM64Zy1y1t1SKE9kCvJd`（general-decision-3jj8zlppn-cc4wang-uis-projects.vercel.app） | `94b4e0b`。正式站（Round 6）的檔＋7a–7c（lanes、scene、probe）。直傳做法同前；打包腳本 scratchpad `tools/pack-r7.mjs` |
 
 ## 實測
 
@@ -72,6 +75,18 @@ typecheck ✅、單元 590 條 ✅（`TZ=Asia/Taipei`）、build ✅（前端 JS
 - 「其他／有插座」派到貓咖啡：是咖啡店，但有插座與否沒驗（Google 沒這個欄位）。跟 Round 5 一樣是關鍵字盡力。
 - 量測費：約 15 次 Places＋12 次 Claude。
 
-### 深夜（待，東京 2026-11-03 01:00）
+### 深夜（上線後驗證，東京 2026-11-03 01:00）
 
-session 自己排了喚醒，到時打同一個 preview 的 probe，存 `r7check/scene-shinjuku-night.json`。
+session 自己排了喚醒，到時打 preview-1 的 probe（程式跟正式站相同；正式站的 probe 是 404），存 `r7check/scene-shinjuku-night.json`，只回報不開 checker。
+
+## Cross 決定（2026-11-02 15:45）
+
+「麥當勞不用排除 直接上線」→ 麥當勞（fast_food_restaurant）維持不排除；不等深夜量測、不跑 checker，直接上正式站。
+
+## 已知風險／下一輪候選
+
+- 深夜東京「歇」的真資料還沒有（白天 6/6 乾淨）。深夜店少，放大 2.5 倍後有沒有又撈到水煙吧，01:00 的量測會知道。
+- 「其他／有插座」派到貓咖啡：Google 沒有插座欄位，關鍵字只能盡力。
+- 「約會」派到酒吧（Bar Vier）：約會的排除清單沒有酒吧類。下一輪候選。
+- 「去」卡的交通選項仍然沒有作用。
+- 定位可疑 60 秒／300 m 的門檻沒有實機數據。
