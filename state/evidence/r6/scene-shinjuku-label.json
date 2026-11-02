@@ -1,0 +1,16 @@
+{"source":"GET https://general-decision-qiw16vmid-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=shinjuku","deployment":"dpl_4mZZRHxWPGznKoYnRPQiKupJqnJW (R6 preview-2, commit 83a92ba)","fetched":"2026-11-01T17:46:55Z (東京 02:47)","loc":"東京新宿駅","station_label_sent":"新宿駅","localHour":2,
+"checks_per_row":["rule(scenePasses)","distM <= radiusM (radiusM = 情境半徑 ×2.5 if widened)","steps 含 出站/車站/駅/站 或 站名"],
+"rows":[
+{"id":"eat:一個人快吃","pass":true,"picked":"中華食堂 一番館 西武新宿駅前店","type":"chinese_restaurant","rating":3.3,"walkMin":7,"distM":538,"radiusM":1250,"closeIn":1183,"how":"text=\"そば\" DISTANCE → text=\"食堂\" DISTANCE","steps":["出站後走 7 分抵達","點一碗拉麵或丼飯","20 分鐘內吃完起身"]},
+{"id":"eat:外帶","pass":true,"picked":"ローソン 新宿御苑中央店","type":"convenience_store","rating":3.8,"walkMin":12,"distM":939,"radiusM":1500,"closeIn":null,"how":"text=\"惣菜\" RELEVANCE → text=\"弁当\" RELEVANCE","rescue":false,"steps":["出站後走12分鐘抵達","現場選便當或飯糰一樣東西，結帳","拿了就走，回去吃完"]},
+{"id":"eat:朋友聚餐","pass":true,"picked":"焼肉・ホルモン焼幸永 さくら通り店","type":"yakiniku_restaurant","rating":4.8,"walkMin":8,"distM":585,"radiusM":3000,"closeIn":133,"steps":["出站後走 8 分鐘抵達","點牛五花、豬五花、內臟拼盤各一份，啤酒、飲料自行點","02:54 到，04:24 前吃完，約 90 分鐘"]},
+{"id":"eat:約會吃好一點","pass":true,"picked":"鮨和食かなうS","type":"sushi_restaurant","rating":4.7,"walkMin":9,"distM":703,"radiusM":3750,"closeIn":133,"steps":["出站後走9分鐘抵達","點招牌握壽司組合，別急著點","02:55到店，04:25前離開，你各位啊"]},
+{"id":"eat:宵夜","pass":true,"picked":"和牛らーめん 極 歌舞伎町","type":"ramen_restaurant","rating":4.9,"walkMin":8,"distM":622,"radiusM":1000,"closeIn":73,"steps":["出站後走8分鐘抵達","點一碗らーめん，清湯或醬油，別猶豫","30分鐘內吃完，03:16 前出門回家"]},
+{"id":"eat:其他(吃到飽)","pass":true,"picked":"ホルモン焼肉 縁 新宿歌舞伎町店","type":"yakiniku_restaurant","rating":4.7,"walkMin":8,"distM":616,"radiusM":2500,"closeIn":73,"steps":["出站後走 8 分鐘抵達","點烤肉套餐，一輪一輪上，別怕吃","03:50 前吃完出店"]},
+{"id":"rest:一個人放空","pass":true,"picked":"新宿シーシャ Shisha Cafe 紅洛煙","type":"hookah_bar","rating":4.9,"walkMin":10,"distM":755,"radiusM":1500,"closeIn":253,"steps":["出站後走10分鐘抵達","坐下點一杯咖啡，手機面朝下","坐滿30分鐘再起來"]},
+{"id":"rest:工作讀書","pass":true,"picked":"シーシャ カフェ&バー C.STAND 新宿歌舞伎町靖国通り2号店","type":"hookah_bar","rating":4.8,"walkMin":6,"distM":474,"radiusM":2500,"closeIn":253,"steps":["出站後走 6 分鐘抵達","進門找靠牆有插座的位子坐下","點一杯咖啡，手機面朝下開始工作"]},
+{"id":"rest:朋友聊天","pass":true,"picked":"C.Stand Shinjuku 3-chome","type":"hookah_bar","rating":4.8,"walkMin":8,"distM":606,"radiusM":2500,"closeIn":133,"steps":["出站後走 8 分鐘到店","找得下兩個人的位子坐定","點兩杯咖啡，60 分鐘內慢慢喝"]},
+{"id":"rest:談事情","pass":true,"picked":"shisha cafe and bar NAROZ 歌舞伎町店","type":"cafe","rating":4.7,"walkMin":8,"distM":586,"radiusM":2500,"closeIn":253,"steps":["出站後走8分鐘抵達","找最裡面的角落位坐定，點一份咖啡","坐滿60分鐘再起身"]},
+{"id":"rest:等人","pass":true,"picked":"shisha cafe and bar NAROZ","type":"hookah_bar","rating":4.8,"walkMin":5,"distM":363,"radiusM":1000,"closeIn":253,"steps":["出站後走5分鐘抵達","點一杯咖啡坐下","02時51分到，03時11分起身離開"]},
+{"id":"rest:其他(有插座)","pass":true,"picked":"マクドナルド 東新宿駅前店","type":"fast_food_restaurant","rating":3.6,"walkMin":14,"distM":1106,"radiusM":2500,"closeIn":null,"how":"text=\"有插座 咖啡廳\" DISTANCE → RELEVANCE（第二次，半徑 1000×2.5）","steps":["出站後走 14 分鐘","進去點一杯咖啡，找靠插座的位子坐","坐 60 分鐘內喝完，筆電充飽就撤"]}
+],"summary":{"scenarios":12,"ok":12,"pass":12,"failed":[],"maxMs":3876}}
