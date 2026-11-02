@@ -184,7 +184,7 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
     const fails: string[] = []
     if (!b.place?.id) fails.push('沒派店')
     if (d?.rescue) fails.push('超商救援')
-    if (b.place && c && !scenePasses({ primaryType: c.type, rating: c.rating, walkMin: c.walkMin, closeInMin: c.closeIn }, rule)) fails.push(`不符規則（${c.type ?? '?'}／${c.rating ?? '?'}★／${c.walkMin ?? '?'}分／剩 ${c.closeIn ?? '?'} 分關門）`)
+    if (b.place && c && !scenePasses({ name: c.name, primaryType: c.type, rating: c.rating, walkMin: c.walkMin, closeInMin: c.closeIn }, rule)) fails.push(`不符規則（${c.type ?? '?'}／${c.rating ?? '?'}★／${c.walkMin ?? '?'}分／剩 ${c.closeIn ?? '?'} 分關門）`)
     if (rule?.rule.openNow && c?.opensAt) fails.push(`還沒開（${c.opensAt}）`)
     if (scene === SCENE_OTHER && !d?.places?.how.includes(SCENE_TEXT_PROBE[m])) fails.push('關鍵字沒用到手動輸入')
     // Round 6 checker：店離起點要 ≤ 情境半徑（第二次查詢用擴大後的半徑）；報了站，口令第一步要從出站寫起。

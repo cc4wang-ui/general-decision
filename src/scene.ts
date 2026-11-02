@@ -37,6 +37,8 @@ export interface SceneRule {
   openNow?: boolean
   /** 挑店前先排除這些類型的店（不夠就放回）。 */
   avoidTypes?: string[]
+  /** 挑店前先排除店名符合的店（不夠就放回）。 */
+  avoidNames?: RegExp
   /** 挑店前先排除評分低於這個的店（不夠就放回）。 */
   minRating?: number
   /** 挑店前先排除步行超過這個分鐘的店（不夠就放回）。 */
@@ -58,7 +60,11 @@ const DESSERTISH = ['cake_shop', 'dessert_shop', 'dessert_restaurant', 'pastry_s
 const SWEET_OK = new Set([...DESSERTISH, 'bakery'])
 /** 喝酒的店（checker 2026-11-01：選咖啡＋談事情，「安靜 咖啡廳」撞到店名「安靜小酒館」）。選咖啡時排除。 */
 const BARISH = ['bar', 'pub', 'wine_bar', 'cocktail_bar', 'lounge_bar', 'sports_bar', 'night_club', 'bar_and_grill', 'beer_hall', 'japanese_izakaya_restaurant']
-type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'>
+/** 歇不派的「不是坐下喝一杯」的店（Round 7，Cross 2026-11-02：東京深夜「咖啡廳」派到水煙吧 ×2、購物中心 ×2）。 */
+const NOT_A_SEAT = ['hookah_bar', 'shopping_mall', 'department_store']
+/** 水煙吧常把自己標成 cafe（shisha cafe and bar NAROZ，type=cafe）：選咖啡時再用店名擋一層。 */
+export const SHISHA_RE = /シーシャ|shisha|hookah|水煙/i
+type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'> & Partial<Pick<PlaceCandidate, 'name'>>
 /** 一個人快吃不派要久坐、要多人的店（checker 2026-11-01：東京查「牛丼」派到燒肉店）。 */
 const SLOW_MEAL = ['yakiniku_restaurant', 'korean_barbecue_restaurant', 'barbecue_restaurant', 'hot_pot_restaurant', 'fine_dining_restaurant', 'buffet_restaurant', 'steak_house', 'japanese_izakaya_restaurant', 'bar', 'pub', 'wine_bar', 'bar_and_grill']
 
@@ -171,11 +177,27 @@ export function sceneOf(module: ModuleId, choices: Record<string, string | numbe
   return rule ? { id, rule: withChoices(module, choices, rule) } : null
 }
 
-/** 規則再依其他選項調整：吃選甜食就不排除甜點店；歇選咖啡就排除酒吧類（關鍵字會撞到店名）。 */
+/**
+ * 規則再依其他選項調整：吃選甜食就不排除甜點店；歇一律排除水煙吧、購物中心（Round 7）；
+ * 歇選咖啡再排除酒吧類（關鍵字會撞到店名）＋店名有シーシャ的。
+ */
 function withChoices(module: ModuleId, choices: Record<string, string | number>, rule: SceneRule): SceneRule {
   if (module === 'eat' && choices.taste === '甜食' && rule.avoidTypes) return { ...rule, avoidTypes: rule.avoidTypes.filter((t) => !SWEET_OK.has(t)) }
-  if (module === 'rest' && String(choices.drink ?? '咖啡') === '咖啡') return { ...rule, avoidTypes: [...(rule.avoidTypes ?? []), ...BARISH] }
+  if (module === 'rest') {
+    const coffee = String(choices.drink ?? '咖啡') === '咖啡'
+    return { ...rule, avoidTypes: [...(rule.avoidTypes ?? []), ...NOT_A_SEAT, ...(coffee ? BARISH : [])], ...(coffee ? { avoidNames: SHISHA_RE } : {}) }
+  }
   return rule
+}
+
+/**
+ * 歇的基本關鍵字依國家換語言（Round 7）。卡片上的 byOption 是中文（咖啡廳／酒吧／居酒屋／熱炒 燒烤）；
+ * 在日本用 languageCode=ja 查中文「咖啡廳」，Google 會撈到水煙吧（シーシャカフェ）、購物中心、麥當勞。
+ * ⚠️ 熱炒燒烤 → 焼き鳥（日本沒有熱炒攤；居酒屋已是另一個選項）。台灣與其他地方原字不動。
+ */
+const REST_BASE_JP: Record<string, string> = { 咖啡廳: 'カフェ', 酒吧: 'バー', 居酒屋: '居酒屋', '熱炒 燒烤': '焼き鳥' }
+export function restBase(base: string, country: Country): string {
+  return country === 'JP' ? REST_BASE_JP[base] ?? base : base
 }
 
 /** 歇：情境改寫「喝什麼」的關鍵字（工作讀書 → 不限時 咖啡廳；其他 → 使用者的字＋咖啡廳）。 */
@@ -208,6 +230,7 @@ function passes(c: Cand, r: SceneRule): boolean {
     // 主類別是速食才排除；types 裡順帶有 fast_food 的正餐店（例：拉麵店也標 fast_food）不排除。
     if (c.primaryType && r.avoidTypes.includes(c.primaryType)) return false
   }
+  if (r.avoidNames && c.name && r.avoidNames.test(c.name)) return false
   if (r.minRating !== undefined && typeof c.rating === 'number' && c.rating < r.minRating) return false
   if (r.maxWalk !== undefined && typeof c.walkMin === 'number' && c.walkMin > r.maxWalk) return false
   // 宵夜：還沒開門的店（「HH:MM 開」）不算。Nearby 的查法沒有 openNow，這裡補上（checker 2026-11-01）。

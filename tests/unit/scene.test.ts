@@ -153,7 +153,7 @@ describe('每一種預設都會改查法（STOP 2）', () => {
       for (const d of drinks) for (const p of restPlans({ scene: id, drink: d }, 'TW', 5)) expect(p.radius, `${id} ${d}`).toBe(sceneOf('rest', { scene: id })!.rule.radius)
     }
     expect(restPlans({ scene: '工作讀書', drink: '咖啡' })[0]).toMatchObject({ textQuery: '不限時 咖啡廳' })
-    expect(restPlans({ scene: '工作讀書', drink: '咖啡' }, 'JP')[0]).toMatchObject({ textQuery: '電源 咖啡廳' })
+    expect(restPlans({ scene: '工作讀書', drink: '咖啡' }, 'JP')[0]).toMatchObject({ textQuery: '電源 カフェ' }) // Round 7：日本用日文基本詞
     expect(restPlans({ scene: '談事情', drink: '酒吧' })[0]).toMatchObject({ textQuery: '安靜 酒吧' })
     // 不適合的組合不加修飾詞（熱炒不會「不限時」）
     expect(restPlans({ scene: '工作讀書', drink: '熱炒燒烤' })[0]).toMatchObject({ textQuery: '熱炒 燒烤' })
@@ -545,5 +545,66 @@ describe('鐘點照伺服器算的時間（preview-5：大安 20:11 寫「23:11 
     expect(o.steps[1]).toBe('22:44前吃完，該撤')
     const u = buildOrderPrompt({ module: 'eat', level: 1, choices: { scene: '朋友聚餐' }, now: '2026-11-01T12:11:00Z', loc: { lat: 35.6795, lng: 139.77 }, recentOrders: [] } as unknown as OrderRequest, pick, 'JP').user
     expect(u).toContain('【已算好】現在 21:11，走到店 21:14，店 23:00 關')
+  })
+})
+
+// Round 7（Cross 2026-11-02「開始修東京「歇」的關鍵字」）：日本的歇用日文基本詞；水煙吧、購物中心不派。
+import { SHISHA_RE, restBase } from '../../src/scene.ts'
+describe('Round 7：東京的歇', () => {
+  it('基本詞依國家換語言：日本 咖啡廳→カフェ、酒吧→バー、居酒屋→居酒屋、熱炒 燒烤→焼き鳥；台灣與其他地方不動', () => {
+    expect(restBase('咖啡廳', 'JP')).toBe('カフェ')
+    expect(restBase('酒吧', 'JP')).toBe('バー')
+    expect(restBase('居酒屋', 'JP')).toBe('居酒屋')
+    expect(restBase('熱炒 燒烤', 'JP')).toBe('焼き鳥')
+    expect(restBase('咖啡廳', 'TW')).toBe('咖啡廳')
+    expect(restBase('咖啡廳', 'other')).toBe('咖啡廳')
+    expect(restBase('不認得的字', 'JP')).toBe('不認得的字')
+  })
+  it('pickLane：日本的查詞全是日文（含修飾詞、其他），台灣一字不改', () => {
+    const jp = (choices: Record<string, string | number>) => restPlans(choices, 'JP', 1)[0]!
+    expect(jp({ scene: '一個人放空', drink: '咖啡' })).toMatchObject({ textQuery: 'カフェ', lane: 'text:カフェ@一個人放空' })
+    expect(jp({ scene: '工作讀書', drink: '咖啡' })).toMatchObject({ textQuery: '電源 カフェ' })
+    expect(jp({ scene: '談事情', drink: '咖啡' })).toMatchObject({ textQuery: '静か カフェ' })
+    expect(jp({ scene: '談事情', drink: '酒吧' })).toMatchObject({ textQuery: '静か バー' })
+    expect(jp({ scene: '朋友聊天', drink: '居酒屋' })).toMatchObject({ textQuery: '居酒屋' })
+    expect(jp({ scene: '朋友聊天', drink: '熱炒燒烤' })).toMatchObject({ textQuery: '焼き鳥' })
+    expect(jp({ scene: SCENE_OTHER, sceneText: '有插座', drink: '咖啡' })).toMatchObject({ textQuery: '有插座 カフェ' })
+    expect(jp({ drink: '咖啡' })).toMatchObject({ textQuery: 'カフェ' })
+    for (const p of [...restPlans({ scene: '一個人放空', drink: '咖啡' }, 'JP', 20), ...restPlans({ scene: '工作讀書', drink: '咖啡' }, 'JP', 20)]) {
+      expect(p.kind === 'text' && /[぀-ヿ]/.test(p.textQuery) && !/咖啡廳/.test(p.textQuery), p.kind === 'text' ? p.textQuery : '').toBe(true)
+    }
+    expect(restPlans({ scene: '一個人放空', drink: '咖啡' }, 'TW', 1)[0]).toMatchObject({ textQuery: '咖啡廳' })
+    expect(restPlans({ scene: '工作讀書', drink: '咖啡' }, 'TW', 1)[0]).toMatchObject({ textQuery: '不限時 咖啡廳' })
+    expect(restPlans({ scene: '談事情', drink: '酒吧' }, 'TW', 1)[0]).toMatchObject({ textQuery: '安靜 酒吧' })
+    expect(restPlans({ scene: '朋友聊天', drink: '熱炒燒烤' }, 'TW', 1)[0]).toMatchObject({ textQuery: '熱炒 燒烤' })
+  })
+  it('第二次（擴大）保留同一個日文關鍵字', () => {
+    const first = restPlans({ scene: '談事情', drink: '咖啡' }, 'JP', 1)[0]!
+    expect(widenPlan(first, { country: 'JP', rng: mulberry32(1) })).toMatchObject({ kind: 'text', textQuery: '静か カフェ', radius: 2500, openNow: true })
+  })
+  it('歇的篩選：水煙吧（type）、購物中心、百貨不派；選咖啡時店名有シーシャ／shisha 的也不派（即使 type=cafe）', () => {
+    const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+      ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
+    const coffee = sceneOf('rest', { scene: '一個人放空', drink: '咖啡' })
+    const cands = [
+      c('アラビアン カフェ&バー', { primaryType: 'hookah_bar' }),
+      c('新宿サザンテラス', { primaryType: 'shopping_mall' }),
+      c('伊勢丹', { primaryType: 'department_store' }),
+      c('shisha cafe and bar NAROZ 歌舞伎町店'),
+      c('新宿シーシャ Shisha Cafe 紅洛煙'),
+      c('コメダ珈琲店'),
+      c('マクドナルド', { primaryType: 'fast_food_restaurant' }),
+    ]
+    expect(sceneFilter(cands, coffee).kept.map((x) => x.id)).toEqual(['コメダ珈琲店', 'マクドナルド'])
+    // 選酒吧：水煙吧、購物中心仍不派；酒吧類與店名不擋
+    const bar = sceneOf('rest', { scene: '朋友聊天', drink: '酒吧' })
+    expect(sceneFilter([...cands, c('Bar Vier', { primaryType: 'bar' })], bar).kept.map((x) => x.id)).toEqual(['shisha cafe and bar NAROZ 歌舞伎町店', '新宿シーシャ Shisha Cafe 紅洛煙', 'コメダ珈琲店', 'マクドナルド', 'Bar Vier'])
+    // 附近真的只剩水煙吧 → 整批放回，relaxed
+    const only = cands.slice(0, 2)
+    expect(sceneFilter(only, coffee)).toEqual({ kept: only, relaxed: true })
+    expect(SHISHA_RE.test('Hookah Lounge')).toBe(true)
+    expect(SHISHA_RE.test('猿田彦珈琲')).toBe(false)
+    // 吃的情境不受影響
+    expect(scenePasses({ primaryType: 'shopping_mall', rating: 4.5, walkMin: 3 }, sceneOf('eat', { scene: '一個人快吃' }))).toBe(true)
   })
 })

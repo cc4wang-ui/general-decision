@@ -6,7 +6,7 @@
 import { betaSample, cuisineOf, type Rng } from './discovery.ts'
 import { WIDEN_FACTOR } from './places.ts'
 import { priceFit } from './price.ts'
-import { SCENE_OTHER, SCENE_QUERIES, eatOtherQuery, restQuery, type Scene } from './scene.ts'
+import { SCENE_OTHER, SCENE_QUERIES, eatOtherQuery, restBase, restQuery, type Scene } from './scene.ts'
 import type { Band, Country, CuisineStats, ModuleCard } from './types.ts'
 
 export interface Lane {
@@ -216,7 +216,8 @@ export function pickLane(
   if (tq) {
     const fallback = card.intake.find((f) => f.key === tq.key)?.default
     const drink = String(choices[tq.key] ?? '')
-    const base = tq.byOption[drink] ?? tq.byOption[String(fallback ?? '')]
+    const base0 = tq.byOption[drink] ?? tq.byOption[String(fallback ?? '')]
+    const base = base0 ? restBase(base0, country) : base0
     if (base) {
       const q = restQuery(scene, tq.byOption[drink] ? drink : String(fallback ?? ''), base, country)
       // lane id 不放使用者打的字（會進伺服器 log）：有情境就標情境名。
