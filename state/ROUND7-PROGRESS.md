@@ -1,6 +1,6 @@
 # Round 7 進度（接手用）
 
-> 最後更新：2026-11-02 15:55（東京）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`。
+> 最後更新：2026-11-03 01:25（東京）。深夜上線後驗證已量，見「深夜」。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`。
 > **2026-11-02 15:48 正式站上線 Round 7**（Cross 回「麥當勞不用排除 直接上線」）：`dpl_GRtU7onjopNWnQ1YrXRnQ9rM6eyA`，程式碼 `94b4e0b`，檔案跟 R7 preview-1 相同，直傳 target production。別名 general-decision.vercel.app。
 > 上線驗證：首頁回 `index-Bhx1KeXk.js`、`/api/probe` 404、`/api/order` GET 405、runtime error 0。
 > 回復點：Round 6 `dpl_EFM2ouyUzAqQC1KEzJaxCK1bh7i5`（Vercel rollback 一鍵）。
@@ -75,9 +75,25 @@ typecheck ✅、單元 590 條 ✅（`TZ=Asia/Taipei`）、build ✅（前端 JS
 - 「其他／有插座」派到貓咖啡：是咖啡店，但有插座與否沒驗（Google 沒這個欄位）。跟 Round 5 一樣是關鍵字盡力。
 - 量測費：約 15 次 Places＋12 次 Claude。
 
-### 深夜（上線後驗證，東京 2026-11-03 01:00）
+### 深夜（上線後驗證，2026-11-03 01:14 東京，preview-1 = 正式站程式）
 
-session 自己排了喚醒，到時打 preview-1 的 probe（程式跟正式站相同；正式站的 probe 是 404），存 `r7check/scene-shinjuku-night.json`，只回報不開 checker。
+原始回應存 scratchpad `r7check/scene-shinjuku-night.json`＋`.meta.txt`。第一次呼叫 60 秒超時（冷啟動），第二次成功；費用可能兩倍。
+
+| 歇情境 | 查詞 | 派到 | type | 距離／半徑 | 候選 |
+|---|---|---|---|---|---|
+| 一個人放空 | カフェ（放大） | カラオケパセラ 新宿靖国通り店 | karaoke | 478／1500 | 7/20 |
+| 工作讀書 | 電源 カフェ（放大） | 珈琲貴族エジンバラ | cafe | 523／2500 | 4/4 |
+| 朋友聊天 | カフェ（放大） | 新宿カブキhall（居酒屋美食街） | restaurant | 700／2500 | 3/15 |
+| 談事情 | 静か カフェ（放大） | 香楽 現 UtuTu | cafe | 559／2500 | 2/18 |
+| 等人 | カフェ（放大） | 中国茶房8 新宿店 | chinese_restaurant | 464／1000 | 1/16 |
+| 其他／有插座 | 有插座 カフェ（放大） | 超商救援（セブン-イレブン） | convenience_store | 437 | 0/0 |
+
+- **水煙吧 0、購物中心 0**（STOP 3 的字面成立）。Round 6 同時段是水煙吧 ×2、商場 ×2、shisha cafe ×1、麥當勞 ×1。
+- 6 筆全部第一次查不夠 5 家 → 放大 2.5 倍。深夜 01:00 新宿的「カフェ」，Google 回的仍混了卡拉OK、居酒屋美食街、中華餐廳；水煙吧被 type 擋掉後，剩下的候選就是這些。咖啡店本身只有 2 筆（珈琲貴族エジンバラ、UtuTu）。
+- 「其他／有插座」深夜 0 筆候選 → 超商救援，誠實說「附近都收了」。
+- 吃 6/6 過規則，但「外帶」01:19 派到 BAR G.O.A.T.（type=bar，口令「點酒或下酒菜外帶」）。外帶的排除清單沒有酒吧類。下一輪候選。
+
+**判斷**：沒有退步（0 水煙吧／商場）。深夜「カフェ」仍派到非咖啡店，是深夜店少＋Google 的語意鬆，不是這輪造成；不建議現在動作。下一輪候選：歇選咖啡時再排除 karaoke、food_court／居酒屋美食街類；外帶排除酒吧類。
 
 ## Cross 決定（2026-11-02 15:45）
 
@@ -85,7 +101,8 @@ session 自己排了喚醒，到時打 preview-1 的 probe（程式跟正式站�
 
 ## 已知風險／下一輪候選
 
-- 深夜東京「歇」的真資料還沒有（白天 6/6 乾淨）。深夜店少，放大 2.5 倍後有沒有又撈到水煙吧，01:00 的量測會知道。
+- 深夜東京「歇」（01:14 量）：0 水煙吧／商場，但放大後派到卡拉OK、居酒屋美食街、中華餐廳各 1。候選：歇選咖啡再排除 karaoke、food_court 類。
+- 深夜「外帶」派到酒吧（BAR G.O.A.T.，type=bar）：外帶的排除清單沒有酒吧類。候選。
 - 「其他／有插座」派到貓咖啡：Google 沒有插座欄位，關鍵字只能盡力。
 - 「約會」派到酒吧（Bar Vier）：約會的排除清單沒有酒吧類。下一輪候選。
 - 「去」卡的交通選項仍然沒有作用。
