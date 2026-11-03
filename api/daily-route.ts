@@ -38,7 +38,7 @@ async function handler(req:Request):Promise<Response>{
  const location=safe(input.location,100)
  if(!location)return respond({error:'location_required',message:'請先指定出發地。'},400)
  const list=Array.isArray(input.stops)?input.stops.slice(0,9):[]
- const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45}))
+ const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate:x.candidate&&typeof x.candidate==='object'&&typeof x.candidate.id==='string'&&Number.isFinite(x.candidate.lat)&&Number.isFinite(x.candidate.lng)?x.candidate:undefined}))
  const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,30):[]
  try{
   const origins=await search(key,location+' Japan',undefined,1)
@@ -46,10 +46,11 @@ async function handler(req:Request):Promise<Response>{
   const center={lat:origins[0].lat,lng:origins[0].lng}
   const result:Stop[]=[]
   for(const s of stops){
+   if(shuffle&&s.id!==shuffle&&s.candidate){result.push(s);continue}
    // Explicitly named or fixed locations are resolved, never replaced by another business.
    const preserve=s.done||s.locked||s.custom
    const named=s.place&&s.place!== '澀谷站周邊'&&!s.place.includes('周邊')&&!s.place.includes('／')&&!s.place.includes('（')
-   const q=preserve||named&&shuffle!==s.id?s.place:queries[s.id]??queries[s.kind]??s.title
+   const q=preserve||(named&&shuffle!==s.id)?s.place:queries[s.id]??queries[s.kind]??s.title
    if(!q){result.push(s);continue}
    const found=await search(key,q+' '+(preserve?'':location),center,8)
    const eligible=found.filter(p=>!excluded.includes(p.id)&& (preserve||shuffle!==s.id||p.id!==s.candidate?.id))
