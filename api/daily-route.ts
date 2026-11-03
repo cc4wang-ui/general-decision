@@ -8,7 +8,7 @@ const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{stat
 type Coord={lat:number;lng:number}
 type Candidate={id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean}
 type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;done?:boolean;custom?:boolean;start?:string;minutes?:number;candidate?:Candidate}
-const queries:Record<string,string>={gym:'FIT-EASY gym',meal:'Japanese set meal restaurant',creative:'art gallery exhibition',coffee:'quiet specialty coffee cafe',shopping:'sports goods drugstore',rest:'Japanese restaurant'}
+const queries:Record<string,string>={gym:'FIT-EASY Shibuya Sakura Stage',meal:'Japanese set meal restaurant',creative:'art gallery exhibition',coffee:'quiet specialty coffee cafe',shopping:'sports goods drugstore',rest:'Shibuya Station'}
 const dist=(a:Coord,b:Coord)=>{const rad=Math.PI/180,dLat=(b.lat-a.lat)*rad,dLon=(b.lng-a.lng)*rad,v=Math.sin(dLat/2)**2+Math.cos(a.lat*rad)*Math.cos(b.lat*rad)*Math.sin(dLon/2)**2;return 12742*Math.asin(Math.sqrt(v))}
 const safe=(s:unknown,n=120)=>typeof s==='string'?s.slice(0,n).trim():''
 async function search(key:string,q:string,center?:Coord,count=8):Promise<Candidate[]>{
@@ -51,7 +51,7 @@ async function handler(req:Request):Promise<Response>{
    // Explicitly named or fixed locations are resolved, never replaced by another business.
    const preserve=s.done||s.locked||s.custom
    const named=s.place&&s.place!== '澀谷站周邊'&&!s.place.includes('周邊')&&!s.place.includes('／')&&!s.place.includes('（')
-   const q=preserve||(named&&shuffle!==s.id)?s.place:queries[s.id]??queries[s.kind]??s.title
+   const q=s.id==='rest'&&!preserve?location:(preserve||(named&&shuffle!==s.id)?s.place:queries[s.id]??queries[s.kind]??s.title)
    if(!q){result.push(s);continue}
    const found=await search(key,q+' '+(preserve?'':location),center,8)
    const eligible=found.filter(p=>!excluded.includes(p.id)&& (preserve||shuffle!==s.id||p.id!==s.candidate?.id))
