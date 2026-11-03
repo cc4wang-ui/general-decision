@@ -40,7 +40,7 @@ async function handler(req:Request):Promise<Response>{
    const start=Date.now()
    const res=await handler(new Request(req.url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sample)}))
    const data=await res.json() as Record<string,any>
-   return respond({test:true,apiStatus:res.status,elapsedMs:Date.now()-start,routeVerified:data.routeVerified,warning:data.warning,error:data.error,message:data.message,conflicts:data.conflicts,stops:(data.stops??[]).map((t:any)=>({id:t.id,name:t.candidate?.name,address:t.candidate?.address,mapUrl:!!t.candidate?.mapUrl,eta:t.eta,travelMin:t.travelMin}))})
+   return respond({test:true,apiStatus:res.status,elapsedMs:Date.now()-start,routeVerified:data.routeVerified,warning:data.warning,error:data.error,message:data.message,conflicts:data.conflicts,stops:(data.stops??[]).map((t:any)=>({id:t.id,name:t.candidate?.name,address:t.candidate?.address,placeId:t.candidate?.id,mapUrl:!!t.candidate?.mapUrl,eta:t.eta,travelMin:t.travelMin}))})
  }
  if(req.method!=='POST')return respond({error:'method_not_allowed'},405)
  const key=process.env.GOOGLE_PLACES_KEY
@@ -80,7 +80,8 @@ async function handler(req:Request):Promise<Response>{
    const {matrix,distances}=await travelMatrix(key,center,located)
    const schedule=scheduleRoute(located,matrix,distances,now)
    return respond({origin:origins[0],...schedule,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
-  }catch{
+  }catch(e){
+   console.warn('[daily-route] Routes matrix unavailable:', e instanceof Error?e.message:'unknown')
    // Keep verified names, photos and navigation functional even if the separate Routes API is not enabled.
    // Do NOT label these geographically grouped stops as verified walking ETAs.
    return respond({origin:origins[0],stops:ordered.stops.map(({candidate,...rest})=>({...rest,candidate})),routeVerified:false,travelMode:null,verifiedSource:'Google Places',searchedAt:new Date().toISOString(),conflicts:[],warning:'Google Routes 暫時無法驗證；僅依地理接近程度排順序。每站請開啟 Google Maps 取得實際導航時間。'})
