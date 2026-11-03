@@ -1,7 +1,8 @@
 import {describe,it,expect} from 'vitest'
+import type {ScheduledStop} from '../../src/dailyRouting.ts'
 import {scheduleRoute} from '../../src/dailyRouting.ts'
 describe('daily route fixed appointments',()=>{
- const stops=[
+ const stops:ScheduledStop[]=[
   {id:'coffee',title:'Coffee',minutes:30,candidate:{lat:1,lng:1}},
   {id:'fixed',title:'Meeting',minutes:60,start:'15:00',locked:true,candidate:{lat:2,lng:2}},
   {id:'gym',title:'Gym',minutes:80,candidate:{lat:3,lng:3}},
