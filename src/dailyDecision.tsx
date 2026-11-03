@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import './dailyDecision.css'
 
 export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; variant?: number }
 export type DailyState = {
@@ -103,41 +104,74 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     change(s=>({ ...s, notes:[...s.notes,v].slice(-20) }))
     setFeedback('')
   }
-  return <section className="screen" data-screen="daily-decision" style={{paddingBottom:40}}>
-    <button className="back" onClick={onBack}>← 回報告</button>
-    <h2>今日決策</h2>
-    <p className="hint">少問問題，直接執行。固定偏好保留在此裝置；今日行程每天重置。</p>
-    <label className="lab" htmlFor="daily-location">現在在哪裡？</label>
-    <input id="daily-location" aria-label="目前位置" value={state.currentPlace} onChange={e=>change(s=>({...s,currentPlace:e.target.value.slice(0,80)}))} />
-    <p className="hint">目前位置：{state.currentPlace || state.area}。這是手動輸入，不代表已取得 GPS。</p>
-    <div style={{padding:'14px 0',borderBottom:'1px solid #7775'}}>
-      <h3>加入既有安排（固定，不會被重排）</h3>
-      <input aria-label="既有行程名稱" placeholder="例如：15:00 與朋友見面" value={fixedTitle} onChange={e=>setFixedTitle(e.target.value)} />
-      <input aria-label="既有行程地點" placeholder="指定地點／地址" value={fixedPlace} onChange={e=>setFixedPlace(e.target.value)} />
-      <label className="lab">開始時間 <input aria-label="開始時間" type="time" value={fixedTime} onChange={e=>setFixedTime(e.target.value)} /></label>
-      <label className="lab">分鐘 <input aria-label="行程長度分鐘" type="number" min="5" max="720" value={fixedMinutes} onChange={e=>setFixedMinutes(e.target.value)} /></label>
-      <button className="btn" disabled={!fixedTitle.trim()||!fixedPlace.trim()||Number(fixedMinutes)<5||Number(fixedMinutes)>720} onClick={()=>{change(s=>addFixedTask(s,fixedTitle,fixedPlace,fixedTime,Number(fixedMinutes)));setFixedTitle('');setFixedPlace('')}}>加入固定行程</button>
+  const completed=state.tasks.filter(t=>t.done).length
+  return <section className="screen dd" data-screen="daily-decision">
+    <header className="dd-header">
+      <button className="dd-back" onClick={onBack} aria-label="返回">← 返回</button>
+      <span className="dd-brand">GENERAL DECISION / DAILY</span>
+    </header>
+    <div className="dd-shell">
+      <div className="dd-hero">
+        <div className="dd-eyebrow">{state.day} · TOKYO TIME</div>
+        <h1>今天，<em>換個節奏。</em></h1>
+        <p>把時間留給值得做的事。先排好，再依心情調整。</p>
+        <div className="dd-progress"><span>{completed} / {state.tasks.length} 已完成</span><div className="dd-meter"><i style={{width:state.tasks.length?completed/state.tasks.length*100+'%':'0%'}}/></div></div>
+      </div>
+      <div className="dd-columns">
+        <aside className="dd-panel">
+          <div className="dd-panel-title"><span>01 / 今日設定</span><span>PERSONALIZE</span></div>
+          <label htmlFor="daily-location">目前位置</label>
+          <input id="daily-location" aria-label="目前位置" value={state.currentPlace} onChange={e=>change(s=>({...s,currentPlace:e.target.value.slice(0,80)}))} placeholder="例如：宮下公園" />
+          <small>位置由你指定，尚未使用 GPS 定位。</small>
+          <label>今天想怎麼過？</label>
+          <div className="dd-mode" role="group" aria-label="今日模式">
+            <button aria-pressed={state.mode==='creative'} onClick={()=>change(s=>replanDaily({...s,mode:'creative'}))}>✦ 創意探索</button>
+            <button aria-pressed={state.mode==='practical'} onClick={()=>change(s=>replanDaily({...s,mode:'practical'}))}>◈ 效率採買</button>
+          </div>
+          <button className="dd-primary" data-testid="daily-generate" onClick={generate}>{state.tasks.length?'↻ 重排未完成行程':'✦ 生成今日行程'}</button>
+          <details className="dd-details">
+            <summary>＋ 加入已安排的行程</summary>
+            <div className="dd-form">
+              <label>行程名稱<input aria-label="既有行程名稱" placeholder="例如：與朋友見面" value={fixedTitle} onChange={e=>setFixedTitle(e.target.value)}/></label>
+              <label>地點<input aria-label="既有行程地點" placeholder="例如：吉祥寺" value={fixedPlace} onChange={e=>setFixedPlace(e.target.value)}/></label>
+              <div className="dd-form-row">
+                <label>開始時間<input aria-label="開始時間" type="time" value={fixedTime} onChange={e=>setFixedTime(e.target.value)}/></label>
+                <label>分鐘<input aria-label="行程長度分鐘" type="number" min="5" max="720" value={fixedMinutes} onChange={e=>setFixedMinutes(e.target.value)}/></label>
+              </div>
+              <button className="dd-secondary" disabled={!fixedTitle.trim()||!fixedPlace.trim()||Number(fixedMinutes)<5||Number(fixedMinutes)>720} onClick={()=>{change(s=>addFixedTask(s,fixedTitle,fixedPlace,fixedTime,Number(fixedMinutes)));setFixedTitle('');setFixedPlace('')}}>加入固定行程</button>
+            </div>
+          </details>
+          <details className="dd-details">
+            <summary>＋ 記住我的偏好</summary>
+            <div className="dd-form">
+              <textarea aria-label="補充偏好" value={feedback} maxLength={160} rows={3} placeholder="例如：不要推薦跨區的咖啡店" onChange={e=>setFeedback(e.target.value)}/>
+              <button className="dd-secondary" onClick={addFeedback} disabled={!feedback.trim()}>儲存偏好</button>
+              <div className="dd-notes">{state.notes.map((n,i)=><p key={i}>· {n}</p>)}</div>
+            </div>
+          </details>
+        </aside>
+        <main className="dd-itinerary">
+          <div className="dd-section-title"><div><span>02 / YOUR DAY</span><h2>今日路線</h2></div><span className="dd-count">{state.tasks.length} STOPS</span></div>
+          {state.tasks.length===0?<div className="dd-empty"><span>✳</span><h3>今天還沒有行程</h3><p>選擇模式後點「生成今日行程」，讓今天開始。</p></div>:<div className="dd-timeline" aria-label="今日任務">
+            {state.tasks.map((t,i)=><article className={'dd-stop'+(t.done?' is-done':'')} key={t.id}>
+              <div className="dd-marker"><span>{String(i+1).padStart(2,'0')}</span></div>
+              <div className="dd-card">
+                <div className="dd-card-top"><span className="dd-kind">{t.locked?'◆ 固定安排':t.kind==='gym'?'● FITNESS':t.kind==='meal'?'● FOOD':t.kind==='creative'?'● DISCOVER':t.kind==='shopping'?'● SHOPPING':'● RESET'}</span><span className="dd-duration">{t.start?t.start+' · ':''}{t.minutes} MIN</span></div>
+                <h3>{t.title}</h3>
+                <p className="dd-description">{t.detail||'建議停留 '+t.minutes+' 分鐘；實際營業資訊需查證。'}</p>
+                <div className="dd-location"><span>⌖</span><input aria-label={t.title+' 指定地點'} value={t.place||''} placeholder="指定地點或輸入地址" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value}:x)}))}/></div>
+                <div className="dd-actions">
+                  <label className="dd-done"><input type="checkbox" checked={t.done} onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done:e.target.checked}:x)}))}/><span>{t.done?'已完成':'完成'}</span></label>
+                  {!t.done&&!t.locked&&<button onClick={()=>change(s=>shuffleTask(s,t.id))}>↻ 換一站</button>}
+                  {t.place&&<a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(t.place)} target="_blank" rel="noopener noreferrer">↗ 地圖</a>}
+                  {t.custom?<button onClick={()=>change(s=>({...s,tasks:s.tasks.filter(x=>x.id!==t.id)}))}>移除</button>:!t.done&&!t.locked?<button className="dd-muted" onClick={()=>change(s=>replanDaily({...s,avoid:[...new Set([...s.avoid,t.id])]}))}>略過</button>:null}
+                </div>
+              </div>
+            </article>)}
+          </div>}
+          <p className="dd-disclaimer">行程為離線建議，不代表店家已營業、現場有庫存或預約成功。資料只儲存在此瀏覽器，不會跨裝置同步。</p>
+        </main>
+      </div>
     </div>
-    <div className="chips" role="group" aria-label="今日模式">
-      <button className="chip" aria-pressed={state.mode==='creative'} onClick={()=>change(s=>replanDaily({...s,mode:'creative'}))}>創意探索</button>
-      <button className="chip" aria-pressed={state.mode==='practical'} onClick={()=>change(s=>replanDaily({...s,mode:'practical'}))}>效率採買</button>
-    </div>
-    <div className="row"><button className="btn" data-testid="daily-generate" onClick={generate}>{state.tasks.length?'重排未完成事項':'生成今日行程'}</button></div>
-    <p className="hint">不虛構店家、活動、即時庫存或營業時間；此版為離線決策草案，出發前需查證。</p>
-    <div aria-label="今日任務">
-      {state.tasks.map((t,i)=><div key={t.id} style={{padding:'12px 0',borderBottom:'1px solid #7775'}}>
-        <label><input type="checkbox" checked={t.done} onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done:e.target.checked}:x)}))} /> {i+1}. {t.title} · {t.minutes} 分</label>
-        <p className="hint">{t.start ? '固定時間 '+t.start+' · ' : ''}{t.place || state.area}｜{t.detail || '建議停留時間 '+t.minutes+' 分鐘；尚未確認即時營業資訊'}</p>
-        <label className="lab">指定地點 <input aria-label={t.title+' 指定地點'} value={t.place||''} placeholder="輸入地點／地址" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value}:x)}))}/></label>
-        {t.place && <a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(t.place)} target="_blank" rel="noopener noreferrer">查看地圖 ↗</a>}
-        {!t.done && !t.locked && <button className="chip" onClick={()=>change(s=>shuffleTask(s,t.id))}>換這一站 ↻</button>}
-        {t.custom && <button className="chip" onClick={()=>change(s=>({...s,tasks:s.tasks.filter(x=>x.id!==t.id)}))}>移除安排</button>}
-        {!t.done && !t.locked && <button className="chip" style={{marginLeft:8}} onClick={()=>change(s=>replanDaily({...s,avoid:[...new Set([...s.avoid,t.id])]}))}>今天略過</button>}
-      </div>)}
-    </div>
-    <p className="lab">修正偏好（會保留供下次使用）</p>
-    <div className="manual-in"><input aria-label="補充偏好" value={feedback} maxLength={160} placeholder="例如：不要再推薦新宿；我已經買到肌酸" onChange={e=>setFeedback(e.target.value)} /><button className="btn" onClick={addFeedback} disabled={!feedback.trim()}>記住</button></div>
-    <details><summary>已記住的偏好</summary>{state.notes.map((n,i)=><p key={i}>{n}</p>)}</details>
-    <p className="hint">目前偏好僅存在此瀏覽器，不跨裝置同步；沒有連接 ChatGPT 對話記憶。</p>
   </section>
 }
