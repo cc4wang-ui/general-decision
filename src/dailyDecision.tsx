@@ -121,10 +121,10 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       const data=await response.json()
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       change(old=>({...old,tasks:data.stops}))
-      setRouteKm(data.distanceKm)
-      setTravelMin(data.travelMinutes)
+      setRouteKm(data.routeVerified?data.distanceKm:null)
+      setTravelMin(data.routeVerified?data.travelMinutes:null)
       setConflicts(data.conflicts??[])
-      setStatus('店家已確認 · 已更新 Google Routes 步行路線'+(data.conflicts?.length?'；請留意時間衝突':''))
+      setStatus(data.routeVerified?'店家已確認 · 已更新 Google Routes 步行路線'+(data.conflicts?.length?'；請留意時間衝突':''):'店家已確認，但步行路線目前無法驗證。請用 Google Maps 導航確認。')
     }catch(e){setStatus('無法更新：'+(e instanceof Error?e.message:'未知錯誤')+'；原行程已保留')}
     finally{setBusy(null)}
   }
@@ -209,7 +209,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 </div>
                 {!t.done&&<details className="dd-change-place"><summary>⌖ 指定／修改這一站的地點</summary>
                   <label>輸入店家名稱或地址
-                    <input aria-label={t.title+' 指定地點'} defaultValue={t.specified?t.place||'':''} key={t.id+':'+String(t.candidate?.id||'')} placeholder="例如：Fuglen Tokyo" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value,specified:true,candidate:undefined,eta:undefined,departure:undefined,travelMin:undefined,conflict:undefined}:x)}))} />
+                    <input aria-label={t.title+' 指定地點'} value={t.specified?t.place||'':''} placeholder="例如：Fuglen Tokyo" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value,specified:true,candidate:undefined,eta:undefined,departure:undefined,travelMin:undefined,conflict:undefined}:x)}))} />
                   </label>
                   <button className="dd-secondary" disabled={busy!==null||!t.place?.trim()} onClick={()=>{void searchRoute(t.id)}}>確認這個地點並更新路線</button>
                 </details>}
