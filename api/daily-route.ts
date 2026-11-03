@@ -7,7 +7,7 @@ const MASK='places.id,places.displayName,places.formattedAddress,places.location
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}})
 type Coord={lat:number;lng:number}
 type Candidate={id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean}
-type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;done?:boolean;custom?:boolean;start?:string;minutes?:number;candidate?:Candidate}
+type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;done?:boolean;custom?:boolean;specified?:boolean;start?:string;minutes?:number;candidate?:Candidate}
 const queries:Record<string,string>={gym:'FIT-EASY Shibuya Sakura Stage',meal:'Japanese set meal restaurant',creative:'art gallery exhibition',coffee:'quiet specialty coffee cafe',shopping:'sports goods drugstore',rest:'Shibuya Station'}
 const dist=(a:Coord,b:Coord)=>{const rad=Math.PI/180,dLat=(b.lat-a.lat)*rad,dLon=(b.lng-a.lng)*rad,v=Math.sin(dLat/2)**2+Math.cos(a.lat*rad)*Math.cos(b.lat*rad)*Math.sin(dLon/2)**2;return 12742*Math.asin(Math.sqrt(v))}
 const safe=(s:unknown,n=120)=>typeof s==='string'?s.slice(0,n).trim():''
@@ -39,7 +39,7 @@ async function handler(req:Request):Promise<Response>{
  const location=safe(input.location,100)
  if(!location)return respond({error:'location_required',message:'請先指定出發地。'},400)
  const list=Array.isArray(input.stops)?input.stops.slice(0,9):[]
- const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate:x.candidate&&typeof x.candidate==='object'&&typeof x.candidate.id==='string'&&Number.isFinite(x.candidate.lat)&&Number.isFinite(x.candidate.lng)?x.candidate:undefined}))
+ const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,specified:x.specified===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate:x.candidate&&typeof x.candidate==='object'&&typeof x.candidate.id==='string'&&Number.isFinite(x.candidate.lat)&&Number.isFinite(x.candidate.lng)?x.candidate:undefined}))
  const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,30):[]
  try{
   const origins=await search(key,location+' Japan',undefined,1)
@@ -47,13 +47,14 @@ async function handler(req:Request):Promise<Response>{
   const center={lat:origins[0].lat,lng:origins[0].lng}
   const result:Stop[]=[]
   for(const s of stops){
-   if(shuffle&&s.id!==shuffle&&s.candidate){result.push(s);continue}
+   if(s.candidate && (!shuffle || s.id!==shuffle)){result.push(s);continue}
+   if(shuffle&&s.id!==shuffle){result.push(s);continue}
    // Explicitly named or fixed locations are resolved, never replaced by another business.
    const preserve=s.done||s.locked||s.custom
    const named=s.place&&s.place!== '澀谷站周邊'&&!s.place.includes('周邊')&&!s.place.includes('／')&&!s.place.includes('（')
-   const q=s.id==='rest'&&!preserve?location:(preserve||(named&&shuffle!==s.id)?s.place:queries[s.id]??queries[s.kind]??s.title)
+   const q=s.specified?s.place:(s.id==='rest'&&!preserve?location:(preserve||(named&&shuffle!==s.id)?s.place:queries[s.id]??queries[s.kind]??s.title))
    if(!q){result.push(s);continue}
-   const found=await search(key,q+' '+(preserve?'':location),center,8)
+   const found=await search(key,q+(preserve||s.specified?'':' '+location),center,8)
    const eligible=found.filter(p=>!excluded.includes(p.id)&& (preserve||shuffle!==s.id||p.id!==s.candidate?.id))
    const ranked=eligible.sort((a,b)=>dist(center,a)-dist(center,b)+((b.rating??0)-(a.rating??0))*.18)
    const selected=ranked[0]
@@ -63,9 +64,16 @@ async function handler(req:Request):Promise<Response>{
   const now=new Date().toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'})
   const located=ordered.stops.filter(s=>s.candidate)
   if(located.length!==ordered.stops.length)return respond({error:'unresolved_stops',message:'部分行程尚未找到真實地點，無法計算可靠交通時間。原行程保留。'},422)
-  const {matrix,distances}=await travelMatrix(key,center,located)
-  const schedule=scheduleRoute(located,matrix,distances,now)
-  return respond({origin:origins[0],...schedule,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
+  try{
+   const {matrix,distances}=await travelMatrix(key,center,located)
+   const schedule=scheduleRoute(located,matrix,distances,now)
+   return respond({origin:origins[0],...schedule,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
+  }catch(e){
+   console.warn('[daily-route] Routes matrix unavailable:', e instanceof Error?e.message:'unknown')
+   // Keep verified names, photos and navigation functional even if the separate Routes API is not enabled.
+   // Do NOT label these geographically grouped stops as verified walking ETAs.
+   return respond({origin:origins[0],stops:ordered.stops.map(({candidate,...rest})=>({...rest,candidate})),routeVerified:false,travelMode:null,verifiedSource:'Google Places',searchedAt:new Date().toISOString(),conflicts:[],warning:'Google Routes 暫時無法驗證；僅依地理接近程度排順序。每站請開啟 Google Maps 取得實際導航時間。'})
+  }
  }catch(e){return respond({error:'places_unavailable',message:e instanceof Error?e.message:'店家搜尋失敗'},502)}
 }
 export function POST(req:Request){return handler(req)}

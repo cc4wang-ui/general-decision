@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDaily, replanDaily, shuffleTask, addFixedTask, type DailyState } from '../../src/dailyDecision.tsx'
+import { buildDaily, replanDaily, shuffleTask, addFixedTask, mapsNavigationUrl, type DailyState } from '../../src/dailyDecision.tsx'
 
 const state = (): DailyState => ({ day:'2026-11-03', area:'澀谷', currentPlace:'宮下公園', mode:'creative', tasks:[], notes:[], avoid:[] })
 
@@ -43,5 +43,18 @@ describe('Daily itinerary controls',()=>{
  })
  it('rejects incomplete fixed commitments',()=>{
   expect(addFixedTask(state(),'','吉祥寺','15:00',60).tasks).toHaveLength(0)
+ })
+})
+
+describe('Google Maps direct navigation',()=>{
+ it('opens walking navigation for the exact verified place ID',()=>{
+  const url=new URL(mapsNavigationUrl({id:'ChIJABC_123',lat:35.6595,lng:139.7005}))
+  expect(url.hostname).toBe('www.google.com')
+  expect(url.pathname).toBe('/maps/dir/')
+  expect(url.searchParams.get('api')).toBe('1')
+  expect(url.searchParams.get('destination')).toBe('35.6595,139.7005')
+  expect(url.searchParams.get('destination_place_id')).toBe('ChIJABC_123')
+  expect(url.searchParams.get('travelmode')).toBe('walking')
+  expect(url.searchParams.get('dir_action')).toBe('navigate')
  })
 })
