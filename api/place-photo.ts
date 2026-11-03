@@ -1,5 +1,6 @@
 // Ephemeral, on-demand Google Places photos. No photo names or URLs are cached.
 // Return image attribution alongside a short-lived Google photo URI; never expose API keys.
+declare const process: {env: Record<string,string|undefined>}
 export const config = { runtime: 'nodejs' }
 
 const json = (body:unknown,status=200) => new Response(JSON.stringify(body),{
