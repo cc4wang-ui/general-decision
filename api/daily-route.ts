@@ -30,6 +30,18 @@ function order(stops:Stop[],origin:Coord):{stops:Stop[];distanceKm:number;warnin
  return {stops:result,distanceKm:Math.round(km*10)/10,warning:'路線按地理距離估算，非 Google Maps 實際步行／大眾運輸時間；固定行程時段衝突尚未自動驗證。'}
 }
 async function handler(req:Request):Promise<Response>{
+ // TEMP QA SMOKE: preview-only validation. Remove before merge to production.
+ if(req.method==='GET' && new URL(req.url).searchParams.get('qa')==='smoke-daily-2026'){
+   const sample={location:'渋谷駅',stops:[
+    {id:'coffee',title:'咖啡探索',kind:'creative',minutes:30,done:false},
+    {id:'meal',title:'日式定食',kind:'meal',minutes:45,done:false},
+    {id:'fixed-test',title:'渋谷PARCO 測試',kind:'rest',place:'渋谷PARCO',start:'20:00',minutes:20,locked:true,custom:true,done:false}
+   ]}
+   const start=Date.now()
+   const res=await handler(new Request(req.url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sample)}))
+   const data=await res.json() as Record<string,any>
+   return respond({test:true,apiStatus:res.status,elapsedMs:Date.now()-start,routeVerified:data.routeVerified,warning:data.warning,error:data.error,message:data.message,conflicts:data.conflicts,stops:(data.stops??[]).map((t:any)=>({id:t.id,name:t.candidate?.name,address:t.candidate?.address,mapUrl:!!t.candidate?.mapUrl,eta:t.eta,travelMin:t.travelMin}))})
+ }
  if(req.method!=='POST')return respond({error:'method_not_allowed'},405)
  const key=process.env.GOOGLE_PLACES_KEY
  if(!key)return respond({error:'missing_places_key',message:'Google Places 尚未設定，無法提供可查證店家。'},503)
