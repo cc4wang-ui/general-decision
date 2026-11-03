@@ -608,3 +608,57 @@ describe('Round 7：東京的歇', () => {
     expect(scenePasses({ primaryType: 'shopping_mall', rating: 4.5, walkMin: 3 }, sceneOf('eat', { scene: '一個人快吃' }))).toBe(true)
   })
 })
+
+// Round 8（Cross 2026-11-03「開始」：補「派錯店」）：歇選咖啡不派卡拉OK、美食街；外帶不派酒吧。
+// 店名、type 取自 2026-11-03 01:14–01:19 東京新宿駅深夜量測（state/evidence/r7/scene-shinjuku-night.json）。
+import { NOT_COFFEE_RE } from '../../src/scene.ts'
+describe('Round 8：派錯店', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
+  const night = [
+    c('カラオケパセラ 新宿靖国通り店', { primaryType: 'karaoke', types: ['karaoke'] }),
+    c('新宿カブキhall / 歌舞伎横丁｜Shinjuku Izakaya & Food Court Kabuki Hall', { primaryType: 'restaurant', types: ['restaurant'] }),
+    c('某フードコート', { primaryType: 'food_court', types: ['food_court'] }),
+    c('珈琲貴族エジンバラ'),
+    c('香楽 現 (うつつ) UtuTu'),
+  ]
+  it('歇選咖啡：卡拉OK（type 或店名）、美食街（type 或店名）、店名有居酒屋的不派；咖啡店照派', () => {
+    for (const scene of ['一個人放空', '工作讀書', '朋友聊天', '談事情', '等人']) {
+      expect(sceneFilter(night, sceneOf('rest', { scene, drink: '咖啡' })).kept.map((x) => x.id), scene).toEqual(['珈琲貴族エジンバラ', '香楽 現 (うつつ) UtuTu'])
+    }
+    // 「其他」（自己打字）也一樣
+    expect(sceneFilter(night, sceneOf('rest', { scene: SCENE_OTHER, sceneText: '有插座', drink: '咖啡' })).kept).toHaveLength(2)
+    // 沒選情境時不篩（照 Round 5 起的行為）
+    expect(sceneFilter(night, sceneOf('rest', { drink: '咖啡' })).kept).toHaveLength(5)
+    // 店名擋得到美食街；Round 7 的水煙吧照擋；正常咖啡店名不誤擋
+    for (const n of ['Shinjuku Izakaya & Food Court Kabuki Hall', '新宿フードコート', '微風美食廣場', '錢櫃KTV', '好樂迪卡拉OK', 'カラオケ館', 'シーシャカフェ', '居酒屋 和民']) expect(NOT_COFFEE_RE.test(n), n).toBe(true)
+    for (const n of ['猿田彦珈琲', 'コメダ珈琲店', 'Shinjuku CROSSING cafe&dining', 'ギャップ カフェ 新宿フラッグス店', '路易莎咖啡', 'Cafe & Bar Tokyo', '猫カフェMOCHA']) expect(NOT_COFFEE_RE.test(n), n).toBe(false)
+  })
+  it('歇選酒吧／居酒屋：卡拉OK、美食街不擋（只在選咖啡時擋）', () => {
+    expect(sceneFilter(night, sceneOf('rest', { scene: '朋友聊天', drink: '居酒屋' })).kept).toHaveLength(5)
+    expect(sceneFilter(night, sceneOf('rest', { scene: '朋友聊天', drink: '酒吧' })).kept).toHaveLength(5)
+  })
+  it('附近真的只剩卡拉OK、美食街 → 整批放回（寧可派得到），relaxed=true', () => {
+    const only = night.slice(0, 3)
+    expect(sceneFilter(only, sceneOf('rest', { scene: '等人', drink: '咖啡' }))).toEqual({ kept: only, relaxed: true })
+  })
+  it('外帶：主類別是酒吧類（bar、pub、居酒屋…）不派；便當、超商、速食照派', () => {
+    const takeout = sceneOf('eat', { scene: '外帶' })
+    const cands = [
+      c('BAR G.O.A.T.(ゴート) 新宿西口店', { primaryType: 'bar', types: ['bar'] }),
+      c('HUB 新宿店', { primaryType: 'pub', types: ['pub'] }),
+      c('鳥貴族', { primaryType: 'japanese_izakaya_restaurant', types: ['japanese_izakaya_restaurant'] }),
+      c('ほっともっと', { primaryType: 'meal_takeaway', types: ['meal_takeaway'] }),
+      c('セブン-イレブン', { primaryType: 'convenience_store', types: ['convenience_store'] }),
+      c('松屋', { primaryType: 'fast_food_restaurant', types: ['fast_food_restaurant'] }),
+      c('ラーメン屋（types 順帶有 bar）', { primaryType: 'ramen_restaurant', types: ['ramen_restaurant', 'bar'] }),
+    ]
+    expect(sceneFilter(cands, takeout).kept.map((x) => x.id)).toEqual(['ほっともっと', 'セブン-イレブン', '松屋', 'ラーメン屋（types 順帶有 bar）'])
+    // 選甜食時一樣擋酒吧
+    expect(scenePasses(cands[0]!, sceneOf('eat', { scene: '外帶', taste: '甜食' }))).toBe(false)
+    // 附近只剩酒吧 → 整批放回
+    expect(sceneFilter(cands.slice(0, 2), takeout)).toEqual({ kept: cands.slice(0, 2), relaxed: true })
+    // 其他吃的情境不受影響：宵夜仍可派居酒屋
+    expect(scenePasses(cands[2]!, sceneOf('eat', { scene: '宵夜' }))).toBe(true)
+  })
+})

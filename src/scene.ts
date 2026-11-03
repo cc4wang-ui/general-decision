@@ -64,6 +64,13 @@ const BARISH = ['bar', 'pub', 'wine_bar', 'cocktail_bar', 'lounge_bar', 'sports_
 const NOT_A_SEAT = ['hookah_bar', 'shopping_mall', 'department_store']
 /** 水煙吧常把自己標成 cafe（shisha cafe and bar NAROZ，type=cafe）：選咖啡時再用店名擋一層。 */
 export const SHISHA_RE = /シーシャ|shisha|hookah|水煙/i
+/**
+ * 歇選咖啡也不派的「不是咖啡店」（Round 8，2026-11-03 01:14 東京深夜量測：查「カフェ」放大後派到
+ * カラオケパセラ（type=karaoke）、新宿カブキhall（居酒屋美食街，type=restaurant，只有店名看得出來））。
+ */
+const NOT_COFFEE = ['karaoke', 'food_court']
+/** 選咖啡時店名擋一層：水煙吧＋美食街、居酒屋、卡拉OK（美食街常標成 restaurant，type 擋不到）。 */
+export const NOT_COFFEE_RE = new RegExp(`${SHISHA_RE.source}|food ?court|フードコート|美食街|美食廣場|居酒屋|izakaya|カラオケ|karaoke|卡拉ok|ktv`, 'i')
 type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'> & Partial<Pick<PlaceCandidate, 'name'>>
 /** 一個人快吃不派要久坐、要多人的店（checker 2026-11-01：東京查「牛丼」派到燒肉店）。 */
 const SLOW_MEAL = ['yakiniku_restaurant', 'korean_barbecue_restaurant', 'barbecue_restaurant', 'hot_pot_restaurant', 'fine_dining_restaurant', 'buffet_restaurant', 'steak_house', 'japanese_izakaya_restaurant', 'bar', 'pub', 'wine_bar', 'bar_and_grill']
@@ -80,7 +87,8 @@ const EAT: SceneRule[] = [
     hint: '情境：一個人、趕時間。steps 只點一道，20 分鐘內吃完。',
   },
   {
-    id: '外帶', radius: 600, minOpen: 10, maxWalk: 12,
+    // Round 8：外帶不派喝酒的店（2026-11-03 01:19 東京深夜派到 BAR G.O.A.T.，口令「點酒或下酒菜外帶」）。
+    id: '外帶', radius: 600, minOpen: 10, maxWalk: 12, avoidTypes: BARISH,
     queries: {
       TW: [q('便當', 'tw', 1), q('滷味', 'tw', 1), q('鹽酥雞', 'tw', 1), q('水餃 鍋貼', 'cn', 1), q('港式 燒臘', 'cn', 1.5), q('小吃', 'tw', 1)],
       JP: [q('弁当', 'jp', 1), q('テイクアウト', 'fast', 1.5), q('おにぎり', 'jp', 1), q('惣菜', 'jp', 1)],
@@ -179,13 +187,13 @@ export function sceneOf(module: ModuleId, choices: Record<string, string | numbe
 
 /**
  * 規則再依其他選項調整：吃選甜食就不排除甜點店；歇一律排除水煙吧、購物中心（Round 7）；
- * 歇選咖啡再排除酒吧類（關鍵字會撞到店名）＋店名有シーシャ的。
+ * 歇選咖啡再排除酒吧類（關鍵字會撞到店名）、卡拉OK、美食街（Round 8）＋店名有シーシャ／美食街／居酒屋／カラオケ的。
  */
 function withChoices(module: ModuleId, choices: Record<string, string | number>, rule: SceneRule): SceneRule {
   if (module === 'eat' && choices.taste === '甜食' && rule.avoidTypes) return { ...rule, avoidTypes: rule.avoidTypes.filter((t) => !SWEET_OK.has(t)) }
   if (module === 'rest') {
     const coffee = String(choices.drink ?? '咖啡') === '咖啡'
-    return { ...rule, avoidTypes: [...(rule.avoidTypes ?? []), ...NOT_A_SEAT, ...(coffee ? BARISH : [])], ...(coffee ? { avoidNames: SHISHA_RE } : {}) }
+    return { ...rule, avoidTypes: [...(rule.avoidTypes ?? []), ...NOT_A_SEAT, ...(coffee ? [...BARISH, ...NOT_COFFEE] : [])], ...(coffee ? { avoidNames: NOT_COFFEE_RE } : {}) }
   }
   return rule
 }
