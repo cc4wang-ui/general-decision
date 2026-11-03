@@ -1,6 +1,14 @@
 // Google Routes matrix: walking travel durations, fixed appointment feasibility and leg-by-leg ETAs.
 // Fail closed: never present straight-line distances as travel time.
 export type Point={lat:number;lng:number}
+/** 目前位置（GPS）：只收有限數字、緯度 -90～90、經度 -180～180；其他一律 null（呼叫端回 400，不猜）。 */
+export function validPoint(v:unknown):Point|null{
+ if(!v||typeof v!=='object'||Array.isArray(v))return null
+ const {lat,lng}=v as Record<string,unknown>
+ if(typeof lat!=='number'||typeof lng!=='number'||!Number.isFinite(lat)||!Number.isFinite(lng))return null
+ if(lat<-90||lat>90||lng<-180||lng>180)return null
+ return {lat,lng}
+}
 export type ScheduledStop={id:string;title?:string;minutes?:number;start?:string;locked?:boolean;custom?:boolean;done?:boolean;candidate?:Point;eta?:string;departure?:string;travelMin?:number;conflict?:string}
 const clock=(m:number)=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0')
 const minute=(t:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t)?Number(t.slice(0,2))*60+Number(t.slice(3)):null
