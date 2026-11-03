@@ -88,7 +88,8 @@ try {
 
     // GET 應該回 405（第 4 節：只收 POST）。Vercel 兩種入口都可能被選中，兩種都驗。
     // 例外：api/probe 是 preview 專用的量測工具，沒有 VERCEL_ENV=preview 時必須 404（正式站不能被拿來燒額度）。
-    const expected = name === 'probe' ? 404 : 405
+    // 例外：api/place-photo 只收 GET（今日行程 PR #32）；沒帶 placeId 的 GET 必須回 400。
+    const expected = name === 'probe' ? 404 : name === 'place-photo' ? 400 : 405
     let ok = true
     for (const [label, fn] of [['具名 GET', mod.GET], ['default.fetch', mod.default.fetch]]) {
       const res = await fn(new Request(`https://example.com/api/${name}`, { method: 'GET' }))

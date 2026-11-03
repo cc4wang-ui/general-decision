@@ -77,4 +77,5 @@ async function handler(req:Request):Promise<Response>{
  }catch(e){return respond({error:'places_unavailable',message:e instanceof Error?e.message:'店家搜尋失敗'},502)}
 }
 export function POST(req:Request){return handler(req)}
+export function GET(req:Request){return handler(req)}
 export default {fetch:handler}
