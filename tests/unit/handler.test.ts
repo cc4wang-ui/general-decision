@@ -710,10 +710,11 @@ describe('Round 3：Places 呼叫規則', () => {
 describe('R3 修正 S-1：不查店的卡，模型編的 place 不准流到前端', () => {
   beforeEach(() => { vi.spyOn(console, 'info').mockImplementation(() => {}); vi.spyOn(console, 'warn').mockImplementation(() => {}) })
 
-  it('go 卡＋模型帶 place → 回應沒有 place（也沒有 mapUrl）', async () => {
+  // Round 10 X2：go 改查真地點，這條改用同樣不查店的 travel（go 的覆寫測試在 tests/unit/go.test.ts）。
+  it('travel 卡＋模型帶 place → 回應沒有 place（也沒有 mapUrl）', async () => {
     const f = routed(() => claudeOk(ORDER_JSON))
     vi.stubGlobal('fetch', f)
-    const res = await handler(post({ module: 'go', choices: { transport: '捷運', minutes: '30 分' } }))
+    const res = await handler(post({ module: 'travel', choices: { region: '日韓', days: '5 天' } }))
     expect(res.status).toBe(200)
     const body = (await res.json()) as Body
     expect(body.place).toBeUndefined()

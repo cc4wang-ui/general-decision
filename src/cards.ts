@@ -33,11 +33,12 @@ export const CARDS: ModuleCard[] = [
       { key: 'transport', label: '交通', type: 'chips', options: ['走路', '捷運', '計程車', '開車'], default: '捷運' },
       { key: 'minutes', label: '可接受', type: 'chips', options: ['15 分', '30 分', '60 分'], default: '30 分' },
     ],
-    needsPlaces: false,
+    // Round 10 X2：查真地點。交通＋可接受 → 半徑、時段 → 目的地關鍵字，都在 src/go.ts（不用 placesQuery）。
+    needsPlaces: true,
     promptHint:
-      'MVP 不查 Places，用常識加定位城市選一個真實存在、此刻合理的地點。meme.big = 地點名。' +
-      'steps 三條：怎麼去（含交通方式與時間）、到那裡做一件具體的事、回家。' +
-      '必須符合時間帶：晚上不排早市、深夜不排登山、雨天不排純戶外。單程時間不得超過使用者選的「可接受」。',
+      '地點已由班長決定（見【店已決定】），meme.big = 地點名（≤10 字，太長就用慣稱）。' +
+      'steps 三條：用使用者選的交通方式怎麼去、到那裡做一件具體的事、幾點前回家。' +
+      '交通方式只准寫使用者選的那一種；不准編路線、站名、出口、車資、車程分鐘。到那裡做的事要符合現在的時段。',
     reissueLabel: '路封了',
     stopVerdictAllowed: false,
   },

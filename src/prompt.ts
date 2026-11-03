@@ -4,7 +4,8 @@ import { CARD_BY_ID } from './cards.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
 import { bandOf, estText, priceFit, priceText } from './price.ts'
 import { sceneOf, sceneTimes, sceneTimesLine } from './scene.ts'
-import { hhmmIn, tzOf } from './tz.ts'
+import { hhmmIn, hourIn, tzOf } from './tz.ts'
+import { TRANSPORT_HOW, goTrip } from './go.ts'
 import type { Band, Country, Level, ModuleId, OrderRequest, PickResult } from './types.ts'
 
 // Round 3：PlaceCandidate 搬到 types.ts（DEV-PLAN-3 §B.1），這裡轉出口讓既有 import 不用動。
@@ -58,7 +59,7 @@ export function buildOrderPrompt(req: OrderRequest, pick: PickResult | null, cou
     `使用者的選擇：${JSON.stringify(req.choices, null, 0)}`,
     // Round 5：情境一行（口令要對得上：外帶不寫內用、聚餐寫幾道一起分…）。
     sceneOf(req.module, req.choices ?? {})?.rule.hint ?? '',
-    pick ? decidedBlock(req, pick, country) : '',
+    pick ? (req.module === 'go' ? goDecidedBlock(req, pick) : decidedBlock(req, pick, country)) : '',
     req.recentOrders.length
       ? `近 7 天口令：\n${req.recentOrders.map((r) => `・${r.at} ${r.module} ${r.big}`).join('\n')}`
       : '近 7 天沒有紀錄。',
@@ -127,6 +128,28 @@ function decidedBlock(req: OrderRequest, pick: PickResult, country: Country): st
     '禁止提到任何別家店或類別；禁止寫出「價位」以外的金額；禁止寫連結。',
     // Team Lead 設計修訂：口令卡最上面已經印了店名、步行、營業、價位，steps 再講一次就是廢話。
     '口令卡上已經印好店名、步行分鐘、營業時間、價位：steps 不要重複這些，只寫點什麼、怎麼吃、幾分鐘內吃完這類動作（「HH:MM 開」的店例外，要講幾點到）。',
+  ].filter(Boolean).join('\n')
+}
+
+/**
+ * Round 10 X2：去的【店已決定】。距離是座標算的直線距離（真數字）；車程沒有資料（Routes API 未開），
+ * 只准寫使用者選的單程上限，不准自己編分鐘、站名、路線、車資。不是走路就不給步行分鐘（src/go.ts goKeep 已拿掉）。
+ */
+function goDecidedBlock(req: OrderRequest, pick: PickResult): string {
+  const p = pick.place
+  const trip = goTrip(req.choices ?? {}, hourIn(new Date(req.now), tzOf(req.loc)))
+  const hours = p.opensAt ? `${p.opensAt} 開` : p.openUntil ? `營業到 ${p.openUntil}` : '營業中'
+  const walk = p.walkMin ? `步行 ${p.walkMin} 分　` : ''
+  const km = p.distM !== undefined ? `直線 ${(p.distM / 1000).toFixed(1)} 公里　` : ''
+  return [
+    `【店已決定】place.name=${p.name}　${walk}${km}${hours}`,
+    `使用者選的交通：${trip.transport}，單程上限 ${trip.minutes} 分（地點已照這個範圍挑好）。`,
+    `steps 第一條：${TRANSPORT_HOW[trip.transport]}。只准寫這一種交通；不准編路線、站名、出口、車資、車程分鐘，要寫時間只准寫「單程 ${trip.minutes} 分內」。`,
+    'steps 第二條：到了做一件具體的事（看展、走一圈、找位子坐下看書…），要符合現在的時段。第三條：幾點前回家。',
+    '你只負責寫口令：meme.big 就是這個地點名（≤10 字，太長用慣稱）。mode=wildcard：在 meme.top 或 meme.bot 講這是偵察任務；不要說他去過或沒去過。',
+    p.lane === 'rescue' ? '附近營業中的地點都派不出去，這次派的是便利商店：在 meme.bot 直說「附近都收了，去超商」，steps 寫怎麼去、買一杯熱的、回家。' : '',
+    '禁止提到任何別的地點；禁止寫金額；禁止寫連結。',
+    '口令卡上已經印好地點名與營業時間：steps 不要重複（「HH:MM 開」的例外，要講幾點到）。',
   ].filter(Boolean).join('\n')
 }
 

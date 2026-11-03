@@ -15,6 +15,7 @@ import { bandOf, countryOf, currencyCountry, effectiveBand, estText, priceFit, p
 import { brandKeyOf, clusterKeys } from './chains.ts'
 import { templateOrder } from './template.ts'
 import { SCENE_TEXT_KEY, sanitizeSceneText, sceneFilter, sceneOf, scenePasses, sceneWiden, viable } from './scene.ts'
+import { goKeep, goPick, goTrip } from './go.ts'
 import { hourIn, tzOf } from './tz.ts'
 import type { Band, Country, CuisineStats, Order, OrderDebug, OrderRequest, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
 
@@ -178,6 +179,8 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     }
     // Round 5（Cross 2026-11-01「返回的結果不符合我的需求」）：先看情境，決定查什麼、查多遠、挑店前排除什麼。
     const scene = sceneOf(req.module, req.choices ?? {})
+    // Round 10 X2：去的交通＋可接受 → 半徑；候選只留能當目的地、到了還開著的（src/go.ts）。
+    const goT = req.module === 'go' ? goTrip(req.choices ?? {}, hourIn(now, tz)) : null
     const first = pickLane(card, req.choices ?? {}, req.cuisine, country, rng, hourIn(now, tz), card.id === 'eat' ? req.budget : undefined, scene)
     const words = sceneWiden(scene, country)
     /** 伺服器 log 不記「其他」使用者打的字（手機上的 debug 照留）。 */
@@ -196,6 +199,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
         const est = laneEst(p.lane)
         let got = toCandidates(raw, loc, now, req.exclude ?? [], tz).map((c) => ({ ...c, lane: p.lane, ...(est !== undefined ? { estBand: est } : {}) }))
         got = withinRadius(got, p)
+        if (goT) got = goKeep(got, goT, p.lane === 'rescue')
         if (veg && p.lane !== 'rescue') got = got.filter(looksVeg) // 忌口「素」：關鍵字查詢會混進葷食店
         cands = mergeCandidates(cands, got)
         tries.push({ r: p.radius, raw: raw.length, kept: got.length })
@@ -278,6 +282,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
         { 'x-places-calls': String(placesCalled), 'x-timing': `places=${placesMs};claude=0` },
       )
     }
+    if (goT) pick = goPick(pick)
     dbg.pick = { mode: pick.mode, lane: pick.place.lane ?? first.lane, pool: pick.pool, afterFilter: pick.afterFilter, relaxed: pick.relaxed, exhausted: pick.exhausted, seed }
     // 匿名一行（R12）：不記 place_id、不記座標、不記店名。第一週拿來量價位覆蓋率（R3§4.3）。
     // 情境只記 id（「其他」不記使用者打的字）。
