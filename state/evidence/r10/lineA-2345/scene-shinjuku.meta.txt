@@ -1,0 +1,5 @@
+URL: https://general-decision-pmmu14b8h-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=shinjuku
+fetched: curl（分享連結 cookie）
+date: 2026-11-03 14:42:02 UTC（東京 23:42）
+status: 200
+x-vercel-id: iad1::iad1::48btf-1793716919138-801caf57c47b

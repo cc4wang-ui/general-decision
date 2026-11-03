@@ -62,6 +62,8 @@ const DESSERTISH = ['cake_shop', 'dessert_shop', 'dessert_restaurant', 'pastry_s
 const SWEET_OK = new Set([...DESSERTISH, 'bakery'])
 /** 喝酒的店（checker 2026-11-01：選咖啡＋談事情，「安靜 咖啡廳」撞到店名「安靜小酒館」）。選咖啡時排除。 */
 const BARISH = ['bar', 'pub', 'wine_bar', 'cocktail_bar', 'lounge_bar', 'sports_bar', 'night_club', 'bar_and_grill', 'beer_hall', 'japanese_izakaya_restaurant']
+/** 純喝酒的店（宵夜不派；居酒屋、pub、bar_and_grill 有正餐，不算）。 */
+const PURE_BARS = ['bar', 'cocktail_bar', 'wine_bar', 'lounge_bar', 'night_club', 'sports_bar']
 /** 歇不派的「不是坐下喝一杯」的店（Round 7，Cross 2026-11-02：東京深夜「咖啡廳」派到水煙吧 ×2、購物中心 ×2）。 */
 const NOT_A_SEAT = ['hookah_bar', 'shopping_mall', 'department_store']
 /** 水煙吧常把自己標成 cafe（shisha cafe and bar NAROZ，type=cafe）：選咖啡時再用店名擋一層。 */
@@ -118,7 +120,8 @@ const EAT: SceneRule[] = [
     hint: '情境：約會或想吃好一點。steps 寫點招牌、慢慢吃；時間寫 90 分鐘以上，不准催。',
   },
   {
-    id: '宵夜', radius: 1000, openNow: true, minOpen: 30,
+    // Round 10：宵夜不派純喝酒的店（2026-11-03 23:42 新宿派到 bar moon walk，type=bar）；居酒屋照留（日本宵夜的常態）。
+    id: '宵夜', radius: 1000, openNow: true, minOpen: 30, avoidTypes: PURE_BARS,
     queries: {
       TW: [q('宵夜', 'tw', 1), q('鹽酥雞', 'tw', 1), q('清粥小菜', 'tw', 1), q('滷味', 'tw', 1), q('拉麵', 'ramen', 2), q('麵店', 'noodle', 1)],
       JP: [q('ラーメン', 'ramen', 1.5), q('牛丼', 'fast', 1, BEEF), q('居酒屋', 'jp', 2.5), q('そば', 'jp', 1)],

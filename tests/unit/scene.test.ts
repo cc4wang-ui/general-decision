@@ -722,4 +722,10 @@ describe('Round 10：到店要開著、約會擋酒吧、其他的需求換日�
     expect(sceneOf('rest', { scene: '工作讀書', drink: '咖啡' })!.rule.hint).toMatch(/不准保證有/)
     expect(sceneOf('rest', { scene: SCENE_OTHER, sceneText: '有插座', drink: '咖啡' })!.rule.hint).toMatch(/到店先確認/)
   })
+  it('宵夜：純酒吧不派，居酒屋照派（日本宵夜常態）', () => {
+    const late = sceneOf('eat', { scene: '宵夜' })
+    expect(scenePasses(c('bar moon walk', { primaryType: 'bar', types: ['bar'] }), late)).toBe(false)
+    expect(scenePasses(c('鳥貴族', { primaryType: 'japanese_izakaya_restaurant' }), late)).toBe(true)
+    expect(scenePasses(c('松屋', { primaryType: 'japanese_restaurant' }), late)).toBe(true)
+  })
 })
