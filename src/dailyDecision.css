@@ -63,6 +63,7 @@
 .dd-place-meta{display:flex;flex-direction:column;gap:5px;padding:0 0 11px;border-bottom:1px dashed var(--line)}
 .dd-place-meta strong{font-size:.8125rem;color:var(--ink);font-weight:750;line-height:1.5;overflow-wrap:anywhere}
 .dd-place-meta span{font-size:.6875rem;color:var(--mute);line-height:1.5}
+.dd-place-link{font-size:.75rem;font-weight:800;color:var(--ink);text-decoration:underline;text-underline-offset:3px;align-self:flex-start;min-height:32px;display:inline-flex;align-items:center}
 .dd-place-unresolved{font-size:.75rem;background:var(--paper);color:var(--signal);border:1px solid var(--signal);padding:10px;margin-bottom:10px}
 .dd-eta{font-size:.75rem;line-height:1.5;padding:9px 0;font-weight:800;color:var(--ink);border-bottom:1px dashed var(--line)}
 .dd-description{font-size:.75rem;color:var(--mute);line-height:1.65;margin:10px 0}
