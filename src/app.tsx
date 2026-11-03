@@ -371,7 +371,9 @@ export function App() {
   /** 換一家。吃／歇要先問原因（底部選單），其他卡（去／飛）維持原樣直接換。 */
   const reissue = useCallback(() => {
     if (!card || reissued) return
-    if (card.needsPlaces) { setReasonOpen(true); return }
+    if (card.needsPlaces && isMemModule(card.id)) { setReasonOpen(true); return }
+    // Round 10：去也查真地點，但沒有到訪記憶（原因選單是吃／歇的）：直接換，這次排除剛派的地點。
+    if (order?.place?.id) excluded.current.push(order.place.id)
     setReissued(true) // 第 10 節：一次口令最多換 1 次
     void record('reissued', order, card)
     void fetchOrder(card, choices)

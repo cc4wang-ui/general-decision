@@ -4,6 +4,7 @@
 // 鐵則：只在 verified 的 lane 裡挑。新 type 沒實測過可能讓整次查詢 400（R2 風險），
 // 只有 Team Lead／Cross 跑完 `npm run probe:lanes` 回 200 才把 verified 翻成 true。
 import { betaSample, cuisineOf, type Rng } from './discovery.ts'
+import { GO_LANE_PREFIX, goPlan, goTrip, goWiden } from './go.ts'
 import { WIDEN_FACTOR } from './places.ts'
 import { priceFit } from './price.ts'
 import { SCENE_OTHER, SCENE_QUERIES, eatOtherQuery, restBase, restQuery, type Scene } from './scene.ts'
@@ -200,6 +201,7 @@ export function mealLanes(choices: Record<string, string | number>, country: Cou
  * - 情境（Round 5，src/scene.ts）：半徑照情境；吃的一般情況只在情境的關鍵字池裡挑（一個人快吃 → 便當、麵店…），
  *   不排 Nearby lane；宵夜第一次就只要營業中；「其他」→ 使用者的字＋基本詞（餐廳／甜點／素食）。
  *   甜食、吃素照原本的 lane，只換半徑。歇：情境改寫「喝什麼」的關鍵字（工作讀書 → 不限時 咖啡廳）。
+ * - 去（Round 10 X2，src/go.ts）：交通＋可接受決定半徑，時段決定目的地關鍵字（深夜只要營業中）。
  */
 export function pickLane(
   card: Pick<ModuleCard, 'id' | 'intake' | 'placesQuery'>,
@@ -234,6 +236,7 @@ export function pickLane(
   })
   const local = country === 'TW' || country === 'JP' ? country : null
 
+  if (card.id === 'go') return goPlan(goTrip(choices, hour ?? 12), country, rng)
   if (card.id !== 'eat') {
     // 目前只有 eat 用 lane；其他需要 Places 的卡照卡片設定的 type。
     return { kind: 'nearby', lane: (card.placesQuery?.includedTypes ?? ['restaurant']).join('|'), includedTypes: card.placesQuery?.includedTypes ?? ['restaurant'], radius, rank: nearbyRank() }
@@ -301,8 +304,10 @@ const GENERIC: Record<Country, string[]> = { TW: ['餐廳', '美食', '小吃'],
  * - 預算的 priceLevels 第二次保留（Round 4 實測）；只有 dropPrice（預算內一家都撈不到的後備）才拿掉。
  * - 關鍵字不是 q: 開頭的 Text Search（歇、吃的「其他」）：同一個關鍵字擴大再查一次。
  * - words（Round 5 情境）：一般餐廳的通用關鍵字換成情境自己的（朋友聚餐 → 餐廳／熱炒／火鍋）。
+ * - 去（go: 開頭，Round 10）：半徑不放大（使用者選了單程上限）、換通用關鍵字（景點／公園）、只要營業中；400 也不退回餐廳。
  */
 export function widenPlan(first: LanePlan, opts: { forceRestaurant?: boolean; country?: Country; rng?: Rng; dropPrice?: boolean; words?: string[] } = {}): LanePlan {
+  if (first.lane.startsWith(GO_LANE_PREFIX)) return goWiden(first, opts.country ?? 'TW', opts.rng)
   const radius = Math.round(first.radius * WIDEN_FACTOR)
   const country = opts.country ?? 'TW'
   // Round 4 實測（2026-11-01 內湖 09:00）：第二次不帶 priceLevels → 撈回 20 家最近的平價早餐店，

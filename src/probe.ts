@@ -4,16 +4,22 @@
 //   matrix：一個地點 × 一組情境，真 Places、真 Claude，同時打。量「有沒有給解答」「價位資料覆蓋率」「預算命中」。
 //   sim   ：一個地點 × N 天 × 每天 2 餐，記憶照前端的規則累積。Places 用真資料但同一個請求只打一次（快取），
 //           Claude 換成固定假回應（店由程式決定，Claude 不影響挑哪一家）。量「反覆推同一家」。
+//   scene／geocode：Round 5／6（見各段）。lanes：每條 lane 打一次真 Places（Round 10 X5）。go：四種交通各派一次（Round 10 X2）。
 // 回傳裡的店名只給人看報表，不寫進 repo（Google 條款：店家資料不落地，R4）。
 import { FIELD_MASK, WIDEN_FACTOR, haversineMeters } from './places.ts'
 import { geocodeLookup } from './geocode.ts'
-import { mealLanes, widenPlan, type LanePlan, type NearbyRank } from './lanes.ts'
+import {
+  LANES, QUERY_LANES, RESTAURANT_LANE, SWEET_LANE, SWEET_QUERIES, VEG_LANE, VEG_QUERIES,
+  mealLanes, pickLane, queryLaneId, rescuePlan, widenPlan, type LanePlan, type NearbyRank,
+} from './lanes.ts'
+import { TRANSPORTS, daypartOf, goLanePlans, goRadius, isGoDestination, mentionsTransport, type Daypart, type Minutes, type Transport } from './go.ts'
 import { countryOf } from './price.ts'
 import { hourIn, tzOf } from './tz.ts'
 import { handleOrder, placesLanguage, placesRequest, type OrderIo } from './orderHandler.ts'
 import { SCENE_OTHER, localizeNeed, sceneOf, sceneOptions, scenePasses } from './scene.ts'
 import { STATION_RE } from './rules.ts'
-import type { Band, ModuleId, Order, OrderDebug, OrderRequest, PlaceMemSummary } from './types.ts'
+import { CARD_BY_ID } from './cards.ts'
+import type { Band, Country, ModuleId, Order, OrderDebug, OrderRequest, PlaceMemSummary } from './types.ts'
 
 export const PROBE_LOCS: Record<string, { lat: number; lng: number; label: string; station?: string }> = {
   xinyi: { lat: 25.0408, lng: 121.565, label: '台北信義（市府）' },
@@ -42,8 +48,9 @@ export const SCENARIOS: Scenario[] = [
   { id: 'rest-bar', module: 'rest', choices: { drink: '酒吧' } },
   { id: 'rest-izakaya', module: 'rest', choices: { drink: '居酒屋' } },
   { id: 'rest-bbq', module: 'rest', choices: { drink: '熱炒燒烤' } },
-  // 不查 Places 的卡：只量 Claude 這一段會不會空手。
+  // Round 10 X2：去也查真地點（沒派到地點算失敗）。
   { id: 'go', module: 'go', choices: { transport: '捷運', minutes: '30 分' } },
+  // 不查 Places 的卡：只量 Claude 這一段會不會空手。
   { id: 'attend', module: 'attend', choices: { occasion: '飯局', stars: '4' } },
   { id: 'sleep', module: 'sleep', choices: { wake: '07:30' } },
   { id: 'reply', module: 'reply', choices: { target: '同事' } },
@@ -97,7 +104,7 @@ export async function runMatrix(locKey: string, now = new Date(), io?: OrderIo):
     const b = (await res.json().catch(() => ({}))) as Body
     const d = b.debug
     const picked = d?.places?.candidates.find((c) => c.name === b.place?.name)
-    const needsPlace = s.module === 'eat' || s.module === 'rest'
+    const needsPlace = CARD_BY_ID[s.module].needsPlaces
     return {
       id: s.id,
       status: res.status,
@@ -406,4 +413,179 @@ export async function runGeocodeProbe(opts: { fetchFn?: typeof fetch; key?: stri
   }))
   const failed = rows.filter((r) => !r.pass).map((r) => `${r.q}:${r.kind === 'ok' ? `${r.distM} m` : r.kind}`)
   return { rows, summary: { stations: rows.length, pass: rows.filter((r) => r.pass).length, failed, maxDistM: Math.max(0, ...rows.map((r) => r.distM ?? 0)), placesCalls: rows.length } }
+}
+
+// ── Round 10 X5：mode=lanes（每條 lane 用真 Places 打一次）────────────────
+// src/lanes.ts 會查的每一條 lane：Nearby 的 type lane（含 verified:false）、吃的關鍵字 lane、吃的情境關鍵字、歇的關鍵字、
+// 超商救援，加上 src/go.ts 的去 lane。請求本體跟正式查詢同一份（placesRequest），只把 fieldMask 縮成 places.id：
+// 不拿店家資料（回傳只有狀態與筆數），也是最便宜的計價。回 400 的那條要維持（或改成）verified:false；
+// verified:false 而且 200 的列在 flip，由 Team Lead／Cross 決定要不要翻成 true。
+
+export interface LaneProbeRow { lane: string; kind: 'nearby' | 'text'; query: string; status: number; raw: number; verified?: boolean; note?: string; ms: number }
+export interface LaneProbeResult {
+  loc: string
+  country: Country
+  rows: LaneProbeRow[]
+  summary: { lanes: number; ok: number; bad400: string[]; failed: string[]; empty: string[]; flip: string[]; placesCalls: number }
+}
+
+/** 這個國家要實測的所有 lane 查法。同一個 lane id 只打一次（「素食」同時在吃的關鍵字與吃素的關鍵字裡）。 */
+export function lanePlansFor(country: Country): { plan: LanePlan; verified?: boolean }[] {
+  const nearby = [...LANES.filter((l) => !l.only || l.only === country), RESTAURANT_LANE, SWEET_LANE, VEG_LANE]
+    .map((l) => ({ plan: { kind: 'nearby', lane: l.id, includedTypes: l.types, radius: 800, rank: 'POPULARITY' } as LanePlan, verified: l.verified }))
+  const local = country === 'TW' || country === 'JP' ? country : null
+  const sceneQs = local ? sceneOptions('eat').flatMap((id) => sceneOf('eat', { scene: id })?.rule.queries?.[local] ?? []) : []
+  const words = local ? [...QUERY_LANES[local], ...SWEET_QUERIES[local], ...VEG_QUERIES[local], ...sceneQs].map((l) => l.q) : []
+  const eatText = words.map((q) => ({ plan: { kind: 'text', lane: queryLaneId(q), textQuery: q, radius: 800, rank: 'RELEVANCE', restrict: true } as LanePlan }))
+  // 歇：每個「喝什麼」照正式的 pickLane 組（日本會換成日文關鍵字）。
+  const restText = Object.keys(CARD_BY_ID.rest.placesQuery?.textQuery?.byOption ?? {})
+    .map((drink) => ({ plan: pickLane(CARD_BY_ID.rest, { drink }, undefined, country, () => 0.9) }))
+  const go = goLanePlans(country).map((plan) => ({ plan }))
+  const seen = new Set<string>()
+  return [...nearby, ...eatText, ...restText, ...go, { plan: rescuePlan(country) }].filter(({ plan }) => {
+    if (seen.has(plan.lane)) return false
+    seen.add(plan.lane)
+    return true
+  })
+}
+
+/** 一個地點把所有 lane 各打一次（同時最多 6 個）。fetchFn／key 只給測試換。 */
+export async function runLaneProbe(locKey: string, opts: { fetchFn?: typeof fetch; key?: string } = {}): Promise<LaneProbeResult> {
+  const loc = PROBE_LOCS[locKey]
+  if (!loc) throw new Error(`未知地點 ${locKey}`)
+  const key = opts.key ?? process.env.GOOGLE_PLACES_KEY
+  if (!key) throw new Error('GOOGLE_PLACES_KEY 未設定')
+  const fetchFn = opts.fetchFn ?? fetch
+  const country = countryOf(loc)
+  const lang = placesLanguage(country)
+  const plans = lanePlansFor(country)
+  const one = async ({ plan, verified }: { plan: LanePlan; verified?: boolean }): Promise<LaneProbeRow> => {
+    const { url, body } = placesRequest(loc, plan, lang)
+    const t0 = Date.now()
+    let status = 0
+    let raw = -1
+    let note = ''
+    try {
+      const res = await fetchFn(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.id' },
+        body,
+        signal: AbortSignal.timeout(10_000),
+      })
+      status = res.status
+      if (res.ok) raw = (((await res.json()) as { places?: unknown[] }).places ?? []).length
+      else note = (await res.text()).replace(/\s+/g, ' ').slice(0, 160)
+    } catch (e) {
+      note = String((e as Error)?.message ?? e)
+    }
+    return {
+      lane: plan.lane, kind: plan.kind, query: plan.kind === 'text' ? plan.textQuery : plan.includedTypes.join('|'), status, raw,
+      ...(verified !== undefined ? { verified } : {}), ...(note ? { note } : {}), ms: Date.now() - t0,
+    }
+  }
+  const rows: LaneProbeRow[] = new Array(plans.length)
+  let next = 0
+  const worker = async () => { while (next < plans.length) { const i = next++; rows[i] = await one(plans[i]!) } }
+  await Promise.all(Array.from({ length: Math.min(6, plans.length) }, worker))
+  return {
+    loc: loc.label,
+    country,
+    rows,
+    summary: {
+      lanes: rows.length,
+      ok: rows.filter((r) => r.status === 200).length,
+      bad400: rows.filter((r) => r.status === 400).map((r) => r.lane),
+      failed: rows.filter((r) => r.status !== 200 && r.status !== 400).map((r) => `${r.lane}:${r.status || r.note}`),
+      empty: rows.filter((r) => r.status === 200 && r.raw === 0).map((r) => r.lane),
+      flip: rows.filter((r) => r.verified === false && r.status === 200).map((r) => r.lane),
+      placesCalls: rows.length,
+    },
+  }
+}
+
+// ── Round 10 X2：mode=go（四種交通各派一次）────────────────────────────
+// 一個地點 × 走路／捷運／計程車／開車，同一個「可接受」、同一個種子（關鍵字與排序一樣，只差交通），走正式 handleOrder：
+// 真 Places、真 Claude。回派到的地點、type、距離、半徑、查詢指紋。pass＝有派到、不是超商救援、距離 ≤ 半徑、
+// 是能去的地方（不是吃喝／車站）、深夜沒有還沒開的、口令寫到選的交通、搭車的不給步行分鐘。
+
+export interface GoProbeRow {
+  transport: Transport
+  minutes: Minutes
+  status: number
+  ok: boolean
+  pass: boolean
+  why?: string
+  error?: string
+  picked?: string
+  type?: string
+  distM?: number
+  radiusM: number
+  walkMin?: number
+  opensAt?: string
+  closeIn?: number
+  /** 第一次查詢的指紋：關鍵字＋排序＋半徑。四種交通要互不相同。 */
+  fingerprint?: string
+  how?: string
+  steps?: string[]
+  ms: number
+}
+
+export async function runGoProbe(
+  locKey: string,
+  opts: { minutes?: Minutes; now?: Date; io?: OrderIo; seed?: number } = {},
+): Promise<{ loc: string; localHour: number; part: Daypart; minutes: Minutes; seed: number; rows: GoProbeRow[]; summary: Record<string, unknown> }> {
+  const loc = PROBE_LOCS[locKey]
+  if (!loc) throw new Error(`未知地點 ${locKey}`)
+  const minutes = opts.minutes ?? 30
+  const now = opts.now ?? new Date()
+  const seed = opts.seed ?? ((Math.random() * 2 ** 32) >>> 0)
+  const localHour = hourIn(now, tzOf(loc))
+  const part = daypartOf(localHour)
+  const rows = await Promise.all(TRANSPORTS.map(async (transport): Promise<GoProbeRow> => {
+    const t = Date.now()
+    const res = await handleOrder(post({
+      module: 'go', level: 1, choices: { transport, minutes: `${minutes} 分` }, loc: { lat: loc.lat, lng: loc.lng },
+      now: now.toISOString(), recentOrders: [], seed,
+    }), opts.io)
+    const b = (await res.json().catch(() => ({}))) as Body
+    const d = b.debug
+    const c = d?.places?.candidates.find((x) => x.name === b.place?.name)
+    const radiusM = goRadius(transport, minutes)
+    const first = d?.places?.how.split(' → ')[0]
+    const fingerprint = first !== undefined && d?.places?.tries[0] ? `${first} r=${d.places.tries[0].r}` : undefined
+    const fails: string[] = []
+    if (!b.place?.id) fails.push('沒派地點')
+    if (d?.rescue) fails.push('超商救援')
+    if (c && !d?.rescue) {
+      if (c.distM !== undefined && c.distM > radiusM) fails.push(`超出半徑（${c.distM} m > ${radiusM} m）`)
+      if (!isGoDestination(c.type)) fails.push(`不是能去的地方（${c.type}）`)
+      if (part === 'late' && c.opensAt) fails.push(`深夜派到還沒開的（${c.opensAt} 開）`)
+    }
+    if (b.place?.id && !mentionsTransport(b.steps ?? [], transport)) fails.push('口令沒寫到選的交通')
+    if (transport !== '走路' && b.place?.walkMin !== undefined) fails.push('搭車卻給步行分鐘')
+    return {
+      transport, minutes, status: res.status, ok: res.status === 200 && !!b.place?.id,
+      pass: fails.length === 0, ...(fails.length ? { why: fails.join('；') } : {}),
+      ...(b.error ? { error: b.error } : {}),
+      ...(b.place ? { picked: b.place.name } : {}),
+      ...(c ? { type: c.type, ...(c.distM !== undefined ? { distM: c.distM } : {}), ...(c.opensAt ? { opensAt: c.opensAt } : {}), ...(c.closeIn !== undefined ? { closeIn: c.closeIn } : {}) } : {}),
+      radiusM,
+      ...(b.place?.walkMin !== undefined ? { walkMin: b.place.walkMin } : {}),
+      ...(fingerprint ? { fingerprint } : {}),
+      ...(d?.places ? { how: d.places.how } : {}),
+      ...(b.steps ? { steps: b.steps } : {}),
+      ms: Date.now() - t,
+    }
+  }))
+  return {
+    loc: loc.label, localHour, part, minutes, seed, rows,
+    summary: {
+      transports: rows.length,
+      ok: rows.filter((r) => r.ok).length,
+      pass: rows.filter((r) => r.pass).length,
+      distinctFingerprints: new Set(rows.map((r) => r.fingerprint).filter(Boolean)).size,
+      failed: rows.filter((r) => !r.pass).map((r) => `${r.transport}:${r.why ?? r.error ?? r.status}`),
+      maxMs: Math.max(...rows.map((r) => r.ms)),
+    },
+  }
 }

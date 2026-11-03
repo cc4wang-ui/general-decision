@@ -55,7 +55,10 @@ test('④ 離線 → 離線訊息，且日記仍可開', async ({ page, context 
   await context.setOffline(false)
 })
 
-test('429 → 一樣是班長在開會', async ({ page }) => {
+test('429 → 一樣是班長在開會', async ({ page, context }) => {
+  // Round 10 X2：去也查真地點，要有定位才會打 API（不然停在「開定位」）。
+  await context.grantPermissions(['geolocation'])
+  await context.setGeolocation({ latitude: 25.033, longitude: 121.5654 })
   await mockOrderFailure(page, 429, '{"error":"rate_limited","message":"班長在開會。30 秒後再報告。"}')
   await page.goto('/')
   await page.locator('[data-card="go"]').click()

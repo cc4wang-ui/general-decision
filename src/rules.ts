@@ -6,6 +6,7 @@ import { localizeFields, localizeText, stripUrls } from './locale.ts'
 import { NEUTRAL_LOG, NEUTRAL_STEP, hasWrongCount, lineSalt, modeLine, neutralBot, satisfiesMode } from './modeLines.ts'
 import { amountsIn, priceText } from './price.ts'
 import { fixSceneClock, sceneOf, sceneTimes } from './scene.ts'
+import { goTransportSteps, transportOf } from './go.ts'
 import { hhmmIn } from './tz.ts'
 import type { Country, EnforceCtx, Level, ModuleId, Order, PickResult } from './types.ts'
 
@@ -78,8 +79,17 @@ export function enforceRules(
   if (pick) order = enforceMode(order, level, pick, now)
   order = fixClocks(order)
   if (pick) order = fixSceneClocks(order, module, choices, pick, now, ctx?.country ?? 'TW')
+  if (pick && module === 'go') order = goTransport(order, choices)
   if (pick && ctx?.origin) order = stationStart(order, ctx.origin, pick.place.walkMin)
   return localizeOrder(order, ctx?.country ?? 'TW')
+}
+
+/** Round 10 X2：去的口令一定寫到使用者選的交通（只靠 prompt 不算保證；src/go.ts goTransportSteps）。 */
+function goTransport(order: Order, choices: Record<string, string | number>): Order {
+  const steps = goTransportSteps(order.steps, transportOf(choices))
+  if (steps === order.steps) return order
+  console.warn(`[rules] 去的口令沒寫到選的交通（${transportOf(choices)}），已補上`)
+  return { ...order, steps }
 }
 
 /**

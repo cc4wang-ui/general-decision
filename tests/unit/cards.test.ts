@@ -11,14 +11,16 @@ describe('cards（第 13.1 節）', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('needsPlaces 只在 eat / rest 為 true', () => {
+  // Round 10 X2：去也查真地點（交通＋可接受 → 半徑，src/go.ts）。
+  it('needsPlaces 只在 eat / go / rest 為 true', () => {
     const withPlaces = CARDS.filter((c) => c.needsPlaces).map((c) => c.id).sort()
-    expect(withPlaces).toEqual(['eat', 'rest'])
+    expect(withPlaces).toEqual(['eat', 'go', 'rest'])
   })
 
   // 2026-09-18 改：rest 原本只查 cafe type、半徑 500m，正式站 [places] 常常 raw=0；
   // 現在 rest 帶 intake「喝什麼」，走 Text Search 中文關鍵字，半徑與 eat 同為 800m（步行 10 分）。
-  it('needsPlaces 的卡都有 placesQuery，且半徑符合第 8 節（eat 800 / rest 800）', () => {
+  it('eat / rest 有 placesQuery，且半徑符合第 8 節（eat 800 / rest 800）；go 的半徑表在 src/go.ts', () => {
+    expect(CARD_BY_ID.go.placesQuery).toBeUndefined()
     expect(CARD_BY_ID.eat.placesQuery?.includedTypes).toEqual(['restaurant'])
     expect(CARD_BY_ID.eat.placesQuery?.radiusByTransport?.default).toBe(800)
     expect(CARD_BY_ID.rest.placesQuery?.radiusByTransport?.default).toBe(800)

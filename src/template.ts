@@ -5,6 +5,7 @@
 import { budgetBot } from './prompt.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
 import { sceneOf } from './scene.ts'
+import { TRANSPORT_HEAD, minutesOf, transportOf } from './go.ts'
 import { hhmmIn, type Tz } from './tz.ts'
 import type { Order, OrderRequest, PickResult } from './types.ts'
 
@@ -47,8 +48,13 @@ export function templateOrder(req: Pick<OrderRequest, 'module' | 'choices' | 're
       if (scene === '談事情') return base(name, ['找角落的位子。', '先點好，再開始談。', `${at(90)} 前談完。`])
       if (scene === '等人') return base(name, ['點一杯。', '坐 20 分鐘，不滑手機。', `${at(20)} 前起身。`])
       return base(name, ['點一杯熱的。', '坐 30 分鐘。', '手機面朝下。'])
-    case 'go':
-      return base('附近公園', [`${String(req.choices.transport ?? '走路')}出門，單程不超過 15 分鐘。`, '到了走一圈，不看手機。', `${at(60)} 前回家。`])
+    case 'go': {
+      // Round 10 X2：地點由伺服器查（pick），模板不再寫死「附近公園」。單程只講使用者選的上限，不編車程。
+      const how = TRANSPORT_HEAD[transportOf(req.choices ?? {})]
+      const m = minutesOf(req.choices ?? {})
+      if (rescue) return base(name, [`${how}單程 ${m} 分內。`, '買一杯熱的。', `${at(m * 2 + 15)} 前回家。`])
+      return base(name || '出門走一圈', [`${how}單程 ${m} 分內。`, '到了走一圈，手機收起來。', `${at(m * 2 + 60)} 前回家。`])
+    }
     case 'attend': {
       const v = attendVerdict(Number(req.choices.stars ?? 5), String(req.choices.occasion ?? ''))
       if (v === 'stop') return base('不去。', ['傳這句：「這次不過去了，祝順利，改天約。」'], 'stop')
