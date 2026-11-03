@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDaily, replanDaily, type DailyState } from '../../src/dailyDecision.tsx'
+import { buildDaily, replanDaily, shuffleTask, addFixedTask, type DailyState } from '../../src/dailyDecision.tsx'
 
 const state = (): DailyState => ({ day:'2026-11-03', area:'澀谷', currentPlace:'宮下公園', mode:'creative', tasks:[], notes:[], avoid:[] })
 
@@ -20,4 +20,28 @@ describe('Daily Decision replan',()=>{
     const result=replanDaily({...state(),avoid:['shopping']})
     expect(result.tasks.some(t=>t.id==='shopping')).toBe(false)
   })
+})
+
+describe('Daily itinerary controls',()=>{
+ it('shuffles only one stop and retains another stop',()=>{
+  const initial={...state(),tasks:buildDaily(state())}
+  const changed=shuffleTask(initial,'meal')
+  expect(changed.tasks.find(t=>t.id==='meal')?.title).not.toBe(initial.tasks.find(t=>t.id==='meal')?.title)
+  expect(changed.tasks.find(t=>t.id==='gym')).toEqual(initial.tasks.find(t=>t.id==='gym'))
+ })
+ it('preserves user-defined place after replanning',()=>{
+  const initial={...state(),tasks:buildDaily(state()).map(t=>t.id==='coffee'?{...t,place:'代官山'}:t)}
+  expect(replanDaily(initial).tasks.find(t=>t.id==='coffee')?.place).toBe('代官山')
+ })
+ it('keeps fixed existing commitments across replan and shuffle',()=>{
+  const withFixed=addFixedTask(state(),'與朋友見面','吉祥寺','15:00',60)
+  const fixed=withFixed.tasks[0]
+  expect(fixed.locked).toBe(true)
+  const result=replanDaily(withFixed)
+  expect(result.tasks.find(t=>t.id===fixed.id)).toEqual(fixed)
+  expect(shuffleTask(result,fixed.id).tasks.find(t=>t.id===fixed.id)).toEqual(fixed)
+ })
+ it('rejects incomplete fixed commitments',()=>{
+  expect(addFixedTask(state(),'','吉祥寺','15:00',60).tasks).toHaveLength(0)
+ })
 })
