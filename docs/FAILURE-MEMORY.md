@@ -16,8 +16,15 @@
 | 2026-11-03 | Shuffle may not preserve all user choices | Client replanning and server selection have separate state paths; insufficient regression coverage | Test custom/fixed/done/selected place retention with one-stop shuffle | **OPEN P0** |
 | 2026-11-03 | Appointment planning may be suboptimal | Greedy walking scheduler, not time-window optimization; opening hours not considered at ETA | Test multi-appointment constraints and opening windows, label limitations | **OPEN P0** |
 
+
+| 2026-11-03 | Daily UI radically differed from the main App despite being called responsive | Daily created a second sage-green editorial theme and a nested `<main>` under the host `main[data-level]` 440px container, causing conflicting global layout rules | PR #32 deletes independent palette/layout overrides; inherits exact host 8-bit tokens, square corners, hard shadow, and width; nested main changed to div | Source fix; device screenshots pending |
+| 2026-11-03 | Itinerary lacked venue images and one-tap navigation | Cards showed text and Google Maps *search* only; no images or direct routing target | PR #32: Places photos via `api/place-photo.ts`, short-lived URI and author attribution, explicit missing-photo UI, `mapsNavigationUrl` with destination_place_id + walking navigation | **Preview Google photo API 3/3 HTTP 200**; browser UX pending |
+| 2026-11-03 | Real route API test revealed Routes 403 | Preview actual Google Text Search and Place Photo calls succeeded, but Routes ComputeRouteMatrix returned HTTP 403 | Keep venue-level navigation and honest fallback, never fabricate ETAs. Enable Google Routes for existing GCP key/billing/restrictions and rerun smoke | **OPEN P0** |
+| 2026-11-03 | External temporary QA function imported sibling `api/daily-route.ts` and returned 500 | Vercel lambda did not package sibling `api/*.ts`; `ERR_MODULE_NOT_FOUND` in preview runtime log | Temporary smoke was moved inside the same route handler to exercise real POST, then removed before release | Fixed; no QA endpoint in release |
+| 2026-11-03 | Per-stop Shuffle risked losing other chosen stops | Separate client/server state paths were not tested end-to-end | Real preview internal-POST smoke: cafe place ID changed, meal and fixed PARCO place IDs unchanged | Verified server-level PASS; UI E2E pending |
+
 ## Mandatory release gates
-1. Confirm env names and Google APIs without printing secret values.
+1. Confirm env names and each Google API separately (Text Search / Details / Photos / Routes) without printing secret values.
 2. Run typecheck, unit tests, build, and API bundle check; record commands, exit codes and commit SHA.
 3. Smoke POST real `/api/daily-route` on production with a geocodable start, named stops, a fixed appointment and one-stop Shuffle; verify response fields and failure behavior.
 4. Run responsive iPhone Safari/WebKit, tablet and desktop visual/interaction checks; record screenshots or a precise blocker.
