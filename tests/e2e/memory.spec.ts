@@ -67,6 +67,9 @@ test('「店關了」只擋 24 小時、不動細類；「今天不想吃這類�
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   await page.getByTestId('reissue').click()
   await page.getByTestId('reason-kind').click()
+  // 換的那一道跟原本同樣回 SECOND_ORDER，畫面看不出差別；cmd 本來就在畫面上，等它可見不會等到請求。
+  // 要等第 4 個請求真的送出（reissueWith 先寫 IndexedDB 才 fetch），才讀 sent.at(-1)。
+  await expect.poll(() => sent.length).toBe(4)
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   const last = sent.at(-1)!
   expect(last.rejectedCuisines).toEqual(['noodle']) // 被換掉的那一道的細類
