@@ -252,7 +252,8 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     const reachable = cands.filter(viable)
     pick = choose(req.budget, sf.kept) ?? (sf.kept.length < reachable.length ? choose(req.budget, reachable) : null)
     if (scene) dbg.scene = { id: scene.id, ...(scene.text ? { text: scene.text } : {}), kept: sf.kept.length, total: cands.length, relaxed: sf.relaxed || (!!pick && !sf.kept.some((k) => k.id === pick!.place.id)) }
-    if (!pick && !allFailed()) {
+    // Round 10：「去」不派超商——超商不是去處，而且固定 3 km 會超過使用者選的單程時間。找不到就說實話（下面 no_places）。
+    if (!pick && !allFailed() && !goT) {
       // 第三次（救援）：附近營業中的都派不出去 → 營業中的超商。預算不適用（超商就是超商），口令會講清楚（prompt rescue 行）。
       dbg.rescue = true
       cands = []
@@ -277,7 +278,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       dbg.error = 'no_places'
       dbg.ms = { places: placesMs, claude: 0, total: Date.now() - t0 }
       return json(
-        { error: 'no_places', message: '方圓 3 公里內查不到營業中的店，連超商都沒有。換個地方再報告。', debug: dbg },
+        { error: 'no_places', message: goT ? '你選的交通和時間內，查不到還開著的去處。換交通方式或拉長時間再報告。' : '方圓 3 公里內查不到營業中的店，連超商都沒有。換個地方再報告。', debug: dbg },
         502,
         { 'x-places-calls': String(placesCalled), 'x-timing': `places=${placesMs};claude=0` },
       )

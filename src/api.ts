@@ -134,16 +134,19 @@ async function post<T>(path: string, body: unknown): Promise<{ data: T; res: Res
   }
   if (!res.ok) {
     let code = ''
+    let serverLine = ''
     let debug: OrderDebug | undefined
     try {
-      const body = (await res.json()) as { error?: string; debug?: OrderDebug }
+      const body = (await res.json()) as { error?: string; message?: unknown; debug?: OrderDebug }
       code = String(body.error ?? '')
+      // Round 10：no_places 的句子由伺服器依卡片決定（「去」不是「連超商都沒有」）。只收短字串。
+      if (typeof body.message === 'string' && body.message.length <= 80) serverLine = body.message
       debug = body.debug
     } catch { /* 沒 body 就看狀態碼 */ }
     const kind: ApiErrorKind =
       code === 'no_location' || code === 'no_places' || code === 'places_down' || code === 'not_found' ? code
       : res.status === 429 ? 'rate_limited' : res.status === 400 ? 'bad_request' : 'upstream'
-    throw new ApiError(kind, ERROR_TEXT[kind].line, debug)
+    throw new ApiError(kind, kind === 'no_places' && serverLine ? serverLine : ERROR_TEXT[kind].line, debug)
   }
   try {
     return { data: (await res.json()) as T, res }

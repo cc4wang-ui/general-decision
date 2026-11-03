@@ -918,7 +918,7 @@ function Cmd({ card, level, order, canReissue, geoDenied, onDone, onReissue, onS
         top={order.meme.top} big={order.meme.big} bot={order.meme.bot}
         level={level} mood="bark"
       />
-      <StepsCard steps={order.steps} place={order.place} />
+      <StepsCard steps={order.steps} place={order.place && card.id === 'go' ? { ...order.place, noPrice: true } : order.place} />
       {/* C3（App Store 1.2）：檢舉不當口令。mailto 就夠，不需要後端；極小文字，不是第二個動作。 */}
       <p className="report"><a href={reportHref(order, level)} target="_blank" rel="noopener noreferrer" data-testid="report-link">回報這道口令</a></p>
       <div className="row">

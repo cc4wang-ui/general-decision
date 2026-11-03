@@ -253,18 +253,25 @@ describe('/api/order：去卡', () => {
     expect(b.steps[0]).toMatch(/^搭電車過去，/)
   })
 
-  it('附近只有吃喝的店 → 第二次通用關鍵字 → 超商救援（不是空手、不是餐廳）', async () => {
+  it('附近只有吃喝的店 → 第二次通用關鍵字 → 不派超商、不派餐廳，說實話（no_places）', async () => {
+    // Round 10：超商不是去處，而且救援固定 3 km 會超過使用者選的單程時間（B 線回報）。
     const store: RawPlace = { id: 's7', displayName: { text: '7-ELEVEN 測試門市' }, location: near(0), currentOpeningHours: { openNow: true }, primaryType: 'convenience_store', rating: 4, userRatingCount: 50 }
+    const bodies: string[] = []
     const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       if (String(url).includes('anthropic')) return new Response(JSON.stringify({ content: [{ type: 'text', text: MODEL }] }), { status: 200 })
+      bodies.push(String(init?.body))
       const rescue = String(init?.body).includes('便利商店')
       return new Response(JSON.stringify({ places: rescue ? [store] : DECOYS.slice(0, 2) }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
-    const b = (await (await handler(goPost({ choices: choices('計程車', 15), seed: 3 }))).json()) as Body
-    expect(b.place?.id).toBe('s7')
-    expect(b.debug.rescue).toBe(true)
-    expect(b.debug.places?.tries.map((t) => t.r)).toEqual([3000, 3000, 3000])
+    const res = await handler(goPost({ choices: choices('計程車', 15), seed: 3 }))
+    expect(res.status).toBe(502)
+    const b = (await res.json()) as Body & { error: string; message: string }
+    expect(b.error).toBe('no_places')
+    expect(b.message).toMatch(/交通和時間內/)
+    expect(b.place).toBeUndefined()
+    expect(bodies.some((x) => x.includes('便利商店'))).toBe(false)
+    expect(b.debug.places?.tries.map((t) => t.r)).toEqual([3000, 3000])
   })
 })
 

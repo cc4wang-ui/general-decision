@@ -54,6 +54,8 @@ export interface PlaceMetaInput {
   openUntil?: string
   opensAt?: string
   priceText?: string
+  /** Round 10：「去」的目的地（公園、美術館…）沒有價位可言，不寫「價位未知」。 */
+  noPrice?: boolean
   /** Round 3：伺服器算的選店理由，畫成印章（B1：讓發掘被看見）。 */
   mode?: 'new' | 'revisit' | 'wildcard'
   visits?: number
@@ -78,7 +80,8 @@ export function formatPlaceMeta(p: PlaceMetaInput): string {
   if (typeof p.walkMin === 'number') bits.push(`步行 ${p.walkMin} 分`)
   if (p.opensAt) bits.push(`${p.opensAt} 開`)
   else if (p.openUntil) bits.push(`營業到 ${p.openUntil}`)
-  bits.push(p.priceText ?? '價位未知')
+  if (p.priceText) bits.push(p.priceText)
+  else if (!p.noPrice) bits.push('價位未知')
   return bits.join(' · ')
 }
 
