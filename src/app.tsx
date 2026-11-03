@@ -1,10 +1,12 @@
 // 單頁狀態機 home→intake→cmd→(log|stand)；diary；weekly（第 4 節）。
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DailyDecision } from './dailyDecision.tsx'
 import { CARD_BY_ID, MAJOR_IDS, MINOR_IDS, MODULE_BARKS, SCENE_BARKS } from './cards.ts'
 import { OFFICER_BY_LEVEL } from './officers.ts'
 import { Avatar } from './avatar.tsx'
 import { InsigniaMark } from './insignia.tsx'
+import { computeStreak, insigniaOf, type StreakResult } from './streak.ts'
+import { tzOf } from './tz.ts'
 import { MemeCard, StepsCard } from './meme.tsx'
 import {
   ApiError, ERROR_TEXT, GEO_DENIED_LINE, GEO_DOUBT_LINE, geoDoubt, getLocation, requestGeocode, requestOrder, requestWeekly, type GeoDoubt, type GeoReason,
@@ -92,6 +94,12 @@ export function App() {
   // ── Round 3 ──
   const [novelty, setNovelty] = useState<Novelty>(loadNovelty)
   const [country, setCountry] = useState<Country>(loadCountry)
+  // 連勝由日記推導；回首頁（screen 變）時重算，跨午夜也跟著換。
+  const streak = useMemo(
+    () => computeStreak(entries, new Date(), country === 'JP' ? 'Asia/Tokyo' : tzOf(undefined)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, country, screen],
+  )
   const [budgets, setBudgets] = useState<Record<'TW' | 'JP', Band[]>>(() => ({ TW: loadBudget('TW'), JP: loadBudget('JP') }))
   /** 這次 intake 解析到的位置——只活在記憶體，用來判斷午餐時段（當地時間）；不存。 */
   const [geoLoc, setGeoLoc] = useState<Loc | undefined>(undefined)
@@ -485,7 +493,7 @@ export function App() {
       <main data-level={level}>
         {screen === 'home' && (
           <Home
-            level={level} novelty={novelty} onCycle={cycleOfficer} onPick={openIntake} onNovelty={cycleNovelty}
+            level={level} novelty={novelty} onCycle={cycleOfficer} onPick={openIntake} onNovelty={cycleNovelty} streak={streak}
             onDaily={() => setScreen('daily')} onDiary={() => setScreen('diary')} onDebug={() => setScreen('debug')} onPrivacy={() => setScreen('privacy')}
           />
         )}
@@ -532,7 +540,7 @@ export function App() {
         {screen === 'stand' && <Stand level={level} onDone={goHome} />}
         {screen === 'diary' && (
           <Diary
-            level={level} entries={entries} weeklyFailed={weeklyFailed} discovery={discovery} onBack={goHome}
+            level={level} entries={entries} weeklyFailed={weeklyFailed} discovery={discovery} streak={streak} onBack={goHome}
             onWeekly={() => { void loadWeekly(true); setScreen('weekly') }}
           />
         )}
@@ -635,15 +643,22 @@ function OfficerPlate({ level, mood, onCycle, onLongPress, meta, tap }: {
   )
 }
 
-function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, onNovelty, onPrivacy, onDaily }: {
-  level: Level; novelty?: Novelty; onCycle: () => void; onPick: (id: ModuleId) => void
+function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, onNovelty, onPrivacy, onDaily, streak }: {
+  streak?: StreakResult; level: Level; novelty?: Novelty; onCycle: () => void; onPick: (id: ModuleId) => void
   onDiary: () => void; onDebug: () => void; onNovelty?: () => void; onPrivacy?: () => void; onDaily?: () => void
 }) {
   const o = OFFICER_BY_LEVEL[level]
+  const freezeNote = useFreezeNotice(streak?.usedYesterday ?? false)
   return (
     <section className="screen" data-screen="home">
       <OfficerPlate level={level} mood="idle" onCycle={onCycle} onLongPress={onDebug} meta="決斷連 · 大事不受理" tap />
       <div className="topnav">
+        {streak && streak.streak > 0 && (
+          <span className="streak" data-testid="streak-chip" style={{ marginRight: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '.75rem', fontWeight: 700 }}>
+            {streak.milestone && <span className="rank"><InsigniaMark insignia={insigniaOf(streak.milestone)} title={streak.milestone.rank} /></span>}
+            連勝 {streak.streak} 天{streak.freezes > 0 && ` · 假單 ${streak.freezes}`}
+          </span>
+        )}
         {onNovelty && (
           <button
             className="nov" data-testid="novelty" onClick={onNovelty}
@@ -673,6 +688,7 @@ function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, 
         ))}
       </div>
       <p className="hint">大事不受理。班長只管小事，大事你自己去找連長。</p>
+      {freezeNote && <p className="hint" role="status" data-testid="freeze-note">昨天用了一張公差假單，連勝保住了。今天自己出勤。</p>}
       {onPrivacy && <button className="linkbtn" data-testid="privacy-link" onClick={onPrivacy}>隱私</button>}
     </section>
   )
@@ -1037,7 +1053,38 @@ function DiaryRow({ e, onLongPress }: { e: DiaryEntry; onLongPress?: (e: DiaryEn
   )
 }
 
-function Diary({ level, entries, weeklyFailed, discovery, onBack, onWeekly }: {
+const FREEZE_ACK_KEY = 'decide.streak.ack'
+
+/** 「昨天用了假單」只提示一次：顯示後把當天記進 localStorage；讀寫失敗（無痕）就照樣顯示。 */
+function useFreezeNotice(usedYesterday: boolean): boolean {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    if (!usedYesterday) return
+    const stamp = new Date().toDateString()
+    let seen = false
+    try { seen = localStorage.getItem(FREEZE_ACK_KEY) === stamp } catch { /* 忽略 */ }
+    if (seen) return
+    setShow(true)
+    try { localStorage.setItem(FREEZE_ACK_KEY, stamp) } catch { /* 忽略 */ }
+  }, [usedYesterday])
+  return show
+}
+
+function StreakCard({ streak }: { streak: StreakResult }) {
+  const m = streak.milestone
+  return (
+    <div className="notice" data-testid="streak-card">
+      <b>出勤連勝 {streak.streak} 天</b> · 公差假單 {streak.freezes}/2
+      {m && <div className="rank"><InsigniaMark insignia={insigniaOf(m)} title={m.rank} />{m.rank}　{m.line}</div>}
+      <small style={{ display: 'block', fontWeight: 400 }}>
+        {streak.nextIn !== null ? `再 ${streak.nextIn} 天升階。` : '已到頂。'}每連勝 7 天發 1 張假單，漏一天自動頂上。
+      </small>
+    </div>
+  )
+}
+
+function Diary({ level, entries, weeklyFailed, discovery, streak, onBack, onWeekly }: {
+  streak?: StreakResult
   level: Level; entries: DiaryEntry[]; weeklyFailed: boolean; discovery?: { newPlaces: number; revisits: number }
   onBack: () => void; onWeekly: () => void
 }) {
@@ -1056,6 +1103,7 @@ function Diary({ level, entries, weeklyFailed, discovery, onBack, onWeekly }: {
         <div className="stat"><b data-testid="stat-rate">{s.complianceRate}%</b><span>服從率</span></div>
         <div className="stat"><b data-testid="stat-punish">{s.punishments}</b><span>次罰則</span></div>
       </div>
+      {streak && <StreakCard streak={streak} />}
       {discovery && (
         <div className="stats two" data-testid="stats-discovery">
           <div className="stat"><b data-testid="stat-new">{discovery.newPlaces}</b><span>本週新占領</span></div>
