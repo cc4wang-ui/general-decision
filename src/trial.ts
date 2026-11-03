@@ -7,7 +7,28 @@
  *
  * 純函式 + localStorage，不依賴 React，可單獨測。localStorage 在無痕模式會丟例外，全部包 try。
  */
+import type { GeoDoubt, GeoResult } from './api.ts'
+import type { MemFile } from './placeMem.ts'
 import type { Band, DiaryEntry, Level, ModuleId, OrderDebug, PickMode, ReissueReason } from './types.ts'
+
+/** N6（Round 10）：問了「你在車上？」之後選什麼——就用目前位置／報下車的站／關掉沒選。 */
+export type GeoPick = 'current' | 'station' | 'cancel'
+
+/**
+ * N6（Round 10）：這道口令用了 GPS 時，定位有多舊、多粗，以及有沒有問「你在車上？」。
+ * 用來校正 60 秒／300 公尺兩個門檻（src/api.ts geoDoubt）。只有真的拿 GPS 座標去派的那幾道才有；
+ * 手動報站、不需要定位的卡、Round 10 以前的舊紀錄都沒有這欄。
+ */
+export interface TrialGeo {
+  /** 有沒有問：太舊 stale／太粗 coarse；沒問是 null。 */
+  ask: GeoDoubt | null
+  /** 問了之後選什麼；沒問就沒有。 */
+  pick?: GeoPick
+  /** 定位誤差（公尺）；瀏覽器沒給就沒有。 */
+  acc?: number
+  /** 送出時這個定位已經多舊（秒）；瀏覽器沒給就沒有。 */
+  age?: number
+}
 
 export interface TrialEntry {
   at: string // ISO
@@ -34,6 +55,8 @@ export interface TrialEntry {
   /** 使用者之後的回報（日記同一個 outcome）。 */
   outcome?: DiaryEntry['outcome']
   reason?: ReissueReason
+  /** N6（Round 10）：定位品質與「你在車上？」。 */
+  geo?: TrialGeo
 }
 
 const KEY = 'decide.trial.v1'
@@ -74,6 +97,14 @@ export function fromDebug(d: OrderDebug | undefined): Partial<TrialEntry> {
   return out
 }
 
+/** 從定位結果記下誤差與新舊（四捨五入到公尺、秒），加上這次有沒有問。 */
+export function trialGeo(g: Pick<GeoResult, 'accuracy' | 'fixAt'>, ask: GeoDoubt | null, now = Date.now()): TrialGeo {
+  const out: TrialGeo = { ask }
+  if (g.accuracy !== undefined && Number.isFinite(g.accuracy)) out.acc = Math.round(g.accuracy)
+  if (g.fixAt !== undefined && Number.isFinite(g.fixAt)) out.age = Math.max(0, Math.round((now - g.fixAt) / 1000))
+  return out
+}
+
 /** 使用者回報（完成／換一家＋原因／沒做）→ 標在同模組最近一筆還沒標的成功紀錄上。 */
 export function tagTrial(module: ModuleId, outcome: DiaryEntry['outcome'], reason?: ReissueReason, now = Date.now()): void {
   const list = readTrial()
@@ -107,6 +138,8 @@ export interface TrialSummary {
   mismatch: number
   /** Round 5：依情境分（吃／歇的 choices.scene；「其他」不分使用者打的字）。 */
   byScene: Record<string, { orders: number; done: number; reissued: number; punished: number; mismatch: number }>
+  /** N6（Round 10）：用 GPS 的道數、問「你在車上？」幾次（依原因）、問了之後選什麼。舊紀錄沒有 geo，不算。 */
+  geo: { fixes: number; asked: number; stale: number; coarse: number; picks: Partial<Record<GeoPick, number>> }
 }
 
 /** 匯出時附的摘要：一眼看出「空手」「重複」「價位」三件事這段期間怎麼樣。 */
@@ -115,7 +148,14 @@ export function summarize(entries: TrialEntry[]): TrialSummary {
   const errors: Record<string, number> = {}
   const reasons: Record<string, number> = {}
   const byScene: TrialSummary['byScene'] = {}
+  const geo: TrialSummary['geo'] = { fixes: 0, asked: 0, stale: 0, coarse: 0, picks: {} }
   for (const e of asc) {
+    if (e.geo && typeof e.geo === 'object') {
+      const { ask, pick } = e.geo
+      geo.fixes++
+      if (ask === 'stale' || ask === 'coarse') { geo.asked++; geo[ask]++ }
+      if (pick === 'current' || pick === 'station' || pick === 'cancel') geo.picks[pick] = (geo.picks[pick] ?? 0) + 1
+    }
     if (!e.ok) errors[e.error ?? 'unknown'] = (errors[e.error ?? 'unknown'] ?? 0) + 1
     if (e.reason) reasons[e.reason] = (reasons[e.reason] ?? 0) + 1
     const sc = e.choices?.scene
@@ -151,10 +191,21 @@ export function summarize(entries: TrialEntry[]): TrialSummary {
     reasons,
     mismatch: asc.filter((e) => e.outcome === 'mismatch').length,
     byScene,
+    geo,
   }
 }
 
-/** 匯出檔內容：摘要＋全部紀錄（新到舊）。 */
-export function exportTrial(entries: TrialEntry[] = readTrial(), now = Date.now()): string {
-  return JSON.stringify({ app: 'decide', kind: 'trial-log', exportedAt: new Date(now).toISOString(), summary: summarize(entries), entries }, null, 1)
+/** 試用紀錄匯出檔版本。1 = Round 4（沒有這欄）；2 = Round 10（紀錄多 geo、檔案可附記憶）。 */
+export const TRIAL_FILE_VERSION = 2
+
+/**
+ * 匯出檔內容：摘要＋全部紀錄（新到舊）。
+ * N4（Round 10）：一鍵匯出時把店家記憶（src/placeMem.ts exportMem）放進 memory，Cross 一次交出全部資料；
+ * 這個檔也可以直接拿去「匯入記憶」。
+ */
+export function exportTrial(entries: TrialEntry[] = readTrial(), now = Date.now(), memory?: MemFile): string {
+  return JSON.stringify({
+    app: 'decide', kind: 'trial-log', version: TRIAL_FILE_VERSION, exportedAt: new Date(now).toISOString(),
+    summary: summarize(entries), entries, ...(memory ? { memory } : {}),
+  }, null, 1)
 }

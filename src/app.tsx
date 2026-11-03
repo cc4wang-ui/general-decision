@@ -17,9 +17,10 @@ import {
 import { SHARE_FALLBACK, shareNode } from './share.ts'
 import { clearDebug, formatCandidate, formatDebug, formatPick, formatPrice, readDebug, type DebugEntry } from './debug.ts'
 import {
-  cuisineStats, discoveryStats, markClosed, markDone, markNeverAgain, markNotThisKind, markRepeat, markShown, memSummary, setFav,
+  cuisineStats, discoveryStats, exportMem, importMem, markClosed, markDone, markNeverAgain, markNotThisKind, markRepeat, markShown,
+  memSummary, setFav, type MemFile, type MemImport,
 } from './placeMem.ts'
-import { clearTrial, exportTrial, readTrial, recordTrial, summarize, tagTrial } from './trial.ts'
+import { clearTrial, exportTrial, readTrial, recordTrial, summarize, tagTrial, trialGeo, type GeoPick, type TrialGeo } from './trial.ts'
 import {
   effectiveBudget, loadBudget, loadCountry, loadLastScene, loadStations, saveStation, loadNovelty, lunchHidesTop, nextNovelty, NOVELTY_LABEL,
   orderScenes, saveBudget, saveCountry, saveLastScene, saveNovelty, toggleBand,
@@ -97,8 +98,11 @@ export function App() {
   const [reasonOpen, setReasonOpen] = useState(false)
   /** Round 5：「沒做」先問原因（不符合情境 → 不罰站；就是不想做 → 罰站）。 */
   const [skipOpen, setSkipOpen] = useState(false)
-  /** Round 6：「從哪裡出發」底部選單。doubt 有值 = 送出時定位太舊／太粗，先問再派；loc 是那個可疑的座標。 */
-  const [locOpen, setLocOpen] = useState<{ doubt?: GeoDoubt; loc?: Loc } | null>(null)
+  /**
+   * Round 6：「從哪裡出發」底部選單。doubt 有值 = 送出時定位太舊／太粗，先問再派；loc 是那個可疑的座標。
+   * geo（N6）：那個定位有多舊多粗，使用者選完後連同選了什麼記進試用紀錄。
+   */
+  const [locOpen, setLocOpen] = useState<{ doubt?: GeoDoubt; loc?: Loc; geo?: TrialGeo } | null>(null)
   /** Round 6：這道口令選的「下車的站」（null = 目前位置）。 */
   const [station, setStation] = useState<string | null>(null)
   const [stations, setStations] = useState<string[]>(loadStations)
@@ -205,7 +209,8 @@ export function App() {
     setScreen(c.intake.some((f) => f.type === 'scene') ? 'scene' : 'intake')
   }, [])
 
-  const fetchOrder = useCallback(async (c: ModuleCard, ch: Record<string, string | number>, locOverride?: Origin) => {
+  /** geoNote（N6）：定位可疑、問過「你在車上？」之後重送時帶著，記進試用紀錄。 */
+  const fetchOrder = useCallback(async (c: ModuleCard, ch: Record<string, string | number>, locOverride?: Origin, geoNote?: TrialGeo) => {
     setScreen('waiting')
     setError(null)
 
@@ -219,6 +224,7 @@ export function App() {
     }
     let loc: Origin | undefined = locOverride ?? manualLoc.current
     let geoReason: GeoReason = 'ok'
+    let trialNote = geoNote
     if (loc) {
       setGeoDenied(false)
     } else if (c.needsPlaces && underPlacesCap()) {
@@ -230,10 +236,11 @@ export function App() {
       // Round 6：車上的定位常是上一站的或誤差幾百公尺。先問「在車上？」，不直接派店。
       const doubt = geoDoubt(geo)
       if (loc && doubt) {
-        setLocOpen({ doubt, loc })
+        setLocOpen({ doubt, loc, geo: trialGeo(geo, doubt) })
         setScreen('intake')
         return
       }
+      if (loc) trialNote = trialGeo(geo, null)
     } else {
       setGeoDenied(false)
     }
@@ -278,7 +285,7 @@ export function App() {
         ...(mem.length ? { mem } : {}),
         ...(Object.keys(cuisine).length ? { cuisine } : {}),
         ...(rejectedCuisines.current.length ? { rejectedCuisines: [...rejectedCuisines.current] } : {}),
-      })
+      }, trialNote)
       if (!issuedAt.current) issuedAt.current = new Date().toISOString()
       // 修 STRATEGY §2⑦：拿到口令的當下就記 shown，不等使用者回報。
       // R2-05：不 await——IndexedDB 慢或卡住不能擋換畫面；失敗由 safe 吞掉。
@@ -326,12 +333,15 @@ export function App() {
     return null
   }, [card, choices, fetchOrder, pickStation])
 
+  /** N6：問過「你在車上？」的話，那個定位的品質加上使用者選了什麼；沒問就沒有。 */
+  const doubtNote = (pick: GeoPick): TrialGeo | undefined => (locOpen?.doubt && locOpen.geo ? { ...locOpen.geo, pick } : undefined)
+
   /** Round 6：選單上的「從哪裡出發」。送出前選站只換出發點；定位可疑時選站就直接派。 */
   const chooseStation = useCallback(async (q: string): Promise<string | null> => {
     const go = !!locOpen?.doubt
     const r = await pickStation(q)
     if ('err' in r) return r.err
-    if (go && card) void fetchOrder(card, choices, r.origin)
+    if (go && card) void fetchOrder(card, choices, r.origin, doubtNote('station'))
     return null
   }, [card, choices, fetchOrder, locOpen, pickStation])
 
@@ -341,8 +351,15 @@ export function App() {
     setStation(null)
     setLocOpen(null)
     // 定位可疑但使用者說就用它：帶著這個座標直接派（不再問一次）。
-    if (doubtLoc && card) void fetchOrder(card, choices, doubtLoc)
+    if (doubtLoc && card) void fetchOrder(card, choices, doubtLoc, doubtNote('current'))
   }, [card, choices, fetchOrder, locOpen])
+
+  /** 收起「從哪裡出發」。問過「你在車上？」卻關掉沒選＝這道沒派出去，也記一筆（N6：問太多次的代價）。 */
+  const closeLoc = useCallback(() => {
+    const note = doubtNote('cancel')
+    if (note && card) recordTrial({ module: card.id, level, ok: false, error: 'geo_cancel', geo: note })
+    setLocOpen(null)
+  }, [card, level, locOpen])
 
   /** 換一家。吃／歇要先問原因（底部選單），其他卡（去／飛）維持原樣直接換。 */
   const reissue = useCallback(() => {
@@ -518,7 +535,7 @@ export function App() {
         )}
         {screen === 'debug' && <Debug level={level} onHome={goHome} />}
         {locOpen && card && (
-          <LocSheet doubt={locOpen.doubt} stations={stations} onCurrent={useCurrent} onPick={chooseStation} onClose={() => setLocOpen(null)} />
+          <LocSheet doubt={locOpen.doubt} stations={stations} onCurrent={useCurrent} onPick={chooseStation} onClose={closeLoc} />
         )}
         {skipOpen && card && (
           <Sheet title="為什麼沒做？" sub="照實報告，班長不冤枉人。" onClose={() => setSkipOpen(false)} testid="skip-sheet">
@@ -1171,6 +1188,40 @@ function Sheet({ title, sub, onClose, children, testid }: {
 export { Home, ScenePick, Intake, Cmd, LogScreen, Stand, Diary, Weekly }
 
 /**
+ * 把一個 JSON 檔帶出這支手機。iPhone：分享面板（存到檔案、AirDrop、貼給 Claude）；不支援就下載；再不行就複製。
+ * 回傳按鈕上要顯示的字；使用者自己關掉分享面板回 null（按鈕不變）。
+ * 呼叫前不要 await 別的東西：Safari 的分享面板要在點擊後馬上叫，晚了會被擋。
+ */
+async function saveJson(text: string, name: string, title: string): Promise<string | null> {
+  try {
+    const file = new File([text], name, { type: 'application/json' })
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title })
+      return '已匯出'
+    }
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') return null
+  }
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    return '已下載'
+  } catch {
+    try { await navigator.clipboard.writeText(text); return '已複製' } catch { return '匯出失敗' }
+  }
+}
+
+/** 匯入檔大小上限：記憶 600 家約 0.2 MB、試用紀錄 1,500 筆約 1 MB；選錯成影片之類的大檔直接擋。 */
+const IMPORT_MAX_BYTES = 5 * 1024 * 1024
+const today = () => new Date().toISOString().slice(0, 10)
+
+/**
  * 除錯畫面（長按班長名牌進來）。顯示最近 10 次 /api/order 的真實經過：
  * 幾秒、Places 查了幾圈查到幾家、候選店與評分、模型有沒有被重打、有沒有被強制指定。
  * 截圖或按「複製」就能把資料帶出這支手機——Vercel 的 log 隔一段時間就查不到了。
@@ -1181,37 +1232,50 @@ function Debug({ level, onHome }: { level: Level; onHome: () => void }) {
   // Round 4：60 天試用紀錄（src/trial.ts）。匯出成一個 JSON 檔，交給 Claude 分析。
   const [trial, setTrial] = useState(() => summarize(readTrial()))
   const [exported, setExported] = useState('')
+  // X4：店家記憶（src/placeMem.ts）。進畫面就先讀好，按匯出時不用再等 IndexedDB（見 saveJson）。
+  const [mem, setMem] = useState<MemFile | 'loading' | 'failed'>('loading')
+  const [memExported, setMemExported] = useState('')
+  const [memMsg, setMemMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  const exportFile = useCallback(() => {
-    void (async () => {
-      const text = exportTrial()
-      const name = `decide-trial-${new Date().toISOString().slice(0, 10)}.json`
-      // iPhone：分享面板（存到檔案、AirDrop、貼給 Claude）；不支援就下載；再不行就複製。
-      try {
-        const file = new File([text], name, { type: 'application/json' })
-        if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], title: '決斷連試用紀錄' })
-          setExported('已匯出')
-          return
-        }
-      } catch (e) {
-        if ((e as Error)?.name === 'AbortError') return // 使用者自己關掉分享面板
-      }
-      try {
-        const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
-        const a = document.createElement('a')
-        a.href = url
-        a.download = name
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-        setExported('已下載')
-      } catch {
-        try { await navigator.clipboard.writeText(text); setExported('已複製') } catch { setExported('匯出失敗') }
-      }
-    })()
+  const loadMem = useCallback(() => {
+    void safe<MemFile | 'failed'>(() => exportMem(), 'failed', 3000).then(setMem)
   }, [])
+  useEffect(loadMem, [loadMem])
+
+  // N4：一鍵匯出＝試用紀錄＋店家記憶同一個檔，Cross 一次交出全部資料。記憶讀不到也照樣匯出紀錄，按鈕上說沒帶到。
+  const exportFile = useCallback(() => {
+    const memory = typeof mem === 'string' ? undefined : mem
+    void saveJson(exportTrial(readTrial(), Date.now(), memory), `decide-trial-${today()}.json`, '決斷連試用紀錄').then((r) => {
+      if (r !== null) setExported(memory || r === '匯出失敗' ? r : `${r}（記憶沒帶到）`)
+    })
+  }, [mem])
+
+  const exportMemFile = useCallback(() => {
+    if (typeof mem === 'string') return
+    void saveJson(JSON.stringify(mem, null, 1), `decide-memory-${today()}.json`, '決斷連店家記憶').then((r) => {
+      if (r !== null) setMemExported(r)
+    })
+  }, [mem])
+
+  /** 匯入：壞檔不動現有記憶，原因顯示在按鈕下面；好檔合併後重讀筆數。 */
+  const importFile = useCallback((f: File | undefined) => {
+    if (!f) return
+    void (async () => {
+      setMemMsg(null)
+      if (f.size > IMPORT_MAX_BYTES) { setMemMsg({ ok: false, text: '檔案太大，不像記憶檔。原本的記憶沒動。' }); return }
+      let r: MemImport
+      try {
+        r = await importMem(await f.text())
+      } catch {
+        setMemMsg({ ok: false, text: '匯入失敗：讀不到檔案或手機存不進去（無痕模式、空間滿了）。原本的記憶沒動。' })
+        return
+      }
+      if (!r.ok) { setMemMsg({ ok: false, text: `沒有匯入：${r.why}原本的記憶沒動。` }); return }
+      setMemMsg({ ok: true, text: `匯入完成：新增 ${r.added} 家、合併 ${r.merged} 家，現在記得 ${r.total} 家。` })
+      loadMem()
+    })()
+  }, [loadMem])
   const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`)
 
   const copy = useCallback(() => {
@@ -1236,14 +1300,29 @@ function Debug({ level, onHome }: { level: Level; onHome: () => void }) {
         試用紀錄 {trial.days} 天 · {trial.orders} 道 · 給出口令 {trial.ok} · 7 天內重複 {pct(trial.repeat7d)} · 預算命中 {pct(trial.budgetHit)}
         {trial.rescue + trial.fallback > 0 ? ` · 救援 ${trial.rescue}／模板 ${trial.fallback}` : ''}
         {trial.mismatch > 0 ? ` · 不符情境 ${trial.mismatch}` : ''}
+        {trial.geo.fixes > 0 ? ` · 問在車上 ${trial.geo.asked}／${trial.geo.fixes}` : ''}
       </div>
       <div className="row">
-        <button className="btn line" data-testid="trial-export" onClick={exportFile}>{exported || '匯出 60 天紀錄'}</button>
+        <button className="btn line" data-testid="trial-export" onClick={exportFile}>{exported || '匯出全部（紀錄＋記憶）'}</button>
         <button
           className="btn ghost" data-testid="trial-clear"
           onClick={() => { if (window.confirm('清掉 60 天試用紀錄？匯出後再清。')) { clearTrial(); setTrial(summarize([])) } }}
         >清掉試用紀錄</button>
       </div>
+      <div className="notice" data-testid="mem-count">
+        {mem === 'loading' ? '店家記憶讀取中' : mem === 'failed' ? '讀不到店家記憶（無痕模式？）' : `店家記憶 ${mem.places.length} 家`}
+      </div>
+      <div className="row">
+        <button className="btn line" data-testid="mem-export" disabled={typeof mem === 'string'} onClick={exportMemFile}>{memExported || '匯出記憶'}</button>
+        <button className="btn ghost" data-testid="mem-import" onClick={() => fileRef.current?.click()}>匯入記憶</button>
+        <input
+          ref={fileRef} type="file" accept=".json,application/json,text/plain" hidden data-testid="mem-file"
+          onChange={(e) => { importFile(e.target.files?.[0]); e.target.value = '' }}
+        />
+      </div>
+      {memMsg && (
+        <p className={memMsg.ok ? 'notice' : 'manual-err'} role={memMsg.ok ? 'status' : 'alert'} data-testid="mem-result">{memMsg.text}</p>
+      )}
       {entries.length === 0 && <div className="notice" data-testid="debug-empty">還沒有紀錄。出一道口令再回來看。</div>}
       {entries.map((e, i) => (
         <article key={`${e.at}-${i}`} className="dbg" data-testid="debug-entry">

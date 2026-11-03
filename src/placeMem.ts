@@ -14,7 +14,7 @@
 //   price          價格不對（Round 4）：不動記憶，只在這次操作排除（app.tsx excluded）
 //   fav            列入愛店 / 取消
 //   skip（沒做）   不呼叫任何一個——不服從是行為問題，不是店的問題
-import { del, get, set } from 'idb-keyval'
+import { del, get, set, setMany } from 'idb-keyval'
 import type { CuisineStats, PlaceMemEntry, PlaceMemSummary } from './types.ts'
 
 const MEM_KEY = 'decide.placeMem'
@@ -224,6 +224,173 @@ export async function discoveryStats(weekStart: string, now: number = Date.now()
     else { newPlaces += 1; revisits += inWeek - 1 }
   }
   return { newPlaces, revisits }
+}
+
+// ── 匯出／匯入（Round 10 X4）──────────────────────────────────────────
+// 記憶只在這支手機：換手機、清 Safari 網站資料、之後換 Capacitor 都會失憶。除錯畫面匯出一個 JSON，換過去再匯入。
+// 檔案只有記憶本來就存的東西（place_id、我方時間戳、我方品牌鍵／細類鍵、封鎖、愛店），沒有店名、評分、座標。
+// 匯入：整份驗過才動資料——壞一筆就整份不收，並說是第幾家、哪一欄；好檔跟現有記憶合併，不是覆蓋。
+
+/** 記憶檔版本。欄位意思改了就加 1；匯入端拒收比自己新的版本。 */
+export const MEM_FILE_VERSION = 1
+
+export interface MemFile {
+  app: 'decide'
+  kind: 'place-memory'
+  version: number
+  exportedAt: string
+  places: PlaceMemEntry[]
+  cuisine: CuisineStats
+}
+
+export type MemImport = { ok: true; added: number; merged: number; total: number } | { ok: false; why: string }
+type MemParse = { ok: true; places: PlaceMemEntry[]; cuisine: CuisineStats } | { ok: false; why: string }
+
+export async function exportMem(now: number = Date.now()): Promise<MemFile> {
+  const [places, cuisine] = await Promise.all([allMem(), readCuisine()])
+  return { app: 'decide', kind: 'place-memory', version: MEM_FILE_VERSION, exportedAt: new Date(now).toISOString(), places, cuisine }
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
+const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0
+/** 當物件鍵用的字串：'__proto__' 一賦值就改到原型，資料會無聲消失，一律不收。 */
+const isKey = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max && v !== '__proto__'
+const isTimes = (v: unknown): v is number[] => Array.isArray(v) && v.every(isTime)
+const newestFirst = (list: number[]): number[] => [...new Set(list)].sort((a, b) => b - a).slice(0, KEEP_EVENTS)
+
+/** 驗一家店；回傳整理過的紀錄（只抄已知欄位，檔案裡多塞的欄位——例如店名——不會進記憶），或壞掉的欄位名。 */
+function readEntry(v: unknown): PlaceMemEntry | string {
+  if (!isObj(v)) return '不是一筆紀錄'
+  const { id, module, shown, done, dislikes, doneCount, dislikeUntil, fav, brand, cuisine } = v
+  if (!isKey(id, 300)) return 'id'
+  if (module !== 'eat' && module !== 'rest') return 'module'
+  if (!isTimes(shown)) return 'shown'
+  if (!isTimes(done)) return 'done'
+  if (!isCount(dislikes)) return 'dislikes'
+  if (doneCount !== undefined && !isCount(doneCount)) return 'doneCount'
+  if (dislikeUntil !== undefined && dislikeUntil !== 'forever' && !isTime(dislikeUntil)) return 'dislikeUntil'
+  if (fav !== undefined && typeof fav !== 'boolean') return 'fav'
+  if (brand !== undefined && !isKey(brand, 100)) return 'brand'
+  if (cuisine !== undefined && !isKey(cuisine, 100)) return 'cuisine'
+  const e: PlaceMemEntry = { id, module, shown: newestFirst(shown), done: newestFirst(done), dislikes }
+  if (isCount(doneCount)) e.doneCount = doneCount
+  if (dislikeUntil === 'forever' || isTime(dislikeUntil)) e.dislikeUntil = dislikeUntil
+  if (fav === true) e.fav = true
+  if (isKey(brand, 100)) e.brand = brand
+  if (isKey(cuisine, 100)) e.cuisine = cuisine
+  return e
+}
+
+function readCuisineStats(v: unknown): CuisineStats | string {
+  if (v === undefined) return {}
+  if (!isObj(v)) return '不是一張表'
+  const out: CuisineStats = {}
+  for (const [k, ab] of Object.entries(v)) {
+    const ok = isKey(k, 100) && Array.isArray(ab) && ab.length === 2 && ab.every((x) => typeof x === 'number' && Number.isFinite(x) && x > 0)
+    if (!ok) return `「${k.slice(0, 20)}」`
+    out[k] = [ab[0], ab[1]]
+  }
+  return out
+}
+
+/**
+ * 驗整份記憶檔（純函式，不碰儲存）。記憶檔與一鍵匯出的試用紀錄（N4，記憶放在 memory 欄位）都收。
+ * 任何一處不對就整份不收，回傳給人看的原因。
+ */
+export function parseMemFile(text: string): MemParse {
+  const bad = (why: string): MemParse => ({ ok: false, why })
+  let root: unknown
+  try { root = JSON.parse(text) } catch { return bad('這不是 JSON 檔。') }
+  if (!isObj(root) || root.app !== 'decide') return bad('這不是報告班長匯出的檔案。')
+  const mem = root.kind === 'trial-log' ? root.memory : root
+  if (root.kind === 'trial-log' && mem === undefined) return bad('這份試用紀錄裡沒有記憶（Round 10 以前匯出的）。')
+  if (!isObj(mem) || mem.kind !== 'place-memory') return bad('這不是記憶檔。')
+  const v = mem.version
+  if (!isCount(v) || v < 1) return bad('檔案沒有版本號。')
+  if (v > MEM_FILE_VERSION) return bad(`檔案是第 ${v} 版，這個 App 只認得到第 ${MEM_FILE_VERSION} 版。先更新 App 再匯入。`)
+  if (!Array.isArray(mem.places)) return bad('檔案裡沒有店家清單。')
+  const places: PlaceMemEntry[] = []
+  const seen = new Set<string>()
+  for (const [i, raw] of mem.places.entries()) {
+    const e = readEntry(raw)
+    if (typeof e === 'string') return bad(`第 ${i + 1} 家的資料壞了（${e}）。`)
+    if (seen.has(e.id)) return bad(`第 ${i + 1} 家跟前面重複（同一個 place_id）。`)
+    seen.add(e.id)
+    places.push(e)
+  }
+  const cuisine = readCuisineStats(mem.cuisine)
+  if (typeof cuisine === 'string') return bad(`細類統計壞了（${cuisine}）。`)
+  return { ok: true, places, cuisine }
+}
+
+/**
+ * 累計完成次數：取大的那邊，再加上小的那邊有、大的那邊不知道的完成。
+ * 大的那邊只留最近 10 筆時間：比它最舊那筆還舊的，可能早就數過了，不加（同一份備份匯入兩次不會越數越多）。
+ */
+function mergeDoneCount(a: PlaceMemEntry, b: PlaceMemEntry): number {
+  const ca = a.doneCount ?? a.done.length
+  const cb = b.doneCount ?? b.done.length
+  const [hi, lo, count] = ca >= cb ? [a, b, ca] : [b, a, cb]
+  const floor = hi.done.length >= count ? -Infinity : Math.min(...hi.done)
+  return count + lo.done.filter((t) => t > floor && !hi.done.includes(t)).length
+}
+
+/**
+ * 同一個 place_id 的兩份記憶合成一份（同 place_id 取較新的時間）：
+ * 時間戳合在一起留最新 10 筆；封鎖取比較久的（永久優先）；「不要再來」次數取大的；
+ * 愛店兩邊有一邊是就算（寧可多一家愛店，不要匯入後愛店消失）；品牌鍵／細類鍵／模組跟最近有事件的那邊。
+ * 合併兩次結果一樣，同一份檔匯入幾次都不會改變記憶。
+ */
+export function mergeEntry(cur: PlaceMemEntry, inc: PlaceMemEntry): PlaceMemEntry {
+  const [newer, older] = lastEventAt(inc) > lastEventAt(cur) ? [inc, cur] : [cur, inc]
+  const out: PlaceMemEntry = {
+    id: cur.id,
+    module: newer.module,
+    shown: newestFirst([...cur.shown, ...inc.shown]),
+    done: newestFirst([...cur.done, ...inc.done]),
+    doneCount: mergeDoneCount(cur, inc),
+    dislikes: Math.max(cur.dislikes, inc.dislikes),
+  }
+  if (cur.dislikeUntil === 'forever' || inc.dislikeUntil === 'forever') out.dislikeUntil = 'forever'
+  else if (cur.dislikeUntil !== undefined || inc.dislikeUntil !== undefined) out.dislikeUntil = Math.max(cur.dislikeUntil ?? 0, inc.dislikeUntil ?? 0)
+  if (cur.fav || inc.fav) out.fav = true
+  const brand = newer.brand ?? older.brand
+  if (brand) out.brand = brand
+  const cuisine = newer.cuisine ?? older.cuisine
+  if (cuisine) out.cuisine = cuisine
+  return out
+}
+
+/** 細類偏好：兩個數各自取大的（計數只會往上加；取大的匯入幾次都一樣，不會越匯越偏）。 */
+export function mergeCuisine(cur: CuisineStats, inc: CuisineStats): CuisineStats {
+  const out: CuisineStats = { ...cur }
+  for (const [k, [a, b]] of Object.entries(inc)) {
+    const c = Object.hasOwn(out, k) ? out[k] : undefined
+    out[k] = c ? [Math.max(c[0], a), Math.max(c[1], b)] : [a, b]
+  }
+  return out
+}
+
+/**
+ * 匯入記憶檔：先驗（壞檔一個字都不寫），再跟現有記憶合併；店家記憶與細類統計同一個交易寫入，不會只寫一半。
+ * 寫入失敗（無痕模式、空間滿了）會丟例外，由呼叫端顯示。
+ */
+export async function importMem(text: string, now: number = Date.now()): Promise<MemImport> {
+  const parsed = parseMemFile(text)
+  if (!parsed.ok) return parsed
+  return serial(async () => {
+    const [store, cuisine] = await Promise.all([readStore(), readCuisine()])
+    let added = 0
+    let merged = 0
+    for (const e of parsed.places) {
+      const cur = Object.hasOwn(store, e.id) ? store[e.id] : undefined
+      if (cur) { store[e.id] = mergeEntry(cur, e); merged++ } else { store[e.id] = e; added++ }
+    }
+    prune(store, now)
+    await setMany([[MEM_KEY, store], [CUISINE_KEY, mergeCuisine(cuisine, parsed.cuisine)]])
+    return { ok: true as const, added, merged, total: Object.keys(store).length }
+  })
 }
 
 /** 測試與「清除資料」用。 */

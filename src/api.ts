@@ -1,7 +1,7 @@
 // 呼叫 /api/order、/api/weekly；重試與錯誤分類（第 4、11 節）。
 import { DAILY_PLACES_CAP } from './places.ts'
 import { recordDebug } from './debug.ts'
-import { fromDebug, recordTrial } from './trial.ts'
+import { fromDebug, recordTrial, type TrialGeo } from './trial.ts'
 import type { GeocodeResponse, Order, OrderDebug, OrderRequest, WeeklyReport, WeeklyRequest } from './types.ts'
 
 export type ApiErrorKind =
@@ -155,10 +155,13 @@ async function post<T>(path: string, body: unknown): Promise<{ data: T; res: Res
 /**
  * 伺服器回的 body 是 Order + 一個 debug 欄位。debug 在這裡就剝掉，
  * 只進除錯紀錄，不跟著 Order 進畫面與日記。失敗也記一筆——「為什麼沒出口令」才是最需要查的。
+ * geo（N6）：這道用了 GPS 時的定位品質與「你在車上？」，只進試用紀錄，不送伺服器。
  */
-export async function requestOrder(req: OrderRequest): Promise<Order> {
+export async function requestOrder(req: OrderRequest, geo?: TrialGeo): Promise<Order> {
   // Round 4 試用紀錄：每一道（成功、失敗）都記一筆，不含店名（src/trial.ts）。
-  const base = { module: req.module, level: req.level, choices: req.choices, ...(req.budget?.length ? { budget: req.budget } : {}) }
+  const base = {
+    module: req.module, level: req.level, choices: req.choices, ...(req.budget?.length ? { budget: req.budget } : {}), ...(geo ? { geo } : {}),
+  }
   try {
     const { data, res } = await post<Order & { debug?: OrderDebug }>('/api/order', req)
     const calls = Number(res.headers.get('x-places-calls') ?? 0)
