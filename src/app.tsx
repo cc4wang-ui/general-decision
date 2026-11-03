@@ -1,5 +1,6 @@
 // 單頁狀態機 home→intake→cmd→(log|stand)；diary；weekly（第 4 節）。
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { DailyDecision } from './dailyDecision.tsx'
 import { CARD_BY_ID, MAJOR_IDS, MINOR_IDS, MODULE_BARKS } from './cards.ts'
 import { OFFICER_BY_LEVEL } from './officers.ts'
 import { Avatar } from './avatar.tsx'
@@ -30,7 +31,7 @@ import type {
   Band, Country, DiaryEntry, Level, ModuleCard, ModuleId, Novelty, Order, ReissueReason, WeeklyReport,
 } from './types.ts'
 
-type Screen = 'home' | 'intake' | 'waiting' | 'cmd' | 'log' | 'stand' | 'error' | 'diary' | 'weekly' | 'debug' | 'privacy'
+type Screen = 'home' | 'intake' | 'waiting' | 'cmd' | 'log' | 'stand' | 'error' | 'diary' | 'weekly' | 'debug' | 'privacy' | 'daily'
 
 const LEVEL_KEY = 'decide.level'
 
@@ -363,9 +364,10 @@ export function App() {
         {screen === 'home' && (
           <Home
             level={level} novelty={novelty} onCycle={cycleOfficer} onPick={openIntake} onNovelty={cycleNovelty}
-            onDiary={() => setScreen('diary')} onDebug={() => setScreen('debug')} onPrivacy={() => setScreen('privacy')}
+            onDaily={() => setScreen('daily')} onDiary={() => setScreen('diary')} onDebug={() => setScreen('debug')} onPrivacy={() => setScreen('privacy')}
           />
         )}
+        {screen === 'daily' && <DailyDecision onBack={goHome} />}
         {screen === 'privacy' && <Privacy onBack={goHome} />}
         {screen === 'intake' && card && (
           <Intake
@@ -475,9 +477,9 @@ function OfficerPlate({ level, mood, onCycle, onLongPress, meta, tap }: {
   )
 }
 
-function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, onNovelty, onPrivacy }: {
+function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, onNovelty, onPrivacy, onDaily }: {
   level: Level; novelty?: Novelty; onCycle: () => void; onPick: (id: ModuleId) => void
-  onDiary: () => void; onDebug: () => void; onNovelty?: () => void; onPrivacy?: () => void
+  onDiary: () => void; onDebug: () => void; onNovelty?: () => void; onPrivacy?: () => void; onDaily?: () => void
 }) {
   const o = OFFICER_BY_LEVEL[level]
   return (
@@ -490,6 +492,7 @@ function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, 
             aria-label={`偵察方針：${NOVELTY_LABEL[novelty]}，點一下切換`}
           >{NOVELTY_LABEL[novelty]}</button>
         )}
+        {onDaily && <button data-testid="daily-entry" onClick={onDaily}>今日決策</button>}
         <button onClick={onDiary}>新兵日記</button>
       </div>
       <div className="bubble" data-testid="bubble">
