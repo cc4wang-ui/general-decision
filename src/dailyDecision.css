@@ -75,3 +75,7 @@
 .dd-place-meta strong{font-size:15px;line-height:1.4;color:var(--dd-ink)}
 .dd-place-meta span{font-size:11px;color:var(--dd-muted);line-height:1.5}
 .dd button:disabled{opacity:.6;cursor:progress}
+
+.dd-eta{font-size:12px;font-weight:750;color:#49643d;background:#eef3e9;border-radius:8px;padding:9px 11px;margin:8px 0;line-height:1.6}
+.dd-conflicts,.dd-stop-conflict{background:#fff0e8;border:1px solid #e4b5a0;color:#893c23;border-radius:9px;padding:9px 12px;font-size:12px;line-height:1.5}
+.dd-conflicts p{margin:4px 0}
