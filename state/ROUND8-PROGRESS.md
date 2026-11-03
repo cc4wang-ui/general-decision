@@ -75,6 +75,15 @@ typecheck ✅、單元 594 條 ✅（`TZ=Asia/Taipei`，原 590＋4）、build �
 **沒有排程。** 原本排 2026-11-04 01:00 東京自動喚醒（`trig_01BKoxN2Myox8D4iHUo6w49x`）；Cross 2026-11-03 17:11 東京說「關掉所有排程」，已停用（沒有刪除）。
 要量深夜：東京 01:00 前後手動打 R8 preview-1 的 `/api/probe?mode=scene&loc=shinjuku`，存 `state/evidence/r8/scene-shinjuku-night.json`，再跑 `r8-check.mjs`。之後才跑 checker、問 Cross 上線 🔒。
 
+## ⚠️ 2026-11-03 22:33 東京：上線中止（正式站已換線）
+
+- Cross 回「直接上線」。送出 production 部署 `dpl_Fa2rMgQxuYeJDrbS9x5jAAk3RigP` 後，發現正式站已不是 Round 7。
+- 今天 14:38–17:32 東京，另一條工作線把 PR #27–#32（「今日行程」Daily Decision）合進 `main`。Vercel 從 `main` 自動部署。
+- 現在正式站 = `dpl_GXH9RaKiS4FpELKoa7GDg5xgF2L5`（`main` `75dc3cd`）= Round 3＋今日行程。**Round 4–7 已不在正式站。**
+- Round 8 是 Round 7 加改動。直接上線會把今日行程整個蓋掉，所以立刻取消。狀態 CANCELED；兩個正式網址仍指向 `dpl_GXH9…`（已驗證）。
+- 本機試合併（`claude/nifty-ramanujan-szofu5` ＋ `origin/main`，沒推）：只有 `src/app.tsx` 兩處衝突，兩邊各加一項，可以都留。typecheck ✅、build ✅、單元 605/606。唯一失敗的 `dailyDecision.test.ts`「keeps fixed existing commitments」在純 `main` 上也失敗，是 `main` 本身的問題。
+- `main` 的 `STATE.md` 不知道 Round 4–8，自稱是正式狀態文件。兩條線的文件互相矛盾，要 Cross 決定哪條是主線。
+
 ## 回復點
 
 正式站目前是 Round 7；Round 8 上線後，回復點是 Round 7 `dpl_GRtU7onjopNWnQ1YrXRnQ9rM6eyA`。
