@@ -1,6 +1,8 @@
 // Round 4：60 天試用紀錄（src/trial.ts）——每道口令記一筆、回報標上去、60 天自動清、匯出含摘要、不存店名。
 import { beforeEach, describe, expect, it } from 'vitest'
-import { TRIAL_DAYS, TRIAL_MAX, clearTrial, exportTrial, fromDebug, readTrial, recordTrial, summarize, tagTrial, type TrialEntry } from '../../src/trial.ts'
+import {
+  TRIAL_DAYS, TRIAL_FILE_VERSION, TRIAL_MAX, clearTrial, exportTrial, fromDebug, readTrial, recordTrial, summarize, tagTrial, trialGeo, type TrialEntry,
+} from '../../src/trial.ts'
 
 const DAY = 86_400_000
 const T0 = Date.parse('2026-11-01T12:00:00+08:00')
@@ -84,5 +86,52 @@ describe('summarize／exportTrial', () => {
 
   it('沒有紀錄也不爆', () => {
     expect(summarize([])).toMatchObject({ orders: 0, repeat7d: null, budgetHit: null, days: 0 })
+  })
+})
+
+// Round 10 N6：每筆多記定位品質與「你在車上？」；N4：匯出檔可以附記憶。
+describe('N6 定位門檻資料', () => {
+  const mk = (e: Partial<TrialEntry>): TrialEntry => ({ at: at(T0), module: 'eat', level: 1, ok: true, ...e })
+
+  it('trialGeo：誤差四捨五入到公尺、多舊四捨五入到秒、記下有沒有問；瀏覽器沒給的就不記', () => {
+    expect(trialGeo({ accuracy: 812.6, fixAt: T0 - 95_400 }, 'coarse', T0)).toEqual({ ask: 'coarse', acc: 813, age: 95 })
+    expect(trialGeo({ accuracy: 12, fixAt: T0 + 500 }, null, T0)).toEqual({ ask: null, acc: 12, age: 0 }) // 時鐘誤差不記成負的
+    expect(trialGeo({}, 'stale', T0)).toEqual({ ask: 'stale' })
+  })
+
+  it('摘要：用 GPS 幾道、問幾次（依原因）、問了選什麼', () => {
+    const s = summarize([
+      mk({ geo: { ask: null, acc: 20, age: 3 } }),
+      mk({ geo: { ask: 'stale', pick: 'current', age: 75 } }),
+      mk({ geo: { ask: 'coarse', pick: 'station', acc: 900 } }),
+      mk({ ok: false, error: 'geo_cancel', geo: { ask: 'stale', pick: 'cancel', age: 130 } }),
+      mk({}), // 手動報站或不用定位的卡：沒有 geo
+    ])
+    expect(s.geo).toEqual({ fixes: 4, asked: 3, stale: 2, coarse: 1, picks: { current: 1, station: 1, cancel: 1 } })
+    expect(s.errors).toEqual({ geo_cancel: 1 })
+  })
+
+  it('舊紀錄（Round 10 以前、沒有 geo）照讀照算，摘要的定位欄位是 0', () => {
+    const old = [{ at: at(T0), module: 'eat', level: 1, ok: true, placeId: 'a', lane: 'q:便當' }]
+    localStorage.setItem('decide.trial.v1', JSON.stringify(old))
+    expect(readTrial()).toEqual(old)
+    const s = summarize(readTrial())
+    expect(s).toMatchObject({ orders: 1, ok: 1, distinctPlaces: 1 })
+    expect(s.geo).toEqual({ fixes: 0, asked: 0, stale: 0, coarse: 0, picks: {} })
+    // 舊紀錄後面接新紀錄，兩種混著也正常
+    recordTrial({ module: 'eat', level: 1, ok: true, placeId: 'b', geo: { ask: 'stale', pick: 'current' } }, T0 + 1000)
+    expect(summarize(readTrial()).geo).toMatchObject({ fixes: 1, asked: 1 })
+    expect(readTrial()[1]).toEqual(old[0])
+  })
+})
+
+describe('N4 一鍵匯出', () => {
+  it('匯出檔有版本號；給了記憶就附在 memory，沒給就沒有這欄', () => {
+    recordTrial({ module: 'eat', level: 1, ok: true, placeId: 'a' }, T0)
+    const memory = { app: 'decide' as const, kind: 'place-memory' as const, version: 1, exportedAt: at(T0), places: [], cuisine: {} }
+    const withMem = JSON.parse(exportTrial(readTrial(), T0, memory))
+    expect(withMem).toMatchObject({ kind: 'trial-log', version: TRIAL_FILE_VERSION, memory })
+    expect(withMem.entries).toHaveLength(1)
+    expect('memory' in JSON.parse(exportTrial(readTrial(), T0))).toBe(false)
   })
 })
