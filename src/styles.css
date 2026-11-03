@@ -128,6 +128,8 @@ main[data-level="2"]{--officer-green:#005800;--officer-deep:#000000;--meme-edge:
 .stamp[data-mode="revisit"]{border-color:var(--line)}
 .stamp[data-mode="wildcard"],.stamp[data-mode="exhausted"]{border-color:var(--signal);color:var(--ink);background:var(--card)}
 .steps .attribution{padding-left:0;margin-top:10px}
+/* Round 10：歸屬移進 place-head（place-meta 正下方），間距跟著 head 的 2px gap，不另加高度。 */
+.steps .place-head .attribution{margin-top:0}
 /* ③ 同意畫面：第一屏先講產品承諾，再講三件資料去向。 */
 .consent-hero{display:flex;gap:14px;align-items:center;padding:4px 0 14px;border-bottom:1px solid var(--line)}
 .consent-hero .av{width:88px;height:96px;flex:none;overflow:hidden;border-radius:var(--radius);background:var(--card);border:var(--card-edge) solid var(--line)}

@@ -42,5 +42,7 @@ describe('口令卡 place-meta', () => {
     const { queryByTestId, container } = render(<StepsCard steps={['一。']} place={real} />)
     expect(container.querySelector('.place-head')).not.toBeNull()
     for (const id of ['mode-stamp', 'place-link', 'place-meta', 'attribution']) expect(queryByTestId(id)).not.toBeNull()
+    // Round 10（T10）：歸屬緊跟在 place-meta 後面（店家區裡），不在步驟之後——放最後一行在 375×667 會掉出第一屏。
+    expect(queryByTestId('place-meta')!.nextElementSibling).toBe(queryByTestId('attribution'))
   })
 })
