@@ -216,6 +216,9 @@ export function toCandidates(
       if (open) {
         const closeIn = minutesUntilClose(p, now, c.openUntil, tz)
         if (closeIn !== undefined) c.closeInMin = closeIn
+      } else {
+        const opensIn = minutesUntilOpen(p, now)
+        if (opensIn !== undefined) c.opensInMin = opensIn
       }
       if (p.types?.length) c.types = p.types
       if (p.priceLevel) c.priceLevel = p.priceLevel

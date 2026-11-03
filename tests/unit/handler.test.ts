@@ -246,6 +246,25 @@ describe('/api/order handler（第 12 節 S5）', () => {
     expect(body.debug.places?.how.split(' → ')).toHaveLength(3)
   })
 
+  it('Round 10：附近的店到店時都已關門（含整批放回）→ 不派它們，走超商救援', async () => {
+    const bodies: string[] = []
+    // now = 12:40（+08:00）。三家 12:45 關門：走過去就關了（checker 2026-11-03 新宿「其他」實測的情況）。
+    const closing = (id: string, lat: number): RawPlace => ({ id, displayName: { text: `快打烊咖啡 ${id}` }, location: { latitude: lat, longitude: 121.5654 }, currentOpeningHours: { openNow: true, nextCloseTime: '2026-09-11T04:45:00Z' }, rating: 4.2, userRatingCount: 120, primaryType: 'cafe' })
+    const store: RawPlace = { id: 's7', displayName: { text: '7-ELEVEN 府前門市' }, location: { latitude: 25.0335, longitude: 121.5658 }, currentOpeningHours: { openNow: true }, rating: 3.6, userRatingCount: 80, primaryType: 'convenience_store' }
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('anthropic')) return claudeOk(ORDER_JSON)
+      bodies.push(String(init?.body ?? ''))
+      const sent = JSON.parse(String(init?.body ?? '{}'))
+      return new Response(JSON.stringify({ places: /便利商店|コンビニ/.test(sent.textQuery ?? '') ? [store] : [closing('c1', 25.0345), closing('c2', 25.0355), closing('c3', 25.0365)] }), { status: 200 })
+    }))
+    const res = await handler(post({ module: 'rest', choices: { drink: '咖啡', scene: '其他', sceneText: '有插座' } }))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as Order & { debug: OrderDebug }
+    expect(body.place?.id).toBe('s7')
+    expect(body.debug.rescue).toBe(true)
+    expect(JSON.parse(bodies.at(-1)!)).toMatchObject({ textQuery: '便利商店', openNow: true })
+  })
+
   it('Round 4 救援（有預算）：兩次帶 priceLevels 都空 → 第三次拿掉價位查餐廳 → 仍空才第四次超商', async () => {
     const bodies: string[] = []
     const store: RawPlace = { id: 's7', displayName: { text: '7-ELEVEN 府前門市' }, location: { latitude: 25.0335, longitude: 121.5658 }, currentOpeningHours: { openNow: true }, rating: 3.6, userRatingCount: 80, primaryType: 'convenience_store' }

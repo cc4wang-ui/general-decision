@@ -45,6 +45,8 @@ export interface SceneRule {
   maxWalk?: number
   /** 走到店之後至少還要營業幾分鐘（checker 2026-11-01：快打烊的店，口令只能叫人坐 2–30 分鐘）。 */
   minOpen?: number
+  /** Round 10：走到店時要已經開門（Round 8 實測 09:25 派到 10:00 才開的咖啡店）。歇全部情境都開。 */
+  openOnArrival?: boolean
   /** 久坐的情境：口令寫的離開時間不得早於「到店＋這麼多分鐘」（伺服器會改，src/rules.ts）。 */
   stay?: number
   /** 寫進 prompt 的一行，讓口令對得上情境。 */
@@ -71,7 +73,7 @@ export const SHISHA_RE = /シーシャ|shisha|hookah|水煙/i
 const NOT_COFFEE = ['karaoke', 'food_court']
 /** 選咖啡時店名擋一層：水煙吧＋美食街、居酒屋、卡拉OK（美食街常標成 restaurant，type 擋不到）。 */
 export const NOT_COFFEE_RE = new RegExp(`${SHISHA_RE.source}|food ?court|フードコート|美食街|美食廣場|居酒屋|izakaya|カラオケ|karaoke|卡拉ok|ktv`, 'i')
-type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'> & Partial<Pick<PlaceCandidate, 'name'>>
+type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'> & Partial<Pick<PlaceCandidate, 'name' | 'opensInMin'>>
 /** 一個人快吃不派要久坐、要多人的店（checker 2026-11-01：東京查「牛丼」派到燒肉店）。 */
 const SLOW_MEAL = ['yakiniku_restaurant', 'korean_barbecue_restaurant', 'barbecue_restaurant', 'hot_pot_restaurant', 'fine_dining_restaurant', 'buffet_restaurant', 'steak_house', 'japanese_izakaya_restaurant', 'bar', 'pub', 'wine_bar', 'bar_and_grill']
 
@@ -106,7 +108,8 @@ const EAT: SceneRule[] = [
     hint: '情境：朋友聚餐，一群人。steps 寫點幾道一起分，不要寫一個人的份量；時間寫 90 分鐘以上，不准催。',
   },
   {
-    id: '約會吃好一點', radius: 1500, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH], minRating: 4.3,
+    // Round 10（路線圖 Q1 建議答案：擋）：約會不派酒吧類（Round 6 起派到 Bar Vier）。
+    id: '約會吃好一點', radius: 1500, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH, ...BARISH], minRating: 4.3,
     queries: {
       TW: [q('義大利麵', 'western', 2.5), q('餐酒館', 'western', 3), q('日式料理', 'jp', 3), q('牛排', 'western', 3, BEEF), q('鐵板燒', 'jp', 2.5), q('法式料理', 'western', 3.5)],
       JP: [q('イタリアン', 'western', 2.5), q('フレンチ', 'western', 3.5), q('寿司', 'jp', 2.5), q('天ぷら', 'jp', 2.5), q('和食', 'jp', 3)],
@@ -130,11 +133,12 @@ const EAT: SceneRule[] = [
  * 不是只改口令。修飾詞加在「喝什麼」的關鍵字前面（REST_MOD）。
  */
 const REST: SceneRule[] = [
-  { id: '一個人放空', radius: 600, maxWalk: 10, minOpen: 40, stay: 30, hint: '情境：一個人放空。steps 寫坐下、點一杯、不看手機；坐 30 分鐘以上。' },
-  { id: '工作讀書', radius: 1000, maxWalk: 15, minOpen: 90, stay: 90, hint: '情境：要工作或讀書，會坐很久。steps 寫找有插座的位子、點一杯、專心多久後休息；坐 90 分鐘以上，不准催人走。' },
-  { id: '朋友聊天', radius: 1000, maxWalk: 15, minOpen: 60, stay: 60, hint: '情境：跟朋友聊天。steps 寫找能坐幾個人的位子、點什麼一起喝；坐 60 分鐘以上，不准催人走。' },
-  { id: '談事情', radius: 1000, minRating: 4.2, maxWalk: 15, minOpen: 60, stay: 60, hint: '情境：要談事情，需要安靜。steps 寫找角落的位子、先點好再開始談；預留 60 分鐘以上。' },
-  { id: '等人', radius: 400, maxWalk: 6, minOpen: 25, hint: '情境：等人或空檔，待不久。steps 寫點一杯、坐 20 分鐘、時間到就走。' },
+  { id: '一個人放空', radius: 600, maxWalk: 10, minOpen: 40, stay: 30, openOnArrival: true, hint: '情境：一個人放空。steps 寫坐下、點一杯、不看手機；坐 30 分鐘以上。' },
+  // Round 10（路線圖 X3）：Google 沒有插座欄位，口令不准保證有插座。
+  { id: '工作讀書', radius: 1000, maxWalk: 15, minOpen: 90, stay: 90, openOnArrival: true, hint: '情境：要工作或讀書，會坐很久。steps 寫先問店員哪裡有插座（插座查不到，不准保證有）、點一杯、專心多久後休息；坐 90 分鐘以上，不准催人走。' },
+  { id: '朋友聊天', radius: 1000, maxWalk: 15, minOpen: 60, stay: 60, openOnArrival: true, hint: '情境：跟朋友聊天。steps 寫找能坐幾個人的位子、點什麼一起喝；坐 60 分鐘以上，不准催人走。' },
+  { id: '談事情', radius: 1000, minRating: 4.2, maxWalk: 15, minOpen: 60, stay: 60, openOnArrival: true, hint: '情境：要談事情，需要安靜。steps 寫找角落的位子、先點好再開始談；預留 60 分鐘以上。' },
+  { id: '等人', radius: 400, maxWalk: 6, minOpen: 25, openOnArrival: true, hint: '情境：等人或空檔，待不久。steps 寫點一杯、坐 20 分鐘、時間到就走。' },
 ]
 /** 歇的情境修飾詞：只加在咖啡（酒吧、居酒屋不適合「不限時」）。 */
 const REST_MOD: Record<string, Partial<Record<string, Words>>> = {
@@ -178,7 +182,10 @@ export function sceneOf(module: ModuleId, choices: Record<string, string | numbe
     if (!text) return null
     return {
       id, text,
-      rule: withChoices(module, choices, { id, radius: 1000, minOpen: 45, hint: `情境：使用者自己寫的需求是「${text}」。口令要對得上這個需求，做不到的部分不要假裝做得到。` }),
+      rule: withChoices(module, choices, {
+        id, radius: 1000, minOpen: 45, ...(module === 'rest' ? { openOnArrival: true } : {}),
+        hint: `情境：使用者自己寫的需求是「${text}」。口令要對得上這個需求，做不到的部分不要假裝做得到。插座、Wi-Fi、安靜、包廂這類條件 Google 查不到：steps 要叫人到店先確認，不准保證有。`,
+      }),
     }
   }
   const rule = rules.find((r) => r.id === id)
@@ -211,7 +218,7 @@ export function restBase(base: string, country: Country): string {
 /** 歇：情境改寫「喝什麼」的關鍵字（工作讀書 → 不限時 咖啡廳；其他 → 使用者的字＋咖啡廳）。 */
 export function restQuery(scene: Scene | null, drink: string, base: string, country: Country): string {
   if (!scene) return base
-  if (scene.text) return `${scene.text} ${base}`
+  if (scene.text) return `${localizeNeed(scene.text, country)} ${base}`
   const words = REST_MOD[scene.id]?.[drink]
   if (!words) return base
   const local = country === 'JP' ? 'JP' : 'TW'
@@ -219,18 +226,51 @@ export function restQuery(scene: Scene | null, drink: string, base: string, coun
 }
 
 /**
- * 情境的硬一點的偏好（排除速食／甜點店／酒吧、評分、步行、宵夜要營業中）：先篩，篩完一家都不剩就整批放回（寧可派得到，也不要空手）。
- * relaxed＝一家都不剩、整批放回了。
+ * 「其他」手打的需求在日本換成日文再查（Round 10）。Cross 打中文，日本用 ja 查「有插座 カフェ」只撈到 3 家
+ * （checker 2026-11-03 22:51 新宿）。只換認得的詞，其他字照原樣；台灣與其他地方不動。長的詞先換。
+ */
+const NEED_JP: [RegExp, string][] = [
+  [/有插座|插座|可充電|充電/g, '電源'],
+  [/不限時/g, '長居'],
+  [/安靜/g, '静か'],
+  [/wi-?fi|網路/gi, 'Wi-Fi'],
+  [/可抽菸|抽菸|吸菸/g, '喫煙'],
+  [/包廂/g, '個室'],
+  [/吃到飽/g, '食べ放題'],
+  [/早午餐/g, 'ブランチ'],
+  [/便宜/g, '安い'],
+  [/甜點/g, 'スイーツ'],
+  [/素食/g, 'ベジタリアン'],
+]
+export function localizeNeed(text: string, country: Country): string {
+  if (country !== 'JP') return text
+  return NEED_JP.reduce((s, [re, ja]) => s.replace(re, ja), text)
+}
+
+/** 走到店時至少還要開這麼久，才算「去得到」（Round 10）。整批放回時也守這條。 */
+export const HARD_OPEN_MIN = 10
+/**
+ * 到店時已經關門（或剩不到 HARD_OPEN_MIN 分）＝派了也白走。這條不放寬：
+ * checker 2026-11-03 22:51 新宿，「其他／有插座」整批放回後派到「走 14 分、剩 8 分關門」的店。
+ */
+export function viable(c: Pick<Cand, 'walkMin' | 'closeInMin'>): boolean {
+  return c.closeInMin === undefined || c.closeInMin - (c.walkMin ?? 0) >= HARD_OPEN_MIN
+}
+
+/**
+ * 情境的硬一點的偏好（排除速食／甜點店／酒吧、評分、步行、宵夜要營業中、歇要到店時開門）：先篩，篩完一家都不剩就整批放回（寧可派得到，也不要空手）。
+ * relaxed＝一家都不剩、整批放回了。放回的只限 viable（到店時還開著）；連這都沒有 → 空的，交給超商救援。
  */
 export function sceneFilter<T extends Cand>(cands: T[], scene: Scene | null): { kept: T[]; relaxed: boolean } {
-  if (!scene) return { kept: cands, relaxed: false }
-  const kept = cands.filter((c) => passes(c, scene.rule))
-  return kept.length ? { kept, relaxed: false } : { kept: cands, relaxed: cands.length > 0 }
+  const pool = cands.filter(viable)
+  if (!scene) return { kept: pool, relaxed: false }
+  const kept = pool.filter((c) => passes(c, scene.rule))
+  return kept.length ? { kept, relaxed: false } : { kept: pool, relaxed: pool.length > 0 }
 }
 
 /** 單一店家是否符合情境偏好（handler 算「夠不夠 5 家」用）。 */
 export function scenePasses(c: Cand, scene: Scene | null): boolean {
-  return !scene || passes(c, scene.rule)
+  return viable(c) && (!scene || passes(c, scene.rule))
 }
 
 function passes(c: Cand, r: SceneRule): boolean {
@@ -243,6 +283,8 @@ function passes(c: Cand, r: SceneRule): boolean {
   if (r.maxWalk !== undefined && typeof c.walkMin === 'number' && c.walkMin > r.maxWalk) return false
   // 宵夜：還沒開門的店（「HH:MM 開」）不算。Nearby 的查法沒有 openNow，這裡補上（checker 2026-11-01）。
   if (r.openNow && c.opensAt) return false
+  // 歇（Round 10）：走到店時還沒開門的不算（沒有幾分鐘後開的資料 → 當作沒開）。
+  if (r.openOnArrival && c.opensAt && !(typeof c.opensInMin === 'number' && c.opensInMin <= (c.walkMin ?? 0))) return false
   // 走過去之後還要營業夠久（沒有關門資料或 24 小時營業 → 不限制）。
   if (r.minOpen !== undefined && typeof c.closeInMin === 'number' && c.closeInMin - (c.walkMin ?? 0) < r.minOpen) return false
   return true
@@ -257,7 +299,7 @@ const EAT_BASE: Record<'sweet' | 'veg' | 'meal', Record<Country, string>> = {
 /** 吃的「其他」：使用者的字＋基本詞（甜食 → 甜點；素 → 素食；其餘 → 餐廳），不然「安靜」會撈到公園。 */
 export function eatOtherQuery(text: string, choices: Record<string, string | number>, country: Country): string {
   const kind = choices.taste === '甜食' ? 'sweet' : choices.diet === '素' ? 'veg' : 'meal'
-  return `${text} ${EAT_BASE[kind][country]}`
+  return `${localizeNeed(text, country)} ${EAT_BASE[kind][country]}`
 }
 
 /** 第二次（擴大）時輪替的關鍵字：情境自己的；沒有就 undefined（照原本的通用關鍵字）。 */

@@ -14,7 +14,7 @@ import { cuisineOf, mulberry32, pickPlace, type PickOutcome } from './discovery.
 import { bandOf, countryOf, currencyCountry, effectiveBand, estText, priceFit, priceText } from './price.ts'
 import { brandKeyOf, clusterKeys } from './chains.ts'
 import { templateOrder } from './template.ts'
-import { SCENE_TEXT_KEY, sanitizeSceneText, sceneFilter, sceneOf, scenePasses, sceneWiden } from './scene.ts'
+import { SCENE_TEXT_KEY, sanitizeSceneText, sceneFilter, sceneOf, scenePasses, sceneWiden, viable } from './scene.ts'
 import { hourIn, tzOf } from './tz.ts'
 import type { Band, Country, CuisineStats, Order, OrderDebug, OrderRequest, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
 
@@ -227,7 +227,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     dbg.places = {
       how: hows.join(' → '),
       tries,
-      candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })),
+      candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, ...(p.opensInMin !== undefined ? { opensIn: p.opensInMin } : {}), band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })),
     }
     dbg.price = { country, known: cands.filter((c) => bandOf(c, country) !== null).length, total: cands.length }
     const choose = (budget: OrderRequest['budget'], pool: PlaceCandidate[] = cands) => pool.length
@@ -244,7 +244,9 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       : null
     // 情境的偏好（排除速食、評分、步行）先篩；篩完沒店、或篩過的店都被記憶擋掉 → 用整批候選（寧可派得到）。
     const sf = sceneFilter(cands, scene)
-    pick = choose(req.budget, sf.kept) ?? (sf.kept.length < cands.length ? choose(req.budget, cands) : null)
+    // Round 10：退路也不派到店時已關門的店（viable）；連這都沒有 → 下面的超商救援。
+    const reachable = cands.filter(viable)
+    pick = choose(req.budget, sf.kept) ?? (sf.kept.length < reachable.length ? choose(req.budget, reachable) : null)
     if (scene) dbg.scene = { id: scene.id, ...(scene.text ? { text: scene.text } : {}), kept: sf.kept.length, total: cands.length, relaxed: sf.relaxed || (!!pick && !sf.kept.some((k) => k.id === pick!.place.id)) }
     if (!pick && !allFailed()) {
       // 第三次（救援）：附近營業中的都派不出去 → 營業中的超商。預算不適用（超商就是超商），口令會講清楚（prompt rescue 行）。
@@ -253,7 +255,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       await call(rescuePlan(country))
       placesMs = Date.now() - t0
       dbg.places.how = hows.join(' → ')
-      dbg.places.candidates.push(...cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })))
+      dbg.places.candidates.push(...cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, ...(p.opensInMin !== undefined ? { opensIn: p.opensInMin } : {}), band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })))
       pick = choose(undefined)
       if (pick) console.warn(`[rescue] module=${req.module}：前兩次派不出店，改派超商`)
     }

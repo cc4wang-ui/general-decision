@@ -568,7 +568,8 @@ describe('Round 7：東京的歇', () => {
     expect(jp({ scene: '談事情', drink: '酒吧' })).toMatchObject({ textQuery: '静か バー' })
     expect(jp({ scene: '朋友聊天', drink: '居酒屋' })).toMatchObject({ textQuery: '居酒屋' })
     expect(jp({ scene: '朋友聊天', drink: '熱炒燒烤' })).toMatchObject({ textQuery: '焼き鳥' })
-    expect(jp({ scene: SCENE_OTHER, sceneText: '有插座', drink: '咖啡' })).toMatchObject({ textQuery: '有插座 カフェ' })
+    // Round 10：「其他」手打的中文需求在日本也換成日文（有插座 → 電源）。
+    expect(jp({ scene: SCENE_OTHER, sceneText: '有插座', drink: '咖啡' })).toMatchObject({ textQuery: '電源 カフェ' })
     expect(jp({ drink: '咖啡' })).toMatchObject({ textQuery: 'カフェ' })
     for (const p of [...restPlans({ scene: '一個人放空', drink: '咖啡' }, 'JP', 20), ...restPlans({ scene: '工作讀書', drink: '咖啡' }, 'JP', 20)]) {
       expect(p.kind === 'text' && /[぀-ヿ]/.test(p.textQuery) && !/咖啡廳/.test(p.textQuery), p.kind === 'text' ? p.textQuery : '').toBe(true)
@@ -660,5 +661,65 @@ describe('Round 8：派錯店', () => {
     expect(sceneFilter(cands.slice(0, 2), takeout)).toEqual({ kept: cands.slice(0, 2), relaxed: true })
     // 其他吃的情境不受影響：宵夜仍可派居酒屋
     expect(scenePasses(cands[2]!, sceneOf('eat', { scene: '宵夜' }))).toBe(true)
+  })
+})
+
+// Round 10（Cross 2026-11-03「全部產品路線圖做完」）：歇要到店時開門；到店已關門的不派（含整批放回）；
+// 約會擋酒吧（Q1）；日本把「其他」的中文需求換成日文；口令不保證有插座（X3）。
+import { HARD_OPEN_MIN, localizeNeed, viable } from '../../src/scene.ts'
+describe('Round 10：到店要開著、約會擋酒吧、其他的需求換日文', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
+  it('viable：到店時剩不到 10 分（或已關）不算；沒有關門資料算', () => {
+    expect(HARD_OPEN_MIN).toBe(10)
+    expect(viable({ walkMin: 14, closeInMin: 8 })).toBe(false) // checker 22:51 コメダ
+    expect(viable({ walkMin: 3, closeInMin: 7 })).toBe(false) // checker 22:52 Caffice
+    expect(viable({ walkMin: 5, closeInMin: 15 })).toBe(true)
+    expect(viable({ walkMin: 5, closeInMin: 14 })).toBe(false)
+    expect(viable({ walkMin: 5 })).toBe(true)
+  })
+  it('整批放回時也只放回到店時還開著的；連這都沒有 → 空的（交給超商救援）', () => {
+    const other = sceneOf('rest', { scene: SCENE_OTHER, sceneText: '有插座', drink: '咖啡' })
+    const night = [c('コメダ', { walkMin: 14, closeInMin: 8 }), c('Caffice', { walkMin: 3, closeInMin: 7 }), c('ドトール', { walkMin: 6, closeInMin: 30 })]
+    // 剩 24 分 < 情境的 45 分 → 沒有一家過情境；整批放回只放回ドトール
+    expect(sceneFilter(night, other)).toEqual({ kept: [night[2]], relaxed: true })
+    expect(sceneFilter(night.slice(0, 2), other)).toEqual({ kept: [], relaxed: false })
+    // 沒選情境也不派到店已關門的
+    expect(sceneFilter(night, null).kept.map((x) => x.id)).toEqual(['ドトール'])
+    expect(scenePasses(night[0]!, null)).toBe(false)
+  })
+  it('歇：走到店時還沒開門的不派（開門時間早於到店的可以）；吃不受影響', () => {
+    const rest = sceneOf('rest', { scene: '一個人放空', drink: '咖啡' })
+    expect(scenePasses(c('LUKE', { walkMin: 2, opensAt: '10:00', opensInMin: 35 }), rest)).toBe(false) // Round 8 09:25 實測
+    expect(scenePasses(c('快開', { walkMin: 6, opensAt: '09:30', opensInMin: 5 }), rest)).toBe(true)
+    expect(scenePasses(c('不知何時開', { walkMin: 6, opensAt: '09:30' }), rest)).toBe(false)
+    for (const scene of ['工作讀書', '朋友聊天', '談事情', '等人']) expect(sceneOf('rest', { scene, drink: '咖啡' })!.rule.openOnArrival, scene).toBe(true)
+    expect(sceneOf('rest', { scene: SCENE_OTHER, sceneText: '安靜', drink: '酒吧' })!.rule.openOnArrival).toBe(true)
+    // 吃：即將營業的店照舊可派（Round 4 的設計，早上可以等開門）
+    expect(scenePasses(c('早餐', { walkMin: 5, opensAt: '09:30', opensInMin: 20, primaryType: 'restaurant' }), sceneOf('eat', { scene: '一個人快吃' }))).toBe(true)
+    expect(sceneOf('eat', { scene: SCENE_OTHER, sceneText: '吃到飽' })!.rule.openOnArrival).toBeUndefined()
+  })
+  it('約會吃好一點：酒吧類不派（Q1）；只剩酒吧時整批放回', () => {
+    const date = sceneOf('eat', { scene: '約會吃好一點' })
+    const cands = [c('Bar Vier', { primaryType: 'bar', types: ['bar'] }), c('鳥貴族', { primaryType: 'japanese_izakaya_restaurant' }), c('イタリアン', { primaryType: 'italian_restaurant' })]
+    expect(sceneFilter(cands, date).kept.map((x) => x.id)).toEqual(['イタリアン'])
+    expect(sceneFilter(cands.slice(0, 1), date)).toEqual({ kept: cands.slice(0, 1), relaxed: true })
+    // 朋友聚餐、宵夜照舊可派居酒屋
+    expect(scenePasses(cands[1]!, sceneOf('eat', { scene: '朋友聚餐' }))).toBe(true)
+  })
+  it('localizeNeed：日本把常見中文需求換成日文；台灣與其他地方不動；不認得的字照留', () => {
+    expect(localizeNeed('有插座', 'JP')).toBe('電源')
+    expect(localizeNeed('安靜 不限時', 'JP')).toBe('静か 長居')
+    expect(localizeNeed('有WiFi', 'JP')).toBe('有Wi-Fi')
+    expect(localizeNeed('吃到飽', 'JP')).toBe('食べ放題')
+    expect(localizeNeed('看得到海', 'JP')).toBe('看得到海')
+    expect(localizeNeed('有插座', 'TW')).toBe('有插座')
+    expect(localizeNeed('有插座', 'other')).toBe('有插座')
+    expect(eatOtherQuery('吃到飽', {}, 'JP')).toBe('食べ放題 レストラン')
+    expect(eatOtherQuery('吃到飽', {}, 'TW')).toBe('吃到飽 餐廳')
+  })
+  it('口令不保證有插座：工作讀書與其他的 hint 要叫人到店確認', () => {
+    expect(sceneOf('rest', { scene: '工作讀書', drink: '咖啡' })!.rule.hint).toMatch(/不准保證有/)
+    expect(sceneOf('rest', { scene: SCENE_OTHER, sceneText: '有插座', drink: '咖啡' })!.rule.hint).toMatch(/到店先確認/)
   })
 })
