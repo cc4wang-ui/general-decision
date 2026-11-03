@@ -11,7 +11,7 @@ import { mealLanes, widenPlan, type LanePlan, type NearbyRank } from './lanes.ts
 import { countryOf } from './price.ts'
 import { hourIn, tzOf } from './tz.ts'
 import { handleOrder, placesLanguage, placesRequest, type OrderIo } from './orderHandler.ts'
-import { SCENE_OTHER, sceneOf, sceneOptions, scenePasses } from './scene.ts'
+import { SCENE_OTHER, localizeNeed, sceneOf, sceneOptions, scenePasses } from './scene.ts'
 import { STATION_RE } from './rules.ts'
 import type { Band, ModuleId, Order, OrderDebug, OrderRequest, PlaceMemSummary } from './types.ts'
 
@@ -186,7 +186,8 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
     if (d?.rescue) fails.push('超商救援')
     if (b.place && c && !scenePasses({ name: c.name, primaryType: c.type, rating: c.rating, walkMin: c.walkMin, closeInMin: c.closeIn, opensAt: c.opensAt, opensInMin: c.opensIn }, rule)) fails.push(`不符規則（${c.type ?? '?'}／${c.rating ?? '?'}★／${c.walkMin ?? '?'}分／剩 ${c.closeIn ?? '?'} 分關門）`)
     if (rule?.rule.openNow && c?.opensAt) fails.push(`還沒開（${c.opensAt}）`)
-    if (scene === SCENE_OTHER && !d?.places?.how.includes(SCENE_TEXT_PROBE[m])) fails.push('關鍵字沒用到手動輸入')
+    // Round 10：日本會把手打的中文需求換成日文（localizeNeed），查詞裡要看到的是換過的字。
+    if (scene === SCENE_OTHER && !d?.places?.how.includes(localizeNeed(SCENE_TEXT_PROBE[m], countryOf(loc)))) fails.push('關鍵字沒用到手動輸入')
     // Round 6 checker：店離起點要 ≤ 情境半徑（第二次查詢用擴大後的半徑）；報了站，口令第一步要從出站寫起。
     const widened = (d?.places?.how.split('→').length ?? 1) > 1
     const radiusM = rule ? Math.round(rule.rule.radius * (widened ? WIDEN_FACTOR : 1)) : undefined
