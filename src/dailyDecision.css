@@ -88,3 +88,5 @@
 .dd-conflicts p{margin:4px 0}
 @media(max-width:350px){.dd-card{padding:9px}.dd-stop{grid-template-columns:25px minmax(0,1fr);gap:6px}.dd-marker span{width:25px;height:25px}.dd-stop:not(:last-child):before{left:12px}.dd-photo-placeholder{min-height:105px}.dd-panel{padding:12px}.dd-actions-secondary>*{flex:1 1 100%!important}}
 @media(prefers-reduced-motion:reduce){.dd *{transition:none!important}}
+/* 出發地＝目前位置：跟輸入框同尺寸的唯讀框，看得出現在用的是 GPS。 */
+.dd-origin-here{min-height:47px;display:flex;align-items:center;background:var(--paper);color:var(--ink);border:var(--card-edge) solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:.875rem;font-weight:750}

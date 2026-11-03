@@ -1,4 +1,4 @@
-import { travelMatrix, scheduleRoute } from '../src/dailyRouting.ts'
+import { travelMatrix, scheduleRoute, validPoint } from '../src/dailyRouting.ts'
 // Daily Decision: real Google Places results and approximate geographic route ordering.
 // Does not claim live traffic, transit ETAs, reservations or confirmed stock.
 export const config = { runtime:'nodejs' }
@@ -36,15 +36,26 @@ async function handler(req:Request):Promise<Response>{
  let raw:unknown;try{raw=await req.json()}catch{return respond({error:'bad_json'},400)}
  if(!raw||typeof raw!=='object')return respond({error:'bad_request'},400)
  const input=raw as Record<string,unknown>
- const location=safe(input.location,100)
- if(!location)return respond({error:'location_required',message:'請先指定出發地。'},400)
+ // 目前位置（GPS）：有帶 origin 就必須是合法座標，否則 400（不猜、不改用文字出發地）。
+ // 合法就直接當中心點，不再用文字查出發地。座標不寫進 log。
+ const hasGps=input.origin!==undefined&&input.origin!==null
+ const gps=hasGps?validPoint(input.origin):null
+ if(hasGps&&!gps)return respond({error:'bad_origin',message:'目前位置的座標不正確，無法排路線。原行程保留。'},400)
+ const location=gps?'':safe(input.location,100)
+ if(!gps&&!location)return respond({error:'location_required',message:'請先指定出發地。'},400)
  const list=Array.isArray(input.stops)?input.stops.slice(0,9):[]
  const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,specified:x.specified===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate:x.candidate&&typeof x.candidate==='object'&&typeof x.candidate.id==='string'&&Number.isFinite(x.candidate.lat)&&Number.isFinite(x.candidate.lng)?x.candidate:undefined}))
  const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,30):[]
  try{
-  const origins=await search(key,location+' Japan',undefined,1)
-  if(!origins.length)return respond({error:'origin_not_found',message:'無法確認出發地，請輸入更具體的車站或地址。'},404)
-  const center={lat:origins[0].lat,lng:origins[0].lng}
+  let origin:Record<string,unknown>,center:Coord
+  if(gps){center=gps;origin={name:'目前位置',current:true,lat:gps.lat,lng:gps.lng}}
+  else{
+   const origins=await search(key,location+' Japan',undefined,1)
+   if(!origins.length)return respond({error:'origin_not_found',message:'無法確認出發地，請輸入更具體的車站或地址。'},404)
+   center={lat:origins[0].lat,lng:origins[0].lng};origin=origins[0]
+  }
+  // 「散步回家」這一站：文字出發地＝回到出發地；目前位置沒有地名可查 → 查離出發點最近的車站（真的 Google 地點），不套預設的澀谷站。
+  const restQuery=gps?'train station':location
   const result:Stop[]=[]
   for(const s of stops){
    if(s.candidate && (!shuffle || s.id!==shuffle)){result.push(s);continue}
@@ -52,9 +63,10 @@ async function handler(req:Request):Promise<Response>{
    // Explicitly named or fixed locations are resolved, never replaced by another business.
    const preserve=s.done||s.locked||s.custom
    const named=s.place&&s.place!== '澀谷站周邊'&&!s.place.includes('周邊')&&!s.place.includes('／')&&!s.place.includes('（')
-   const q=s.specified?s.place:(s.id==='rest'&&!preserve?location:(preserve||(named&&shuffle!==s.id)?s.place:queries[s.id]??queries[s.kind]??s.title))
+   const q=s.specified?s.place:(s.id==='rest'&&!preserve?restQuery:(preserve||(named&&shuffle!==s.id)?s.place:queries[s.id]??queries[s.kind]??s.title))
    if(!q){result.push(s);continue}
-   const found=await search(key,q+(preserve||s.specified?'':' '+location),center,8)
+   // 目前位置模式沒有地名可附加：只靠 locationBias（中心＝目前位置）找附近的店。
+   const found=await search(key,q+(preserve||s.specified||!location?'':' '+location),center,8)
    const eligible=found.filter(p=>!excluded.includes(p.id)&& (preserve||shuffle!==s.id||p.id!==s.candidate?.id))
    const ranked=eligible.sort((a,b)=>dist(center,a)-dist(center,b)+((b.rating??0)-(a.rating??0))*.18)
    const selected=ranked[0]
@@ -67,12 +79,12 @@ async function handler(req:Request):Promise<Response>{
   try{
    const {matrix,distances}=await travelMatrix(key,center,located)
    const schedule=scheduleRoute(located,matrix,distances,now)
-   return respond({origin:origins[0],...schedule,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
+   return respond({origin,...schedule,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
   }catch(e){
    console.warn('[daily-route] Routes matrix unavailable:', e instanceof Error?e.message:'unknown')
    // Keep verified names, photos and navigation functional even if the separate Routes API is not enabled.
    // Do NOT label these geographically grouped stops as verified walking ETAs.
-   return respond({origin:origins[0],stops:ordered.stops.map(({candidate,...rest})=>({...rest,candidate})),routeVerified:false,travelMode:null,verifiedSource:'Google Places',searchedAt:new Date().toISOString(),conflicts:[],warning:'Google Routes 暫時無法驗證；僅依地理接近程度排順序。每站請開啟 Google Maps 取得實際導航時間。'})
+   return respond({origin,stops:ordered.stops.map(({candidate,...rest})=>({...rest,candidate})),routeVerified:false,travelMode:null,verifiedSource:'Google Places',searchedAt:new Date().toISOString(),conflicts:[],warning:'Google Routes 暫時無法驗證；僅依地理接近程度排順序。每站請開啟 Google Maps 取得實際導航時間。'})
   }
  }catch(e){return respond({error:'places_unavailable',message:e instanceof Error?e.message:'店家搜尋失敗'},502)}
 }
