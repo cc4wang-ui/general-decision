@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './dailyDecision.css'
 
-export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean} }
+export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean}; eta?:string;departure?:string;travelMin?:number;conflict?:string }
 export type DailyState = {
   day: string; area: string; currentPlace: string; mode: 'creative'|'practical'
   tasks: DailyTask[]; notes: string[]; avoid: string[]
@@ -9,7 +9,7 @@ export type DailyState = {
 const KEY = 'decide.daily.v1'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
-  day: dayInTokyo(), area: '澀谷', currentPlace: '澀谷住處', mode: 'creative',
+  day: dayInTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
   tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '以澀谷為生活基地，避免不必要跨區', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: []
 })
 export function loadDaily(): DailyState {
@@ -95,6 +95,8 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [busy,setBusy] = useState<string | null>(null)
   const [status,setStatus] = useState('')
   const [routeKm,setRouteKm] = useState<number | null>(null)
+  const [travelMin,setTravelMin] = useState<number | null>(null)
+  const [conflicts,setConflicts] = useState<string[]>([])
   const [fixedTitle,setFixedTitle] = useState('')
   const [fixedPlace,setFixedPlace] = useState('')
   const [fixedTime,setFixedTime] = useState('15:00')
@@ -110,7 +112,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       change(old=>({...old,tasks:data.stops}))
       setRouteKm(data.distanceKm)
-      setStatus('已更新店家與地理路線')
+      setTravelMin(data.travelMinutes)
+      setConflicts(data.conflicts??[])
+      setStatus('已依 Google Routes 步行時間更新路線'+(data.conflicts?.length?'；有固定行程衝突':''))
     }catch(e){setStatus('無法更新：'+(e instanceof Error?e.message:'未知錯誤')+'；原行程已保留')}
     finally{setBusy(null)}
   }
@@ -139,14 +143,15 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
           <div className="dd-panel-title"><span>01 / 今日設定</span><span>PERSONALIZE</span></div>
           <label htmlFor="daily-location">目前位置</label>
           <input id="daily-location" aria-label="目前位置" value={state.currentPlace} onChange={e=>change(s=>({...s,currentPlace:e.target.value.slice(0,80)}))} placeholder="例如：宮下公園" />
-          <small>位置由你指定，尚未使用 GPS 定位。</small>
+          <small>預設以澀谷站為出發點；可改成你現在的確切地點。未使用 GPS。</small>
           <label>今天想怎麼過？</label>
           <div className="dd-mode" role="group" aria-label="今日模式">
             <button aria-pressed={state.mode==='creative'} onClick={()=>change(s=>replanDaily({...s,mode:'creative'}))}>✦ 創意探索</button>
             <button aria-pressed={state.mode==='practical'} onClick={()=>change(s=>replanDaily({...s,mode:'practical'}))}>◈ 效率採買</button>
           </div>
           <button className="dd-primary" data-testid="daily-generate" disabled={busy!==null} onClick={generate}>{busy?'搜尋中…':state.tasks.length?'↻ 搜尋店家並優化路線':'✦ 搜尋店家並生成路線'}</button>
-          <p className="dd-live-status" role="status" aria-live="polite">{status||"搜尋將使用 Google Places 店家資料"}</p>
+          <p className="dd-live-status" role="status" aria-live="polite">{status||"搜尋將使用 Google Places 與 Google Routes"}</p>
+          {conflicts.length>0&&<div className="dd-conflicts" role="alert">{conflicts.map((c,i)=><p key={i}>⚠ {c}</p>)}</div>}
           <details className="dd-details">
             <summary>＋ 加入已安排的行程</summary>
             <div className="dd-form">
@@ -169,16 +174,18 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
           </details>
         </aside>
         <main className="dd-itinerary">
-          <div className="dd-section-title"><div><span>02 / YOUR DAY</span><h2>今日路線</h2></div><span className="dd-count">{state.tasks.length} STOPS{routeKm!==null?" · 約 "+routeKm+" KM":""}</span></div>
+          <div className="dd-section-title"><div><span>02 / YOUR DAY</span><h2>今日路線</h2></div><span className="dd-count">{state.tasks.length} STOPS{routeKm!==null?" · "+routeKm+" KM":""}{travelMin!==null?" · 步行 "+travelMin+" MIN":""}</span></div>
           {state.tasks.length===0?<div className="dd-empty"><span>✳</span><h3>今天還沒有行程</h3><p>選擇模式後點「生成今日行程」，讓今天開始。</p></div>:<div className="dd-timeline" aria-label="今日任務">
             {state.tasks.map((t,i)=><article className={'dd-stop'+(t.done?' is-done':'')} key={t.id}>
               <div className="dd-marker"><span>{String(i+1).padStart(2,'0')}</span></div>
               <div className="dd-card">
                 <div className="dd-card-top"><span className="dd-kind">{t.locked?'◆ 固定安排':t.kind==='gym'?'● FITNESS':t.kind==='meal'?'● FOOD':t.kind==='creative'?'● DISCOVER':t.kind==='shopping'?'● SHOPPING':'● RESET'}</span><span className="dd-duration">{t.start?t.start+' · ':''}{t.minutes} MIN</span></div>
                 <h3>{t.title}</h3>
+                {t.eta&&<p className="dd-eta">預計 {t.eta} 抵達 · {t.departure} 離開 · 前往本站步行 {t.travelMin} 分鐘</p>}
+                {t.conflict&&<p className="dd-stop-conflict" role="alert">⚠ {t.conflict}</p>}
                 <p className="dd-description">{t.detail||'建議停留 '+t.minutes+' 分鐘；實際營業資訊需查證。'}</p>
                 {t.candidate&&<div className="dd-place-meta"><strong>{t.candidate.name}</strong><span>{t.candidate.address}</span><span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{t.candidate.openNow===true?'Google 顯示營業中':t.candidate.openNow===false?'Google 顯示目前未營業':'營業狀態未確認'}</span></div>}
-                <div className="dd-location"><span>⌖</span><input aria-label={t.title+' 指定地點'} value={t.place||''} placeholder="指定地點或輸入地址" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value}:x)}))}/></div>
+                <div className="dd-location"><span>⌖</span><input aria-label={t.title+' 指定地點'} value={t.place||''} placeholder="指定地點或輸入地址" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value,candidate:undefined,eta:undefined,departure:undefined,travelMin:undefined,conflict:undefined}:x)}))}/></div>
                 <div className="dd-actions">
                   <label className="dd-done"><input type="checkbox" checked={t.done} onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done:e.target.checked}:x)}))}/><span>{t.done?'已完成':'完成'}</span></label>
                   {!t.done&&!t.locked&&<button disabled={busy!==null} onClick={()=>{void searchRoute(t.id)}}>{busy===t.id?"搜尋中…":"↻ 換一站"}</button>}
@@ -188,7 +195,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
               </div>
             </article>)}
           </div>}
-          <p className="dd-disclaimer">店家資料來源 Google Places；距離為地理近似值，非實際步行／交通時間。庫存、預約與固定行程衝突尚未驗證。</p>
+          <p className="dd-disclaimer">店家資料來源 Google Places；步行時間由 Google Routes 預估，固定行程衝突會標示；非即時交通保證。庫存與預約尚未驗證。</p>
         </main>
       </div>
     </div>
