@@ -68,3 +68,10 @@
 @media(min-width:1100px){.dd-columns{grid-template-columns:330px minmax(0,1fr);gap:60px}.dd-shell{padding:0 40px}.dd-hero{padding-top:55px}}
 @media(max-width:359px){.dd-shell{padding:0 12px}.dd-card{padding:12px}.dd-stop{grid-template-columns:23px minmax(0,1fr);gap:8px}.dd-marker span{width:23px;height:23px}.dd-stop:not(:last-child):before{left:11px}.dd-actions button,.dd-actions a,.dd-done{font-size:10px;padding:8px}}
 @media(prefers-reduced-motion:reduce){.dd *{transition:none!important}}
+
+/* Live results and responsive feedback */
+.dd-live-status{font-size:12px;line-height:1.55;color:var(--dd-accent);padding:10px 12px;border:1px solid #cbd7be;border-radius:10px;background:#edf1e7;margin:8px 0 12px;overflow-wrap:anywhere}
+.dd-place-meta{display:flex;flex-direction:column;gap:3px;margin:10px 0;padding:12px;background:#f1f4ec;border:1px solid #dce4d5;border-radius:10px;overflow-wrap:anywhere}
+.dd-place-meta strong{font-size:15px;line-height:1.4;color:var(--dd-ink)}
+.dd-place-meta span{font-size:11px;color:var(--dd-muted);line-height:1.5}
+.dd button:disabled{opacity:.6;cursor:progress}
