@@ -9,7 +9,7 @@ export type DailyState = {
 const KEY = 'decide.daily.v1'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
-  day: dayInTokyo(), area: '澀谷', currentPlace: '澀谷住處', mode: 'creative',
+  day: dayInTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
   tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '以澀谷為生活基地，避免不必要跨區', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: []
 })
 export function loadDaily(): DailyState {
@@ -143,7 +143,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
           <div className="dd-panel-title"><span>01 / 今日設定</span><span>PERSONALIZE</span></div>
           <label htmlFor="daily-location">目前位置</label>
           <input id="daily-location" aria-label="目前位置" value={state.currentPlace} onChange={e=>change(s=>({...s,currentPlace:e.target.value.slice(0,80)}))} placeholder="例如：宮下公園" />
-          <small>位置由你指定，尚未使用 GPS 定位。</small>
+          <small>預設以澀谷站為出發點；可改成你現在的確切地點。未使用 GPS。</small>
           <label>今天想怎麼過？</label>
           <div className="dd-mode" role="group" aria-label="今日模式">
             <button aria-pressed={state.mode==='creative'} onClick={()=>change(s=>replanDaily({...s,mode:'creative'}))}>✦ 創意探索</button>
