@@ -1,9 +1,13 @@
 # General Decision — STATE.md
-> Canonical current project status. Updated 2026-11-03 JST. Read this before making changes.
+> Canonical current project status. Updated 2026-11-04 JST. Read this before making changes.
+> Two workstreams were merged on 2026-11-03 (PR #26): the core 班長 app (Round 4–10, details in `state/ROUND*-PROGRESS.md`, handoff `state/HANDOFF-2026-11-03.md`, roadmap `docs/ROADMAP.md`) and 今日行程 (PR #27–#32, below).
 > Repo: cc4wang-ui/general-decision | Production: https://general-decision.vercel.app
 > Historical `state/decide-mvp-build.md` describes September MVP, NOT current acceptance.
 
 ## 1. Verified facts
+- **Workstream merge (PR #26, branch `claude/nifty-ramanujan-szofu5`)**: Round 4–8 had been live via direct Vercel uploads (last: Round 7 `dpl_GRtU7onjopNWnQ1YrXRnQ9rM6eyA`) while `main` was still Round 3. On 2026-11-03 14:38–17:32 JST PR #27–#32 merged into `main` and Vercel's git integration replaced production, silently removing Round 4–7. PR #26 merges `main` back into Round 4–8 (only `src/app.tsx` conflicted; both kept) and adds Round 9–10 fixes. Preview-verified on real Places/Claude data; see `state/ROUND9-PROGRESS.md`, `state/ROUND10-PROGRESS.md`.
+- **Core app features (Round 4–10)**: scene picker for eat/rest (5 presets + free text), no empty-handed orders (convenience-store rescue), budget filter, 60-day trial log, in-train mode (report station when GPS is stale), Japanese keywords in Tokyo, exclusion lists (hookah bars, malls, karaoke, food courts, bars for takeout/date/late-night), shops must be open on arrival (≥10 min left, never relaxed).
+- **Fixed in Round 9 for 今日行程**: `addFixedTask` time regex was `\\d` (literal backslash) so every fixed appointment was rejected; `api/daily-route.ts` and `api/place-photo.ts` now export both named methods (wrong method → 405) so `npm run check:bundle` passes.
 - **PR #32 (2026-11-03)** unifies `今日行程` with the existing 8-bit App design tokens and 440px container; removes the conflicting nested `<main>`, adds Google Places on-demand photos with author attribution, exact Google Maps walking navigation and place detail links. The photo endpoint does not cache Google photo names/URIs.
 - **Verified with actual Vercel preview calls (PR #32)**: `/api/daily-route` real server smoke returned 3 named Shibuya places and addresses, HTTP 200; `/api/place-photo` returned HTTP 200 for **all 3 corresponding Google Place IDs**; single-stop Shuffle returned a different cafe while preserving the selected meal and fixed PARCO appointment.
 - **Confirmed blocker:** Google Routes matrix returned HTTP **403** in real preview runtime logs on 2026-11-03. The app now returns verified named venues and route-order approximation with a visible unverified-route warning, not fake ETAs or an empty itinerary. Direct Google Maps navigation uses Google's directions URL.
@@ -35,11 +39,13 @@
 - **P1 — UI device testing:** PR #32 removed independent editorial style and nested `<main>`; uses original 8-bit tokens and original 440px host container. **No verified real iPhone Safari/iPad/desktop screenshots or touch E2E** yet.
 - **P1 — live shop information:** Places returns place metadata/open-now when supplied; current implementation does not enforce opening hours for planned arrival, confirm product inventory, exhibitions, reservations or admission.
 - **P1 — current location:** no GPS. Default is Shibuya Station; a previous assumed residence label was replaced. Users must enter actual starting point.
-- **P1 — stale documentation:** historical README/DEPLOY/status still describe September setup. This STATE is canonical until those docs are reconciled.
-- **P1 — code hygiene:** prior preview build logs mentioned pre-existing TypeScript diagnostics in `src/diary.ts`; despite Vercel build READY, run `npm run typecheck` and record exact exit status before claiming TS clean.
+- ~~**P1 — stale documentation**~~ — resolved 2026-11-04: README status/structure rewritten; spec, strategy and old plans annotated (`docs/ROADMAP.md` N8). `DEPLOY.md` and `state/decide-mvp-build.md` remain historical.
+- ~~**P1 — code hygiene**~~ — resolved 2026-11-03: `npm run typecheck` exits 0 on the merged branch (no diagnostics in `src/diary.ts`); unit 614/614.
 - **P2 — sync and memory:** local-only browser persistence; no cross-device sync, no ChatGPT memory import, no canonical project vault sync.
 
 ## 4. Lessons learned
+- **Two workstreams on one Vercel project diverge silently.** Before any production deploy, check which deployment `general-decision.vercel.app` points to and its git source (`mcp__Vercel__get_deployment`). Never direct-upload to production when `main` has moved; merge into `main` instead.
+- Running 4 parallel subagents exhausted the account's 5-hour usage limit within ~1 hour; nothing resumed overnight. Keep ≤2 parallel subagents and leave a self-wake timer.
 - Deploy READY ≠ verified functionality; every release needs real POST smoke and device UX evidence.
 - The first daily feature was a static activity list disguised as an itinerary; named venues and real travel times are core requirements, not later enhancements.
 - A mobile CSS makeover without real-world decision quality did not satisfy the user. **Never create independent style tokens or nested `<main>` inside a screen:** these caused the severe mismatched UI; inherit host `src/styles.css` tokens, hard shadows and main width.
