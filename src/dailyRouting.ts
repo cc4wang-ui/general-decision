@@ -37,7 +37,7 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
   const eta=deadline!==null&&arrival<deadline?deadline:arrival
   const conflict=deadline!==null&&arrival>deadline?'預計晚到 '+(arrival-deadline)+' 分鐘':undefined
   if(conflict)conflicts.push((s.title??s.id)+'：'+conflict)
-  ordered.push({...s,eta:clock(eta),departure:clock(eta+(s.minutes??45)),travelMin:duration,conflict})
+  ordered.push({...s,eta:clock(eta),departure:clock(eta+(s.minutes??45)),travelMin:duration,conflict} as T)
   travelMinutes+=duration;distanceKm+=distance;at=eta+(s.minutes??45);position=next
  }
  for(const fixed of [...appointments,{id:'__end__'} as T]){
