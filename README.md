@@ -1,17 +1,29 @@
 # 報告班長 · 決斷連
 
-> **2026-11-03 最新專案狀態：** [STATE.md](STATE.md)（Verified facts / General rules / Open failures / Lessons learned / Last session）；[踩坑與防回歸紀錄](docs/FAILURE-MEMORY.md)。以下「現在的狀態」與部署說明保留早期 MVP 歷史，**不可用來判定目前的 API 或驗收狀態**。正式部署 READY 不等於 Places／Routes 端到端 PASS。\n\n
-一個手機 PWA。按一顆情境鍵、點 0–2 個選項，值星班長下一道不可拒絕的命令，
-你回報「完成／店關了／沒做」，完成就登記、沒做就罰則。每道口令自動寫進新兵日記，
-週日 20:00 後產出莒光園地週報。
+> **目前狀態以 [STATE.md](STATE.md) 為準**（英文，Verified facts／Open failures）。每輪的細節在 `state/ROUND*-PROGRESS.md`，接手先讀 `state/HANDOFF-2026-11-03.md`，路線圖在 [docs/ROADMAP.md](docs/ROADMAP.md)，踩坑紀錄在 [docs/FAILURE-MEMORY.md](docs/FAILURE-MEMORY.md)。
 
-規格：[DECIDE-DEV-DOC-v1.md](DECIDE-DEV-DOC-v1.md)　畫面基準：[decide-mock-v5.html](decide-mock-v5.html)
+一個手機 PWA，兩個入口：
 
-## 現在的狀態
+- **班長口令**：按一張情境卡（吃、歇、去…），選情境與 0–2 個選項，班長派一家附近真的店、下一道口令。你回報「完成／換一家／沒做」，每道口令寫進新兵日記，週日 20:00 後產出莒光園地週報。
+- **今日行程**：排一天的行程（運動、吃飯、咖啡…），每站是 Google 上真的地點，附照片與 Google Maps 步行導航。
 
-S1–S10 完成。已部署到 Vercel，`/api/order`、`/api/weekly` 在正式站可回應。
-**剩最後兩件事需要你本人**：在 Vercel 填 `ANTHROPIC_API_KEY`（必要）、在 GCP 啟用 Places API (New)（可選）。
-見 [DEPLOY.md](DEPLOY.md)。進度在 [state/decide-mvp-build.md](state/decide-mvp-build.md)。
+規格：[DECIDE-DEV-DOC-v1.md](DECIDE-DEV-DOC-v1.md)（2026-09 的原始規格；Round 4 起的改動見檔頭附註）　畫面基準：[decide-mock-v5.html](decide-mock-v5.html)
+
+## 現在的狀態（2026-11-04）
+
+| 輪 | 內容 | 文件 |
+|---|---|---|
+| 3 | 店由程式挑、本機記憶、換一家要原因、台幣／日圓預算、同意頁 | `state/ROUND3-PROGRESS.md` |
+| 4 | 不空手（超商救援）、不重複、照預算、60 天試用紀錄、量測工具（只在 preview） | `state/ROUND4-PROGRESS.md` |
+| 5 | 吃／歇先選情境（5 種＋「其他」）、沒做先問原因 | `state/ROUND5-PROGRESS.md` |
+| 6 | 在車上也能用：地下沒定位 → 報站、日文站名查座標、口令從出站寫起 | `state/ROUND6-PROGRESS.md` |
+| 7 | 東京的「歇」用日文關鍵字；不派水煙吧、購物中心 | `state/ROUND7-PROGRESS.md` |
+| 8 | 歇選咖啡不派卡拉OK、美食街；外帶不派酒吧 | `state/ROUND8-PROGRESS.md` |
+| 今日行程 | PR #27–#32（另一條工作線）：真地點、照片、導航、固定行程、單站洗牌 | `STATE.md` |
+| 9 | 兩條線合併；修固定行程的時間檢查 | `state/ROUND9-PROGRESS.md` |
+| 10 | 路線圖全做：到店要開著、約會與宵夜不派酒吧、其他的需求換日文、「去」卡查真地點、記憶匯出入、今日行程用目前位置… | `state/ROUND10-PROGRESS.md` |
+
+部署：Vercel 接在這個 repo，`main` 一更新就自動部署正式站。測試版在 PR 的分支上自動建。正式站有問題用 Vercel rollback。
 
 ## Round 3（2026-10-22）：不再重複推薦、加上價位
 
@@ -42,10 +54,10 @@ npm run build      # STOP B
 ```
 
 ```bash
-npm run e2e        # STOP C：36 條 Playwright（WebKit，對齊 iPhone Safari）
+npm run e2e        # STOP C：全套 Playwright（條數與結果記在最新的 state/ROUND*-PROGRESS.md）
 ```
-> 先 `npx playwright install webkit`。2026-09-14 那輪 36 條全過（exit 0）。
-> 2026-09-11 交付文件裡「WebKit 被 macOS sandbox 擋住、不得標記 E2E PASS」是那一輪的環境問題，已解除。
+> 設定是 iPhone 13（WebKit）。雲端容器只有 Chromium：`npx playwright test --browser=chromium tests/e2e`。
+> 2026-09-14 那輪 36 條在 WebKit 全過；之後每輪都在 Chromium 跑全套。
 
 ```bash
 npm run e2e:shots  # STOP D：產 shots/ 七張截圖，對照表在 shots/CHECK.md
@@ -67,7 +79,7 @@ npm run check:bundle  # 在本機重建 Vercel lambda 版面，確認 api/ 真�
 ```
 src/
   app.tsx        單頁狀態機 home→intake→cmd→(log|stand)；diary；weekly
-  cards.ts       7 張模組卡（第 6 節）
+  cards.ts       8 張模組卡（第 6 節＋travel）
   officers.ts    3 位班長，語料三層各 24 句（第 7 節）
   banned.ts      護欄字表：罵行為不罵人
   avatar.tsx     SVG 角色（第 14 節資產介面，繪師交件當天可換）
@@ -77,10 +89,21 @@ src/
   prompt.ts      系統提示詞
   rules.ts       算得出來的硬規則（attend／sleep／buy／reply）
   orderParse.ts  Claude 回傳的四層解析
-  places.ts      Places 過濾與距離
+  places.ts      Places 過濾與距離、營業時間
+  orderHandler.ts  /api/order 的本體：Places → 挑店 → Claude → Order JSON（Round 4 從 api/order.ts 搬來）
+  lanes.ts       查詢規劃（料理細類輪替、放大、超商救援）
+  scene.ts       吃／歇的情境規則（排除清單、到店要開著、日文關鍵字）
+  discovery.ts   挑店（品質保底＋曝光衰減＋連鎖降權）
+  placeMem.ts    手機上的店家記憶（只存 place_id 與時間）
+  trial.ts       60 天試用紀錄
+  probe.ts       preview 專用的真資料量測
+  dailyDecision.tsx、dailyRouting.ts  今日行程
 api/
-  order.ts       Places → Claude → Order JSON
+  order.ts       薄殼，呼叫 src/orderHandler.ts
   weekly.ts      本週日記 → Claude → WeeklyReport JSON
+  geocode.ts     日文站名 → 座標（Round 6）
+  probe.ts       量測端點（正式站 404）
+  daily-route.ts、place-photo.ts  今日行程的地點與照片
 ```
 
 金鑰只存在於 `api/`，前端永遠不碰。無 DB、無 cron、無推播。
