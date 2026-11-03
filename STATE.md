@@ -8,7 +8,8 @@
 - **Verified with actual Vercel preview calls (PR #32)**: `/api/daily-route` real server smoke returned 3 named Shibuya places and addresses, HTTP 200; `/api/place-photo` returned HTTP 200 for **all 3 corresponding Google Place IDs**; single-stop Shuffle returned a different cafe while preserving the selected meal and fixed PARCO appointment.
 - **Confirmed blocker:** Google Routes matrix returned HTTP **403** in real preview runtime logs on 2026-11-03. The app now returns verified named venues and route-order approximation with a visible unverified-route warning, not fake ETAs or an empty itinerary. Direct Google Maps navigation uses Google's directions URL.
 
-- Main commit `9f8cb4cc8dea8e4f2a731f8cdb2bac075f07c7d2` (PR #31) deployed to Vercel production, deployment `dpl_7sddcXHb633uyecLH4cFrhmWeMNM`, state **READY** on 2026-11-03. READY verifies deployment status, **not** real-world API functionality or UX.
+- **Latest functional release:** PR #32 merge commit `46579a9d9a3c174ef88bc1a3a115a00864d0e852`, Vercel production deployment `dpl_C5UoWQzHQeevgjMtKLh2kNMYvqPh` **READY** on 2026-11-03. Production GET `/` and `/api/place-photo` returned HTTP 200. Production bundle contains the direct navigation and photo UI. **This is not a mobile browser visual E2E PASS.**
+- **Earlier release:** PR #31 commit `9f8cb4cc8dea8e4f2a731f8cdb2bac075f07c7d2`, prior production deployment `dpl_7sddcXHb633uyecLH4cFrhmWeMNM` READY (historical).
 - PR #27 introduced local-first daily context, FIT-EASY preference, daily tasks and persisted state. PR #28 added per-stop shuffle, custom place, fixed appointments and detail cards. PR #29 redesigned the daily page mobile-first. PR #30 added Google Places-backed named venue search and loading/error feedback. PR #31 added Google Routes WALK matrix, ETAs, fixed-time lateness alerts and scheduler tests.
 - `GOOGLE_PLACES_KEY` and `ANTHROPIC_API_KEY` names exist in Vercel production/preview environment configuration (2026-11-03, metadata only). Their actual values, validity, billing permissions, Places API (New) and Routes API enablement have **not** been independently verified.
 - The daily state uses browser `localStorage` key `decide.daily.v1`; it is not synced between devices and does not automatically inherit ChatGPT memories.
@@ -50,6 +51,6 @@
 
 ## 5. Last session — 2026-11-03
 - User explicitly rejected the mismatched Daily UI and generic non-navigable cards. PR #32 makes Daily consistent with main 8-bit App; each resolved stop has a real Google place, image (or explicit unavailable state), address, place detail and walking navigation link.
-- Main at `9f8cb4c`, Vercel production READY; this is a deployment observation only.
+- PR #32 merge `46579a9` production READY; the official site and actual photo endpoint return 200. Routes is still 403, so complete itinerary ETA acceptance is FAIL.
 - Preview validation: named places 3/3 PASS, real place photos 3/3 PASS, single-stop Shuffle preservation PASS, Routes matrix FAIL (403). Next: enable Google Routes for the existing key, test real walking ETA with fixed times, and run iPhone/desktop UI E2E before declaring full product PASS.
 - Handoff: read this file, `docs/FAILURE-MEMORY.md`, `src/dailyDecision.tsx`, `src/dailyRouting.ts`, `api/daily-route.ts`, `DEPLOY.md`, and the current deployment logs. Do not start a parallel app.
