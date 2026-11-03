@@ -33,7 +33,21 @@
 | C 手機端資料 | 子代理（worktree） | X4 記憶匯出／匯入；N6 試用紀錄記「你在車上？」；N4 匯出一鍵含記憶 | `src/app.tsx` 除錯畫面、`src/placeMem.ts`、`src/trial.ts` |
 | D 今日行程＋e2e | 子代理（worktree） | 今日行程用目前位置當出發點；N7 e2e 5 條失敗 | `src/dailyDecision.tsx`、`api/daily-route.ts`、`tests/e2e/` |
 | E 文件 | 主對話（最後） | N8 README、`STATE.md`、規格附註、ROADMAP 狀態 | 文件 |
+| F 連勝 | 子代理（worktree） | X7 出勤連勝＋公差假單＋升階（最小可用版） | `src/streak.ts`（新）、`src/app.tsx` 首頁與日記頁 |
 
 ## 進度
 
-（工作中）
+### A 線（主對話）✅
+
+| commit | 內容 |
+|---|---|
+| `e053d25` | 歇全部情境：走到店時還沒開門的不派（`openOnArrival`）。到店剩不到 10 分（或已關）的店一律不派，含整批放回（`viable`、`HARD_OPEN_MIN`）；連這都沒有 → 超商救援。約會擋酒吧（Q1）。日本把「其他」的中文需求換成日文（`localizeNeed`：有插座→電源…）。工作讀書與其他的口令不保證有插座（X3） |
+| `b504d8e` | probe 的「其他」查詞檢查認換過的日文；`state/handoff-tools/preview-measure.sh`、`r10-check.mjs` |
+| `7ca1ea4` | 宵夜不派純酒吧（居酒屋照派）——量測時看到 bar moon walk |
+
+- 單元 614/614。handler 測試「附近全是到店已關的店 → 超商救援」做過突變檢查（規則關掉就失敗）。
+- 測試版實測（新宿駅）：23:40 → 12/12 的實質指標全 0，但 probe 字詞檢查誤判 2 格；修 probe 後 **23:42 → 12/12 pass**，歇派錯 0、外帶酒吧 0、約會酒吧 0、歇還沒開 0、到店已關 0。「其他／有插座」候選從 3 家變 11 家。證據 `state/evidence/r10/lineA-2340/`、`lineA-2345/`。
+
+### E 線（主對話）進行中
+
+- `263d43a`：README 換成現況；規格、策略、舊計畫加附註。`STATE.md` 與 ROADMAP 狀態等各線合併後寫。
