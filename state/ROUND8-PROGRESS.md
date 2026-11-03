@@ -70,9 +70,10 @@ typecheck ✅、單元 594 條 ✅（`TZ=Asia/Taipei`，原 590＋4）、build �
 - 白天店多，本來就不會派錯；缺陷只在深夜出現。真正的驗證看深夜。
 - 觀察（不是這輪造成）：09:25 有 2 筆派到 10:00 才開的店（LUKE'S LOBSTER、猫カフェ）。歇沒有「要營業中」的規則，Round 5 起就這樣。列入下一輪候選。
 
-### 深夜（排定 2026-11-04 01:00 東京，session 自己喚醒）
+### 深夜
 
-（待量）
+**沒有排程。** 原本排 2026-11-04 01:00 東京自動喚醒（`trig_01BKoxN2Myox8D4iHUo6w49x`）；Cross 2026-11-03 17:11 東京說「關掉所有排程」，已停用（沒有刪除）。
+要量深夜：東京 01:00 前後手動打 R8 preview-1 的 `/api/probe?mode=scene&loc=shinjuku`，存 `state/evidence/r8/scene-shinjuku-night.json`，再跑 `r8-check.mjs`。之後才跑 checker、問 Cross 上線 🔒。
 
 ## 回復點
 
