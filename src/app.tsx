@@ -228,8 +228,15 @@ export function App() {
     if (loc) {
       setGeoDenied(false)
     } else if (c.needsPlaces && underPlacesCap()) {
-      const geo = await (geoAhead.current ?? getLocation())
+      const ahead = geoAhead.current
+      let geo = await (ahead ?? getLocation())
       geoAhead.current = null // 用過即丟；換口令會重新要一次（maximumAge 30s，通常瞬間回）
+      // Round 10：預先抓的定位是進選單時拿的；在選單停超過 1 分鐘再送出，會被誤判成「舊定位」而問「你在車上？」。
+      // 先重抓一次：拿到新的就用新的；重抓失敗（地下收不到）才用原本的，照舊問。
+      if (ahead && geoDoubt(geo) === 'stale') {
+        const fresh = await getLocation()
+        if (fresh.loc) geo = fresh
+      }
       loc = geo.loc
       geoReason = geo.reason
       setGeoDenied(geo.denied)
