@@ -185,7 +185,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 {t.conflict&&<p className="dd-stop-conflict" role="alert">⚠ {t.conflict}</p>}
                 <p className="dd-description">{t.detail||'建議停留 '+t.minutes+' 分鐘；實際營業資訊需查證。'}</p>
                 {t.candidate&&<div className="dd-place-meta"><strong>{t.candidate.name}</strong><span>{t.candidate.address}</span><span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{t.candidate.openNow===true?'Google 顯示營業中':t.candidate.openNow===false?'Google 顯示目前未營業':'營業狀態未確認'}</span></div>}
-                <div className="dd-location"><span>⌖</span><input aria-label={t.title+' 指定地點'} value={t.place||''} placeholder="指定地點或輸入地址" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value}:x)}))}/></div>
+                <div className="dd-location"><span>⌖</span><input aria-label={t.title+' 指定地點'} value={t.place||''} placeholder="指定地點或輸入地址" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value,candidate:undefined,eta:undefined,departure:undefined,travelMin:undefined,conflict:undefined}:x)}))}/></div>
                 <div className="dd-actions">
                   <label className="dd-done"><input type="checkbox" checked={t.done} onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done:e.target.checked}:x)}))}/><span>{t.done?'已完成':'完成'}</span></label>
                   {!t.done&&!t.locked&&<button disabled={busy!==null} onClick={()=>{void searchRoute(t.id)}}>{busy===t.id?"搜尋中…":"↻ 換一站"}</button>}
