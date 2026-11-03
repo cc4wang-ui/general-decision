@@ -1,5 +1,6 @@
 # 報告班長 · 決斷連
 
+> **2026-11-03 最新專案狀態：** [STATE.md](STATE.md)（Verified facts / General rules / Open failures / Lessons learned / Last session）；[踩坑與防回歸紀錄](docs/FAILURE-MEMORY.md)。以下「現在的狀態」與部署說明保留早期 MVP 歷史，**不可用來判定目前的 API 或驗收狀態**。正式部署 READY 不等於 Places／Routes 端到端 PASS。\n\n
 一個手機 PWA。按一顆情境鍵、點 0–2 個選項，值星班長下一道不可拒絕的命令，
 你回報「完成／店關了／沒做」，完成就登記、沒做就罰則。每道口令自動寫進新兵日記，
 週日 20:00 後產出莒光園地週報。
