@@ -86,7 +86,7 @@ export function shuffleTask(s: DailyState, id: string): DailyState {
  }) }
 }
 export function addFixedTask(s: DailyState, title: string, place: string, start: string, minutes: number): DailyState {
- if(!title.trim() || !place.trim() || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(start) || !Number.isFinite(minutes) || minutes<5 || minutes>720) return s
+ if(!title.trim() || !place.trim() || !/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !Number.isFinite(minutes) || minutes<5 || minutes>720) return s
  const task:DailyTask={id:'fixed-'+Date.now()+'-'+s.tasks.length,title:title.trim().slice(0,100),place:place.trim().slice(0,120),start,minutes,kind:'rest',done:false,locked:true,custom:true,detail:'既有固定安排：不會被重排或洗牌。'}
  return {...s,tasks:[...s.tasks,task].sort((a,b)=>(a.start||'99:99').localeCompare(b.start||'99:99'))}
 }
