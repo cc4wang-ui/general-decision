@@ -1,3 +1,4 @@
+import { travelMatrix, scheduleRoute } from '../src/dailyRouting.ts'
 // Daily Decision: real Google Places results and approximate geographic route ordering.
 // Does not claim live traffic, transit ETAs, reservations or confirmed stock.
 export const config = { runtime:'nodejs' }
@@ -58,7 +59,13 @@ async function handler(req:Request):Promise<Response>{
    const selected=ranked[0]
    result.push(selected?{...s,title:preserve?s.title:selected.name,place:selected.address,candidate:selected}:s)
   }
-  return respond({origin:origins[0],...order(result,center),verifiedSource:'Google Places',searchedAt:new Date().toISOString()})
+  const ordered=order(result,center)
+  const now=new Date().toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'})
+  const located=ordered.stops.filter(s=>s.candidate)
+  if(located.length!==ordered.stops.length)return respond({error:'unresolved_stops',message:'部分行程尚未找到真實地點，無法計算可靠交通時間。原行程保留。'},422)
+  const {matrix,distances}=await travelMatrix(key,center,located)
+  const schedule=scheduleRoute(located,matrix,distances,now)
+  return respond({origin:origins[0],...schedule,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
  }catch(e){return respond({error:'places_unavailable',message:e instanceof Error?e.message:'店家搜尋失敗'},502)}
 }
 export function POST(req:Request){return handler(req)}
