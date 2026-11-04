@@ -89,8 +89,19 @@
 |---|---|---|---|---|---|
 | 11-04 18:20 | 新宿 | 12/12 | 全 0 | JeMare 4.8★ 走 8 分 | `state/evidence/r11/evening/scene-shinjuku.*` |
 | 11-04 17:20（台北） | 信義 | 12/12 | 全 0 | PROMETTENTE 4.7★ 走 15 分 | `state/evidence/r11/evening/scene-xinyi.*` |
+| 11-05 01:01 | 新宿 | 12/12 | 全 0 | 鮨和食かなうS 4.7★ 走 9 分 | `state/evidence/r11/night/scene-shinjuku.*` |
+| 11-05 00:01（台北） | 信義 | 8/12 | 歇派錯 1（見下） | Zentopia 禪托邦 4.8★ 走 14 分 | `state/evidence/r11/night/scene-xinyi.*` |
 
 整理：`node state/handoff-tools/r11-check.mjs <json>`。
+
+**深夜（11-05 01:01 東京）**：
+- STOP 5（深夜新宿）✅：12/12，派錯、還沒開、到店已關、約會酒吧全 0。約會走 9 分。
+- Routes：測試版 `/api/daily-route` 回 `routeVerified:true`（`night/daily.json`）。
+- 信義 00:01（台北）8/12，**不是 Round 11 造成**（Round 11 只改約會）：
+  - 歇 3 格（工作讀書、談事情、等人）是「附近沒有一家符合 → 整批放回」（`relaxed:true`，Round 7／10 的設計）。工作讀書、談事情派到剩 58 分關門的店（情境要 90／60 分）。
+  - **等人派到「PLAYING Hookah Lounge」（type=pub）**：整批放回時不再擋水煙吧與酒吧。這是真的派錯店。
+  - 吃「其他／吃到飽」：午夜附近沒有開著的吃到飽 → 超商救援（說實話）。
+- **下一輪候選（待 Cross）**：歇整批放回時，仍擋店名含 hookah／shisha／水煙、type 是酒吧類的店；剩下的都不行才超商救援。
 
 ### 量測排程（send_later 叫醒這個 session，一次性）
 

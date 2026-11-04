@@ -1,0 +1,452 @@
+{
+ "loc": "台北信義（市府）",
+ "localHour": 0,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "一品活蝦市府店",
+   "type": "seafood_restaurant",
+   "rating": 4.2,
+   "walkMin": 6,
+   "distM": 458,
+   "radiusM": 1250,
+   "closeIn": 118,
+   "how": "text=\"便當\" rank=RELEVANCE → text=\"麵店\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 5,
+    "total": 18,
+    "relaxed": false
+   },
+   "steps": [
+    "點一份活蝦料理",
+    "00:07 到店，20分鐘內吃完"
+   ],
+   "bot": "趕時間就點蝦，6分鐘到",
+   "ms": 2668
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "萊爾富便利商店 信義市府站",
+   "type": "convenience_store",
+   "rating": 4.5,
+   "walkMin": 3,
+   "distM": 180,
+   "radiusM": 1500,
+   "how": "text=\"水餃 鍋貼\" rank=RELEVANCE → text=\"便當\" rank=RELEVANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 9,
+    "total": 13,
+    "relaxed": false
+   },
+   "steps": [
+    "00:04 到店，點飯糰或便當帶回去",
+    "選好就結帳，不要站在那邊挑"
+   ],
+   "bot": "你各位啊，外帶沒有藉口",
+   "ms": 2851
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "一品活蝦市府店",
+   "type": "seafood_restaurant",
+   "rating": 4.2,
+   "walkMin": 6,
+   "distM": 458,
+   "radiusM": 3000,
+   "closeIn": 118,
+   "how": "text=\"熱炒\" rank=RELEVANCE → text=\"熱炒\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 6,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "00:07 到店，點蝦子、時蔬、豆製品各一道分著吃",
+    "01:37 前吃完走人，不要拖延"
+   ],
+   "bot": "你各位啊，一群人就是要點活蝦，一個口令一個動作",
+   "ms": 3054
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Zentopia Taipei 禪托邦餐酒館",
+   "type": "bistro",
+   "rating": 4.8,
+   "walkMin": 14,
+   "distM": 1046,
+   "radiusM": 1200,
+   "closeIn": 118,
+   "how": "text=\"餐酒館\" rank=RELEVANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 7,
+    "total": 12,
+    "relaxed": false
+   },
+   "cands": [
+    {
+     "name": "來吧台北日式暢飲餐酒館",
+     "type": "pub",
+     "rating": 4.9,
+     "walkMin": 11,
+     "closeIn": 118
+    },
+    {
+     "name": "ComingBistro｜台北餐酒館",
+     "type": "restaurant",
+     "rating": 4.9,
+     "walkMin": 12,
+     "closeIn": 118
+    },
+    {
+     "name": "角窩美式餐酒館",
+     "type": "bistro",
+     "rating": 4.8,
+     "walkMin": 15,
+     "closeIn": 118
+    },
+    {
+     "name": "Zentopia Taipei 禪托邦餐酒館",
+     "type": "bistro",
+     "rating": 4.8,
+     "walkMin": 14,
+     "closeIn": 118
+    },
+    {
+     "name": "Commons",
+     "type": "restaurant",
+     "rating": 4.7,
+     "walkMin": 12,
+     "closeIn": 118
+    },
+    {
+     "name": "地中海餐酒館 ABV Bar & Kitchen 台北光復店",
+     "type": "mediterranean_restaurant",
+     "rating": 4.6,
+     "walkMin": 12,
+     "closeIn": 88
+    },
+    {
+     "name": "Flare Taipei",
+     "type": "lounge_bar",
+     "rating": 4.6,
+     "walkMin": 8,
+     "closeIn": 118
+    },
+    {
+     "name": "去憂餐酒館 Chill Bistro & Bar",
+     "type": "bar",
+     "rating": 4.6,
+     "walkMin": 15,
+     "closeIn": 118
+    },
+    {
+     "name": "凨餐酒 Fong Bar & Kitchen",
+     "type": "bistro",
+     "rating": 4.6,
+     "walkMin": 15,
+     "closeIn": 118
+    },
+    {
+     "name": "隱世餐酒館(台北永春店)",
+     "type": "restaurant",
+     "rating": 4.5,
+     "walkMin": 11,
+     "closeIn": 118
+    },
+    {
+     "name": "MADE Paris |東區酒吧|美食酒吧|深夜美食|Bar & Restaurant|餐酒館",
+     "type": "pub",
+     "rating": 4.5,
+     "walkMin": 14,
+     "closeIn": 118
+    },
+    {
+     "name": "NINJA TAIPEI 餐酒｜咖啡廳｜DRAFT COCKTAILS",
+     "type": "bistro",
+     "rating": 4.3,
+     "walkMin": 13,
+     "closeIn": 178
+    }
+   ],
+   "steps": [
+    "00:15 到店，點招牌菜",
+    "慢慢品嚐，不趕時間",
+    "01:45 前離開"
+   ],
+   "bot": "約會慢慢吃，招牌菜一個口令一個動作",
+   "ms": 2769
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "柳家涼麵",
+   "type": "korean_restaurant",
+   "rating": 3.9,
+   "walkMin": 13,
+   "distM": 997,
+   "radiusM": 2500,
+   "closeIn": 268,
+   "how": "text=\"麵店\" rank=RELEVANCE → text=\"消夜\" rank=DISTANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 18,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "點招牌涼麵一份",
+    "現場吃完，不外帶",
+    "0044 前出店門"
+   ],
+   "bot": "你各位，30 分內進食完畢，0014 準時到位",
+   "ms": 2854
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": false,
+   "why": "超商救援",
+   "picked": "萊爾富便利商店 信義市府站",
+   "type": "convenience_store",
+   "rating": 4.5,
+   "walkMin": 3,
+   "distM": 180,
+   "radiusM": 2500,
+   "how": "text=\"吃到飽 餐廳\" rank=DISTANCE → text=\"吃到飽 餐廳\" rank=RELEVANCE → text=\"便利商店\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 0,
+    "total": 0,
+    "relaxed": false
+   },
+   "steps": [
+    "00:04 到店，挑 3～4 樣便當、飯糰、關東煮",
+    "坐下來 15 分鐘內吃完"
+   ],
+   "bot": "附近都收了，去超商",
+   "ms": 3272
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Babylon Taipei",
+   "type": "restaurant",
+   "rating": 4.3,
+   "walkMin": 8,
+   "distM": 620,
+   "radiusM": 1500,
+   "closeIn": 118,
+   "how": "text=\"咖啡廳\" rank=DISTANCE → text=\"咖啡廳\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 3,
+    "total": 18,
+    "relaxed": false
+   },
+   "steps": [
+    "00:09 到店坐下，點一杯咖啡",
+    "咖啡來了就喝，手機面朝下放包包",
+    "坐滿 30 分鐘再起身"
+   ],
+   "bot": "一杯咖啡，腦子放空",
+   "ms": 2975
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": false,
+   "why": "不符規則（bistro／4.4★／13分／剩 58 分關門）",
+   "picked": "Greedy Bistronomy Cafe 咖啡·餐酒｜酒吧｜東區餐酒｜大安餐酒.早午餐｜Wine",
+   "type": "bistro",
+   "rating": 4.4,
+   "walkMin": 13,
+   "distM": 970,
+   "radiusM": 2500,
+   "closeIn": 58,
+   "how": "text=\"不限時 咖啡廳\" rank=RELEVANCE → text=\"不限時 咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 9,
+    "total": 9,
+    "relaxed": true
+   },
+   "steps": [
+    "進店先問店員哪邊有插座能用",
+    "點一杯咖啡，00:59 前喝完",
+    "00:25 到 00:55 專心工作讀書，中間不滑手機"
+   ],
+   "bot": "先問插座，點一杯，90 分鐘專心",
+   "ms": 3186
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "泰讚了 市民總店",
+   "type": "ice_cream_shop",
+   "rating": 4.6,
+   "walkMin": 10,
+   "distM": 794,
+   "radiusM": 2500,
+   "closeIn": 268,
+   "how": "text=\"咖啡廳\" rank=RELEVANCE → text=\"咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 12,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "找能坐四人的位子",
+    "各點一杯咖啡",
+    "01:11 前不准催人走"
+   ],
+   "bot": "坐滿一小時，手機收起來",
+   "ms": 2562
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": false,
+   "why": "不符規則（coffee_shop／4.5★／14分／剩 58 分關門）",
+   "picked": "Placeee 場所",
+   "type": "coffee_shop",
+   "rating": 4.5,
+   "walkMin": 14,
+   "distM": 1054,
+   "radiusM": 2500,
+   "closeIn": 58,
+   "how": "text=\"安靜 咖啡廳\" rank=RELEVANCE → text=\"安靜 咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 9,
+    "total": 9,
+    "relaxed": true
+   },
+   "steps": [
+    "00:15 到店找角落位子坐定",
+    "00:16 前點好咖啡，手機面朝下",
+    "00:59 前起身離開"
+   ],
+   "bot": "找角落、先點、談 60 分",
+   "ms": 2758
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": false,
+   "why": "不符規則（pub／4.4★／7分／剩 118 分關門）",
+   "picked": "PLAYING Hookah Lounge",
+   "type": "pub",
+   "rating": 4.4,
+   "walkMin": 7,
+   "distM": 542,
+   "radiusM": 1000,
+   "closeIn": 118,
+   "how": "text=\"咖啡廳\" rank=DISTANCE → text=\"咖啡廳\" rank=RELEVANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 11,
+    "total": 11,
+    "relaxed": true
+   },
+   "steps": [
+    "00:08 到店點一杯咖啡",
+    "坐滿20分鐘再動",
+    "00:28 起身離開"
+   ],
+   "bot": "點一杯、坐20分、時間到就走",
+   "ms": 2460
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Remember Me_記得我．café -深夜咖啡館 寵物友善",
+   "type": "cafe",
+   "rating": 4.5,
+   "walkMin": 21,
+   "distM": 1662,
+   "radiusM": 2500,
+   "closeIn": 118,
+   "how": "text=\"有插座 咖啡廳\" rank=DISTANCE → text=\"有插座 咖啡廳\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 7,
+    "total": 11,
+    "relaxed": false
+   },
+   "steps": [
+    "00:22 到店，直接問服務生有沒有靠近插座的座位",
+    "點一杯咖啡，坐 60 分鐘內喝完",
+    "手機插好就開工，別亂走"
+   ],
+   "bot": "到店先問插座位置，別廢話",
+   "ms": 3327
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 8,
+  "failed": [
+   "eat:其他:超商救援",
+   "rest:工作讀書:不符規則（bistro／4.4★／13分／剩 58 分關門）",
+   "rest:談事情:不符規則（coffee_shop／4.5★／14分／剩 58 分關門）",
+   "rest:等人:不符規則（pub／4.4★／7分／剩 118 分關門）"
+  ],
+  "maxMs": 3327
+ }
+}
