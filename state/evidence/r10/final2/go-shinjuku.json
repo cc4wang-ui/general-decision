@@ -1,0 +1,94 @@
+{
+ "loc": "東京新宿駅",
+ "localHour": 9,
+ "part": "day",
+ "minutes": 30,
+ "seed": 1992166550,
+ "rows": [
+  {
+   "transport": "走路",
+   "minutes": 30,
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "愛住公園",
+   "type": "park",
+   "distM": 1608,
+   "radiusM": 2000,
+   "walkMin": 21,
+   "fingerprint": "text=\"公園\" rank=DISTANCE r=2000",
+   "how": "text=\"公園\" rank=DISTANCE",
+   "steps": [
+    "照地圖走路過去，單程 30 分內",
+    "到了走一圈，看看公園裡有什麼",
+    "11:00 前回家"
+   ],
+   "ms": 2067
+  },
+  {
+   "transport": "捷運",
+   "minutes": 30,
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "文京区立関口台公園",
+   "type": "park",
+   "distM": 3733,
+   "radiusM": 8000,
+   "fingerprint": "text=\"公園\" rank=DISTANCE r=8000",
+   "how": "text=\"公園\" rank=DISTANCE",
+   "steps": [
+    "電車單程 30 分內抵達",
+    "沿著公園走一圈，確認周邊狀況",
+    "下午 5 點前搭電車回家"
+   ],
+   "ms": 2396
+  },
+  {
+   "transport": "計程車",
+   "minutes": 30,
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "北区立滝野川公園",
+   "type": "park",
+   "distM": 7380,
+   "radiusM": 7500,
+   "fingerprint": "text=\"公園\" rank=DISTANCE r=7500",
+   "how": "text=\"公園\" rank=DISTANCE",
+   "steps": [
+    "叫計程車，跟司機報北区立滝野川公園，單程30分內",
+    "到了在園區走一圈，看現場",
+    "晚上八點前回到宿舍"
+   ],
+   "ms": 2301
+  },
+  {
+   "transport": "開車",
+   "minutes": 30,
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "文京区立関口台公園",
+   "type": "park",
+   "distM": 3733,
+   "radiusM": 6000,
+   "fingerprint": "text=\"公園\" rank=DISTANCE r=6000",
+   "how": "text=\"公園\" rank=DISTANCE",
+   "steps": [
+    "開車過去，到了先找停車位",
+    "在公園裡走一圈，看看周邊環境",
+    "11:00 前回家"
+   ],
+   "ms": 2069
+  }
+ ],
+ "summary": {
+  "transports": 4,
+  "ok": 4,
+  "pass": 4,
+  "distinctFingerprints": 4,
+  "failed": [],
+  "maxMs": 2396
+ }
+}

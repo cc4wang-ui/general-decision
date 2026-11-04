@@ -1,0 +1,5 @@
+URL: https://general-decision-mohauuinv-cc4wang-uis-projects.vercel.app/api/probe?mode=go&loc=shinjuku
+fetched: curl（分享連結 cookie）
+date: 2026-11-04 00:05:05 UTC（東京 09:05）
+status: 200
+x-vercel-id: iad1::iad1::z7vhb-1793750702942-e3e09a9b3fa8
