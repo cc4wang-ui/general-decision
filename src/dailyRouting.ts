@@ -17,13 +17,24 @@ const minute=(t:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t)?Number(t.slice(0,2)
  * 只取 Google 錯誤的狀態、原因、專案編號、啟用網址；不含金鑰。只進伺服器 log，不回給使用者。
  */
 export async function routesErrorDetail(response:Response):Promise<string>{
+ let text=''
+ try{text=await response.text()}catch{return ''}
+ const scrub=(t:string)=>t.replace(/key=[^&\s"]+/gi,'key=…').replace(/AIza[0-9A-Za-z_-]{20,}/g,'AIza…').replace(/\s+/g,' ').trim()
  try{
-  const err=(JSON.parse(await response.text()) as {error?:{status?:string;details?:Array<{reason?:string;metadata?:Record<string,string>}>}}).error
+  // computeRouteMatrix 是串流 API：錯誤可能包在陣列裡（[{error:{…}}]）。
+  type GErr={error?:{status?:string;message?:string;details?:Array<{reason?:string;metadata?:Record<string,string>}>}}
+  const raw=JSON.parse(text) as GErr|GErr[]
+  const err=(Array.isArray(raw)?raw.find(x=>x&&x.error):raw)?.error
   const info=err?.details?.find(d=>d.reason)
   const meta=info?.metadata??{}
-  const parts=[err?.status,info?.reason,meta.consumer,meta.activationUrl].filter((x):x is string=>typeof x==='string'&&x.length>0)
-  return parts.length?' '+parts.join(' ').slice(0,400):''
- }catch{return ''}
+  // 沒有結構化原因時退回 Google 的說明文字（不含金鑰：Google 不回傳金鑰；保險起見把 key= 後面遮掉）。
+  const fallback=info||!err?.message?undefined:scrub(err.message).slice(0,200)
+  const parts=[err?.status,info?.reason,meta.consumer,meta.activationUrl,fallback].filter((x):x is string=>typeof x==='string'&&x.length>0)
+  if(parts.length)return ' '+parts.join(' ').slice(0,400)
+ }catch{/* 不是 JSON（例：代理的 HTML 錯誤頁）→ 下面留原文 */}
+ // 解不出原因：留前 160 字，遮掉金鑰樣式的字串。
+ const t=scrub(text).slice(0,160)
+ return t?' '+t:''
 }
 export async function travelMatrix(key:string,origin:Point,stops:ScheduledStop[]):Promise<{matrix:number[][];distances:number[][]}>{
  const points=[origin,...stops.map(s=>s.candidate).filter((p):p is Point=>!!p)]

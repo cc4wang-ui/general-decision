@@ -34,8 +34,16 @@ describe('Round 11：Routes 錯誤原因',()=>{
  it('金鑰限制：原因是 API_KEY_SERVICE_BLOCKED',async()=>{
   expect(await routesErrorDetail(new Response(JSON.stringify(blocked),{status:403}))).toBe(' PERMISSION_DENIED API_KEY_SERVICE_BLOCKED projects/123456789')
  })
- it('壞的或空的內容：不丟例外、回空字串',async()=>{
-  expect(await routesErrorDetail(new Response('<html>',{status:403}))).toBe('')
+ it('串流 API 的陣列格式（[{error}]）也解得出原因',async()=>{
+  const s=await routesErrorDetail(new Response(JSON.stringify([disabled]),{status:403}))
+  expect(s).toContain('SERVICE_DISABLED');expect(s).toContain('projects/123456789')
+ })
+ it('沒有結構化原因：退回 Google 的說明文字，key= 後面遮掉',async()=>{
+  const s=await routesErrorDetail(new Response(JSON.stringify([{error:{code:403,status:'PERMISSION_DENIED',message:'Requests from referer <empty> are blocked. key=AIzaSECRET'}}]),{status:403}))
+  expect(s).toBe(' PERMISSION_DENIED Requests from referer <empty> are blocked. key=…')
+ })
+ it('不是 JSON：留前 160 字、遮掉金鑰樣式；空內容回空字串；都不丟例外',async()=>{
+  expect(await routesErrorDetail(new Response('<html>403 Forbidden AIzaSyA1234567890abcdefghijk</html>',{status:403}))).toBe(' <html>403 Forbidden AIza…</html>')
   expect(await routesErrorDetail(new Response('',{status:403}))).toBe('')
  })
  it('travelMatrix 丟出的錯誤帶原因，不帶金鑰',async()=>{
