@@ -12,13 +12,26 @@ export function validPoint(v:unknown):Point|null{
 export type ScheduledStop={id:string;title?:string;minutes?:number;start?:string;locked?:boolean;custom?:boolean;done?:boolean;candidate?:Point;eta?:string;departure?:string;travelMin?:number;conflict?:string}
 const clock=(m:number)=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0')
 const minute=(t:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t)?Number(t.slice(0,2))*60+Number(t.slice(3)):null
+/**
+ * Round 11：403 要分得出「API 沒開」（SERVICE_DISABLED）還是「金鑰限制擋了」（API_KEY_SERVICE_BLOCKED），Cross 要做的事不一樣。
+ * 只取 Google 錯誤的狀態、原因、專案編號、啟用網址；不含金鑰。只進伺服器 log，不回給使用者。
+ */
+export async function routesErrorDetail(response:Response):Promise<string>{
+ try{
+  const err=(JSON.parse(await response.text()) as {error?:{status?:string;details?:Array<{reason?:string;metadata?:Record<string,string>}>}}).error
+  const info=err?.details?.find(d=>d.reason)
+  const meta=info?.metadata??{}
+  const parts=[err?.status,info?.reason,meta.consumer,meta.activationUrl].filter((x):x is string=>typeof x==='string'&&x.length>0)
+  return parts.length?' '+parts.join(' ').slice(0,400):''
+ }catch{return ''}
+}
 export async function travelMatrix(key:string,origin:Point,stops:ScheduledStop[]):Promise<{matrix:number[][];distances:number[][]}>{
  const points=[origin,...stops.map(s=>s.candidate).filter((p):p is Point=>!!p)]
  const waypoints=points.map(p=>({waypoint:{location:{latLng:{latitude:p.lat,longitude:p.lng}}}}))
  const response=await fetch((process.env.ROUTES_BASE_URL??'https://routes.googleapis.com')+'/distanceMatrix/v2:computeRouteMatrix',{
   method:'POST',headers:{'content-type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':'originIndex,destinationIndex,duration,distanceMeters,status,condition'},
   body:JSON.stringify({origins:waypoints,destinations:waypoints,travelMode:'WALK',routingPreference:'ROUTING_PREFERENCE_UNSPECIFIED'}),signal:AbortSignal.timeout(14000)})
- if(!response.ok)throw new Error('Google Routes 步行路線服務未啟用或暫時不可用（'+response.status+'）')
+ if(!response.ok)throw new Error('Google Routes 步行路線服務未啟用或暫時不可用（'+response.status+'）'+(await routesErrorDetail(response)))
  const body=await response.text()
  let elements:Array<{originIndex:number;destinationIndex:number;duration?:string;distanceMeters?:number;condition?:string;status?:{code?:number}}>=[] 
  try{const data=JSON.parse(body);elements=Array.isArray(data)?data:[data]}catch{elements=body.split('\n').filter(Boolean).map(line=>JSON.parse(line))}

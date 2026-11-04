@@ -167,10 +167,17 @@ export interface SceneRow {
   closeIn?: number
   how?: string
   dbg?: OrderDebug['scene']
+  /** Round 11：附近沒有一家過評分，派的是走得到的店裡最高分的（規則本身的放寬）。 */
+  ratingRelaxed?: boolean
+  /** Round 11：約會的全部候選（量測腳本重算用）。 */
+  cands?: Array<{ name: string; type?: string; rating?: number; walkMin?: number; closeIn?: number; opensAt?: string }>
   steps?: string[]
   bot?: string
   ms?: number
 }
+
+type DbgCand = NonNullable<OrderDebug['places']>['candidates'][number]
+const asCand = (x: DbgCand) => ({ name: x.name, primaryType: x.type, rating: x.rating, walkMin: x.walkMin, closeInMin: x.closeIn, opensAt: x.opensAt, opensInMin: x.opensIn })
 
 /** 一個地點把吃、歇的每一種情境同時打一次。歇一律「咖啡」（情境修飾詞主要加在咖啡）。 */
 export async function runSceneMatrix(locKey: string, now = new Date(), io?: OrderIo): Promise<{ loc: string; localHour: number; rows: SceneRow[]; summary: Record<string, unknown> }> {
@@ -191,7 +198,16 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
     const fails: string[] = []
     if (!b.place?.id) fails.push('沒派店')
     if (d?.rescue) fails.push('超商救援')
-    if (b.place && c && !scenePasses({ name: c.name, primaryType: c.type, rating: c.rating, walkMin: c.walkMin, closeInMin: c.closeIn, opensAt: c.opensAt, opensInMin: c.opensIn }, rule)) fails.push(`不符規則（${c.type ?? '?'}／${c.rating ?? '?'}★／${c.walkMin ?? '?'}分／剩 ${c.closeIn ?? '?'} 分關門）`)
+    const all = (d?.places?.candidates ?? []).map(asCand)
+    let ratingRelaxed = false
+    if (b.place && c && !scenePasses(asCand(c), rule)) {
+      // Round 11：附近沒有一家過評分時，派「走得到的店裡評分最高的」（差 0.2★ 內）是規則本身（sceneFilter 只放寬評分），不算錯。
+      const soft = rule?.rule.minRating !== undefined ? { ...rule, rule: { ...rule.rule, minRating: undefined } } : null
+      const softPool = soft ? all.filter((x) => scenePasses(x, soft)) : []
+      const best = Math.max(0, ...softPool.map((x) => x.rating ?? 0))
+      if (soft && !all.some((x) => scenePasses(x, rule)) && scenePasses(asCand(c), soft) && (c.rating ?? 0) >= best - 0.2) ratingRelaxed = true
+      else fails.push(`不符規則（${c.type ?? '?'}／${c.rating ?? '?'}★／${c.walkMin ?? '?'}分／剩 ${c.closeIn ?? '?'} 分關門）`)
+    }
     if (rule?.rule.openNow && c?.opensAt) fails.push(`還沒開（${c.opensAt}）`)
     // Round 10：日本會把手打的中文需求換成日文（localizeNeed），查詞裡要看到的是換過的字。
     if (scene === SCENE_OTHER && !d?.places?.how.includes(localizeNeed(SCENE_TEXT_PROBE[m], countryOf(loc)))) fails.push('關鍵字沒用到手動輸入')
@@ -208,6 +224,9 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
       ...(c ? { type: c.type, rating: c.rating, walkMin: c.walkMin, ...(c.distM !== undefined ? { distM: c.distM } : {}), ...(radiusM !== undefined ? { radiusM } : {}), ...(c.opensAt ? { opensAt: c.opensAt } : {}), ...(c.closeIn !== undefined ? { closeIn: c.closeIn } : {}) } : {}),
       ...(d?.places ? { how: d.places.how } : {}),
       ...(d?.scene ? { dbg: d.scene } : {}),
+      ...(ratingRelaxed ? { ratingRelaxed: true } : {}),
+      // Round 11：約會附上全部候選，給量測整理腳本自己重算「15 分內最高分」（不靠 scene.ts）。
+      ...(scene === '約會吃好一點' && d?.places ? { cands: d.places.candidates.map((x) => ({ name: x.name, type: x.type, rating: x.rating, walkMin: x.walkMin, ...(x.closeIn !== undefined ? { closeIn: x.closeIn } : {}), ...(x.opensAt ? { opensAt: x.opensAt } : {}) })) } : {}),
       ...(b.steps ? { steps: b.steps, bot: b.meme?.bot } : {}),
       ms: Date.now() - t,
     }
