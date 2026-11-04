@@ -11,7 +11,7 @@ for (const r of d.rows) {
   if (r.id.startsWith('rest') && (REST_BAD_T.has(r.type) || REST_BAD_N.test(r.picked ?? ''))) { out.restWrong++; flags.push('歇派錯店') }
   if (r.id === 'eat:外帶' && BARISH.has(r.type)) { out.takeoutBar++; flags.push('外帶派酒吧') }
   if (r.id === 'eat:約會吃好一點' && BARISH.has(r.type)) { out.dateBar++; flags.push('約會派酒吧') }
-  if (r.id.startsWith('rest') && r.opensAt && r.type !== 'convenience_store') { out.restNotOpen++; flags.push(`歇派到還沒開（${r.opensAt}）`) }
+  if ((r.id.startsWith('rest') || r.id === 'eat:一個人快吃' || r.id === 'eat:外帶') && r.opensAt && r.type !== 'convenience_store') { out.restNotOpen++; flags.push(`派到還沒開（${r.opensAt}）`) }
   if (typeof r.closeIn === 'number' && r.closeIn - (r.walkMin ?? 0) < 10) { out.closedOnArrival++; flags.push(`到店剩 ${r.closeIn - (r.walkMin ?? 0)} 分`) }
   console.log(`${r.id.padEnd(14)} ${(r.picked ?? '-').slice(0, 28).padEnd(28)} ${String(r.type).padEnd(20)} 走${r.walkMin ?? '?'}分 剩${r.closeIn ?? '-'}分 ${r.opensAt ? r.opensAt + '開 ' : ''}${r.pass ? 'pass' : 'FAIL:' + (r.why ?? '')} ${flags.join(' ')}`)
 }

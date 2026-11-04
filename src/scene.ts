@@ -82,7 +82,8 @@ const SLOW_MEAL = ['yakiniku_restaurant', 'korean_barbecue_restaurant', 'barbecu
 /** 吃：一個人快吃、外帶、朋友聚餐、約會吃好一點、宵夜、其他。 */
 const EAT: SceneRule[] = [
   {
-    id: '一個人快吃', radius: 500, maxWalk: 8, minOpen: 25, avoidTypes: SLOW_MEAL,
+    // Round 10（checker 2026-11-04 09:07）：早上派到 10:00 才開的店、口令卻寫「09:20 前吃完」→ 快吃與外帶也要到店時開著。
+    id: '一個人快吃', radius: 500, maxWalk: 8, minOpen: 25, avoidTypes: SLOW_MEAL, openOnArrival: true,
     queries: {
       TW: [q('便當', 'tw', 1), q('麵店', 'noodle', 1), q('小吃', 'tw', 1), q('滷肉飯', 'tw', 1), q('水餃 鍋貼', 'cn', 1), q('丼飯', 'jp', 2), q('咖哩飯', 'jp', 2)],
       JP: [q('定食', 'jp', 1.5), q('そば', 'jp', 1), q('うどん', 'jp', 1), q('牛丼', 'fast', 1, BEEF), q('ラーメン', 'ramen', 1.5), q('カレー', 'jp', 1)],
@@ -92,7 +93,7 @@ const EAT: SceneRule[] = [
   },
   {
     // Round 8：外帶不派喝酒的店（2026-11-03 01:19 東京深夜派到 BAR G.O.A.T.，口令「點酒或下酒菜外帶」）。
-    id: '外帶', radius: 600, minOpen: 10, maxWalk: 12, avoidTypes: BARISH,
+    id: '外帶', radius: 600, minOpen: 10, maxWalk: 12, avoidTypes: BARISH, openOnArrival: true,
     queries: {
       TW: [q('便當', 'tw', 1), q('滷味', 'tw', 1), q('鹽酥雞', 'tw', 1), q('水餃 鍋貼', 'cn', 1), q('港式 燒臘', 'cn', 1.5), q('小吃', 'tw', 1)],
       JP: [q('弁当', 'jp', 1), q('テイクアウト', 'fast', 1.5), q('おにぎり', 'jp', 1), q('惣菜', 'jp', 1)],
@@ -259,21 +260,42 @@ export const HARD_OPEN_MIN = 10
 export function viable(c: Pick<Cand, 'walkMin' | 'closeInMin'>): boolean {
   return c.closeInMin === undefined || c.closeInMin - (c.walkMin ?? 0) >= HARD_OPEN_MIN
 }
+/** 走到店時已經開門（沒有「幾分鐘後開」的資料 → 當作沒開）。 */
+export function openOnArrivalOk(c: Pick<Cand, 'walkMin' | 'opensAt'> & Partial<Pick<Cand, 'opensInMin'>>): boolean {
+  return !c.opensAt || (typeof c.opensInMin === 'number' && c.opensInMin <= (c.walkMin ?? 0))
+}
+/**
+ * 派了不白走的候選：到店時還開著（viable）；情境要「到店時開著」的（歇、快吃、外帶），還沒開的也不算。
+ * 這條不放寬：checker 2026-11-04 09:08 重現「歇的候選全是還沒開門 → 整批放回照樣派」。沒有 → 超商救援。
+ */
+export function reachablePool<T extends Cand>(cands: T[], scene: Scene | null): T[] {
+  const pool = cands.filter(viable)
+  return scene?.rule.openOnArrival ? pool.filter(openOnArrivalOk) : pool
+}
 
 /**
  * 情境的硬一點的偏好（排除速食／甜點店／酒吧、評分、步行、宵夜要營業中、歇要到店時開門）：先篩，篩完一家都不剩就整批放回（寧可派得到，也不要空手）。
  * relaxed＝一家都不剩、整批放回了。放回的只限 viable（到店時還開著）；連這都沒有 → 空的，交給超商救援。
  */
 export function sceneFilter<T extends Cand>(cands: T[], scene: Scene | null): { kept: T[]; relaxed: boolean } {
-  const pool = cands.filter(viable)
+  const pool = reachablePool(cands, scene)
   if (!scene) return { kept: pool, relaxed: false }
   const kept = pool.filter((c) => passes(c, scene.rule))
-  return kept.length ? { kept, relaxed: false } : { kept: pool, relaxed: pool.length > 0 }
+  if (kept.length) return { kept, relaxed: false }
+  // Round 10（checker 2026-11-04 09:07：早上約會整批放回派到 3.8★）：先只放寬評分，派附近評分最高的那幾家（差 0.2★ 內）。
+  if (scene.rule.minRating !== undefined) {
+    const softer = pool.filter((c) => passes(c, { ...scene.rule, minRating: undefined }))
+    if (softer.length) {
+      const best = Math.max(...softer.map((c) => c.rating ?? 0))
+      return { kept: softer.filter((c) => (c.rating ?? 0) >= best - 0.2), relaxed: true }
+    }
+  }
+  return { kept: pool, relaxed: pool.length > 0 }
 }
 
 /** 單一店家是否符合情境偏好（handler 算「夠不夠 5 家」用）。 */
 export function scenePasses(c: Cand, scene: Scene | null): boolean {
-  return viable(c) && (!scene || passes(c, scene.rule))
+  return reachablePool([c], scene).length === 1 && (!scene || passes(c, scene.rule))
 }
 
 function passes(c: Cand, r: SceneRule): boolean {
@@ -287,7 +309,7 @@ function passes(c: Cand, r: SceneRule): boolean {
   // 宵夜：還沒開門的店（「HH:MM 開」）不算。Nearby 的查法沒有 openNow，這裡補上（checker 2026-11-01）。
   if (r.openNow && c.opensAt) return false
   // 歇（Round 10）：走到店時還沒開門的不算（沒有幾分鐘後開的資料 → 當作沒開）。
-  if (r.openOnArrival && c.opensAt && !(typeof c.opensInMin === 'number' && c.opensInMin <= (c.walkMin ?? 0))) return false
+  if (r.openOnArrival && !openOnArrivalOk(c)) return false
   // 走過去之後還要營業夠久（沒有關門資料或 24 小時營業 → 不限制）。
   if (r.minOpen !== undefined && typeof c.closeInMin === 'number' && c.closeInMin - (c.walkMin ?? 0) < r.minOpen) return false
   return true
@@ -319,6 +341,8 @@ export interface SceneTimes {
   /** 都是當地一天裡的第幾分鐘（0–1439）。 */
   now: number
   arrive: number
+  /** Round 10：店比人晚到時的開門時間（arrive 已改成這個）。 */
+  opens?: number
   /** 久坐的情境才有：到店＋stay。 */
   leave?: number
   close?: number
@@ -331,14 +355,18 @@ const toHM = (min: number) => {
 export const hm = toHM
 
 /** localNow＝當地「HH:MM」。walkMin／closeInMin 是派到的那家店的。 */
-export function sceneTimes(scene: Scene | null, localNow: string, walkMin: number | undefined, closeInMin: number | undefined): SceneTimes | null {
+export function sceneTimes(scene: Scene | null, localNow: string, walkMin: number | undefined, closeInMin: number | undefined, opensInMin?: number): SceneTimes | null {
   if (!scene) return null
   const [h, m] = localNow.split(':').map(Number)
   if (!Number.isFinite(h) || !Number.isFinite(m)) return null
   const now = h! * 60 + m!
-  const arrive = now + (walkMin ?? 0)
+  const reach = now + (walkMin ?? 0)
+  // Round 10（checker 2026-11-04 09:07）：店 10:00 才開，口令不能寫「09:20 前吃完」→ 進店時間從開門算。
+  const opens = opensInMin !== undefined && now + opensInMin > reach ? now + opensInMin : undefined
+  const arrive = opens ?? reach
   const close = closeInMin !== undefined ? now + closeInMin : undefined
   const t: SceneTimes = { now, arrive }
+  if (opens !== undefined) t.opens = opens
   if (close !== undefined) t.close = close
   if (scene.rule.stay !== undefined) t.leave = close !== undefined ? Math.min(arrive + scene.rule.stay, close) : arrive + scene.rule.stay
   return t
@@ -347,7 +375,7 @@ export function sceneTimes(scene: Scene | null, localNow: string, walkMin: numbe
 /** prompt 用的一行（模型照抄數字，不要自己算）。 */
 export function sceneTimesLine(t: SceneTimes | null): string {
   if (!t) return ''
-  const parts = [`現在 ${toHM(t.now)}`, `走到店 ${toHM(t.arrive)}`]
+  const parts = [`現在 ${toHM(t.now)}`, t.opens !== undefined ? `店 ${toHM(t.opens)} 才開，${toHM(t.opens)} 進店` : `走到店 ${toHM(t.arrive)}`]
   if (t.close !== undefined) parts.push(`店 ${toHM(t.close)} 關`)
   const leave = t.leave !== undefined ? `steps 寫的離開、吃完時間不得早於 ${toHM(t.leave)}。` : ''
   return `【已算好】${parts.join('，')}。鐘點照這些寫，不要自己加減。${leave}`

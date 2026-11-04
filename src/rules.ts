@@ -124,7 +124,7 @@ export function fixClock(text: string): string {
 
 /** 情境的鐘點（到店、最早離開、關門）由伺服器算，口令裡違反的改掉（src/scene.ts fixSceneClock）。 */
 function fixSceneClocks(order: Order, module: ModuleId, choices: Record<string, string | number>, pick: PickResult, now: Date, country: Country): Order {
-  const t = sceneTimes(sceneOf(module, choices), hhmmIn(now.toISOString(), country === 'JP' ? 'Asia/Tokyo' : 'Asia/Taipei'), pick.place.walkMin, pick.place.closeInMin)
+  const t = sceneTimes(sceneOf(module, choices), hhmmIn(now.toISOString(), country === 'JP' ? 'Asia/Tokyo' : 'Asia/Taipei'), pick.place.walkMin, pick.place.closeInMin, pick.place.opensInMin)
   if (!t) return order
   const top = fixSceneClock(order.meme.top, t)
   const bot = fixSceneClock(order.meme.bot, t)

@@ -124,7 +124,7 @@ function decidedBlock(req: OrderRequest, pick: PickResult, country: Country): st
     p.lane === 'rescue' ? '附近營業中的店都派不出去，這次派的是便利商店：在 meme.bot 直說「附近都收了，去超商」，steps 寫在超商買什麼、幾分鐘內吃完。' : '',
     budgetLine(band, req.budget),
     // Round 5：到店、最早離開、關門都先算好（preview-5 實測：模型自己加減會算錯）。
-    sceneTimesLine(sceneTimes(sceneOf(req.module, req.choices ?? {}), hhmmIn(req.now, tzOf(req.loc)), p.walkMin, p.closeInMin)),
+    sceneTimesLine(sceneTimes(sceneOf(req.module, req.choices ?? {}), hhmmIn(req.now, tzOf(req.loc)), p.walkMin, p.closeInMin, p.opensInMin)),
     '禁止提到任何別家店或類別；禁止寫出「價位」以外的金額；禁止寫連結。',
     // Team Lead 設計修訂：口令卡最上面已經印了店名、步行、營業、價位，steps 再講一次就是廢話。
     '口令卡上已經印好店名、步行分鐘、營業時間、價位：steps 不要重複這些，只寫點什麼、怎麼吃、幾分鐘內吃完這類動作（「HH:MM 開」的店例外，要講幾點到）。',

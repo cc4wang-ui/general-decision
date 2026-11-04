@@ -409,7 +409,9 @@ describe('checker 2026-11-01 第 1 輪的修正', () => {
   it('宵夜：還沒開門的店（有 opensAt）不算；其他情境不管', () => {
     expect(scenePasses(c('later', { opensAt: '23:00' }), sceneOf('eat', { scene: '宵夜' }))).toBe(false)
     expect(scenePasses(c('open'), sceneOf('eat', { scene: '宵夜' }))).toBe(true)
-    expect(scenePasses(c('later', { opensAt: '23:00' }), sceneOf('eat', { scene: '外帶' }))).toBe(true)
+    expect(scenePasses(c('later', { opensAt: '23:00' }), sceneOf('eat', { scene: '朋友聚餐' }))).toBe(true)
+    // Round 10：外帶、快吃也要到店時開著（checker 2026-11-04 09:07）
+    expect(scenePasses(c('later', { opensAt: '23:00' }), sceneOf('eat', { scene: '外帶' }))).toBe(false)
   })
 
   it('prompt 給當地時間，不給 UTC（內湖：當地 19:32 卻寫「11:52 前吃完」）', () => {
@@ -666,7 +668,7 @@ describe('Round 8：派錯店', () => {
 
 // Round 10（Cross 2026-11-03「全部產品路線圖做完」）：歇要到店時開門；到店已關門的不派（含整批放回）；
 // 約會擋酒吧（Q1）；日本把「其他」的中文需求換成日文；口令不保證有插座（X3）。
-import { HARD_OPEN_MIN, localizeNeed, viable } from '../../src/scene.ts'
+import { HARD_OPEN_MIN, localizeNeed, sceneTimes, sceneTimesLine, viable } from '../../src/scene.ts'
 describe('Round 10：到店要開著、約會擋酒吧、其他的需求換日文', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
     ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
@@ -696,7 +698,11 @@ describe('Round 10：到店要開著、約會擋酒吧、其他的需求換日�
     for (const scene of ['工作讀書', '朋友聊天', '談事情', '等人']) expect(sceneOf('rest', { scene, drink: '咖啡' })!.rule.openOnArrival, scene).toBe(true)
     expect(sceneOf('rest', { scene: SCENE_OTHER, sceneText: '安靜', drink: '酒吧' })!.rule.openOnArrival).toBe(true)
     // 吃：即將營業的店照舊可派（Round 4 的設計，早上可以等開門）
-    expect(scenePasses(c('早餐', { walkMin: 5, opensAt: '09:30', opensInMin: 20, primaryType: 'restaurant' }), sceneOf('eat', { scene: '一個人快吃' }))).toBe(true)
+    expect(scenePasses(c('早餐', { walkMin: 5, opensAt: '09:30', opensInMin: 20, primaryType: 'restaurant' }), sceneOf('eat', { scene: '朋友聚餐' }))).toBe(true)
+    // Round 10（checker 2026-11-04 09:07）：快吃、外帶趕時間，到店時要開著；開門早於到店的可以
+    expect(scenePasses(c('早餐', { walkMin: 5, opensAt: '09:30', opensInMin: 20, primaryType: 'restaurant' }), sceneOf('eat', { scene: '一個人快吃' }))).toBe(false)
+    expect(scenePasses(c('早餐', { walkMin: 5, opensAt: '09:30', opensInMin: 20, primaryType: 'restaurant' }), sceneOf('eat', { scene: '外帶' }))).toBe(false)
+    expect(scenePasses(c('早餐', { walkMin: 5, opensAt: '09:10', opensInMin: 3, primaryType: 'restaurant' }), sceneOf('eat', { scene: '一個人快吃' }))).toBe(true)
     expect(sceneOf('eat', { scene: SCENE_OTHER, sceneText: '吃到飽' })!.rule.openOnArrival).toBeUndefined()
   })
   it('約會吃好一點：酒吧類不派（Q1）；只剩酒吧時整批放回', () => {
@@ -727,5 +733,26 @@ describe('Round 10：到店要開著、約會擋酒吧、其他的需求換日�
     expect(scenePasses(c('bar moon walk', { primaryType: 'bar', types: ['bar'] }), late)).toBe(false)
     expect(scenePasses(c('鳥貴族', { primaryType: 'japanese_izakaya_restaurant' }), late)).toBe(true)
     expect(scenePasses(c('松屋', { primaryType: 'japanese_restaurant' }), late)).toBe(true)
+  })
+  it('checker 第 2 輪前：整批放回也不派到店還沒開的店（歇、快吃、外帶）；沒有 → 空的，交給超商救援', () => {
+    const rest = sceneOf('rest', { scene: '一個人放空', drink: '咖啡' })
+    const morning = [c('A', { walkMin: 3, opensAt: '10:00', opensInMin: 50 }), c('B', { walkMin: 4, opensAt: '10:30', opensInMin: 80 })]
+    expect(sceneFilter(morning, rest)).toEqual({ kept: [], relaxed: false })
+    const quick = sceneOf('eat', { scene: '一個人快吃' })
+    expect(sceneFilter(morning.map((x) => ({ ...x, primaryType: 'restaurant' })), quick).kept).toEqual([])
+    // 朋友聚餐（沒有 openOnArrival）：照舊可派即將營業的店
+    expect(sceneFilter(morning.map((x) => ({ ...x, primaryType: 'restaurant' })), sceneOf('eat', { scene: '朋友聚餐' })).kept).toHaveLength(2)
+  })
+  it('評分不夠時只放寬評分，派附近評分最高的那幾家（差 0.2★ 內）', () => {
+    const date = sceneOf('eat', { scene: '約會吃好一點' })
+    const cands = [c('3.8', { rating: 3.8, primaryType: 'italian_restaurant' }), c('4.0', { rating: 4.0, primaryType: 'italian_restaurant' }), c('4.1', { rating: 4.1, primaryType: 'italian_restaurant' }), c('bar4.6', { rating: 4.6, primaryType: 'bar' })]
+    expect(sceneFilter(cands, date)).toEqual({ kept: [cands[1], cands[2]], relaxed: true })
+  })
+  it('口令時間：店比人晚到時，進店時間從開門算', () => {
+    const quickish = sceneOf('eat', { scene: '朋友聚餐' })
+    expect(sceneTimes(quickish, '09:07', 5, undefined, 53)).toMatchObject({ arrive: 600, opens: 600, leave: 690 })
+    expect(sceneTimesLine(sceneTimes(quickish, '09:07', 5, undefined, 53))).toContain('店 10:00 才開，10:00 進店')
+    expect(sceneTimes(quickish, '09:07', 5, undefined, 2)).toMatchObject({ arrive: 552 })
+    expect(sceneTimes(quickish, '09:07', 5, undefined, 2)!.opens).toBeUndefined()
   })
 })
