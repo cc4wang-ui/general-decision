@@ -101,3 +101,12 @@
 | 11-05 09:30 | 早上第 3 次：新宿；Routes 偵測 → 獨立 checker → 回報 Cross | `state/evidence/r11/morning-0930/` |
 
 每次：分享連結在 scratchpad `share.txt`（過期就用 `get_access_to_vercel_url` 對 preview-2 重拿）→ `bash state/handoff-tools/preview-measure.sh <連結> <目錄> scene-shinjuku`（深夜加 `scene-xinyi`）→ `r11-check.mjs` 整理 → POST `/api/daily-route`（body：`{"origin":{"lat":35.6896,"lng":139.7006},"stops":[{"id":"meal","kind":"meal","minutes":45},{"id":"coffee","kind":"coffee","minutes":45}]}`）看 `routeVerified` → 寫回這份 → commit、push。
+
+## Cross 決定（2026-11-04 19:19 東京）
+
+- Cross 原話：「上線」。
+- 依這句合併 PR #34 進 `main`，正式站自動重建。這時深夜、清晨、早上量測和 checker 都還沒做；不等，是 Cross 的決定，不是 maker 跳過（同 Round 7）。
+- 上線前正式站：`dpl_D5CHYjpdPqdmGADARnHpHvcKzWG2`（`main` `4688301`）＝ **回復點**（Vercel rollback 一鍵）。
+- 排好的量測照常做，改當上線後驗證（測試版 preview-2 跟上線的程式相同）；09:30 的 checker 也照跑，FAIL 就開下一輪修。
+- Places 上限：Cross 沒選 → 維持 40 次（不改程式，不動錢）。
+- Routes：等 Cross 按「啟用」；量測時自己偵測。
