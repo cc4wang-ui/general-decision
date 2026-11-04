@@ -1,7 +1,7 @@
 # Round 8 進度（接手用）
 
 > 最後更新：2026-11-03（東京早上）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`。
-> 正式站仍是 Round 7（`dpl_GRtU7onjopNWnQ1YrXRnQ9rM6eyA`，`94b4e0b`）。Round 8 只在 preview。
+> **2026-11-04 09:28 東京：Round 8 已隨 PR #26 上線**（`main` `a9f9871`）。下面的「上線中止」是 2026-11-03 的歷史紀錄。
 > 新的 session 先讀 `state/HANDOFF-2026-11-03.md`，再讀這份。
 
 ## 目標契約｜R8 派錯店補洞

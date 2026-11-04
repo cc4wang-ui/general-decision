@@ -1,7 +1,7 @@
 # Round 9 進度：兩條線合併（接手用）
 
 > 最後更新：2026-11-03 22:50 東京。分支 `claude/nifty-ramanujan-szofu5`（PR #26）。
-> 正式站仍是 `main` 的 `dpl_GXH9RaKiS4FpELKoa7GDg5xgF2L5`（Round 3＋今日行程）。合併版只在測試版。
+> **2026-11-04 09:28 東京：合併版已上線**（PR #26 → `main` `a9f9871`，Round 10 一起）。checker 第 1 輪的 STOP 3 問題在 Round 10 修掉，見 `state/ROUND10-PROGRESS.md`。
 
 ## 起因
 

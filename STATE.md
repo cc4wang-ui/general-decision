@@ -1,10 +1,11 @@
 # General Decision — STATE.md
-> Canonical current project status. Updated 2026-11-04 JST. Read this before making changes.
+> Canonical current project status. Updated 2026-11-04 09:45 JST. Read this before making changes.
 > Two workstreams were merged on 2026-11-03 (PR #26): the core 班長 app (Round 4–10, details in `state/ROUND*-PROGRESS.md`, handoff `state/HANDOFF-2026-11-03.md`, roadmap `docs/ROADMAP.md`) and 今日行程 (PR #27–#32, below).
 > Repo: cc4wang-ui/general-decision | Production: https://general-decision.vercel.app
 > Historical `state/decide-mvp-build.md` describes September MVP, NOT current acceptance.
 
 ## 1. Verified facts
+- **Latest release (2026-11-04 09:28 JST):** PR #26 merged into `main` (`a9f9871`), production deployment `dpl_6bFCi5QrsQXRrR9qiqp89ZQmSfPq` READY and aliased to general-decision.vercel.app. Verified on production: homepage JS `index-7SIEHx2k.js`; `/api/probe` 404; GET on order/weekly/daily-route/geocode 405; real POST `/api/order` 200 (Shinjuku, quick meal → 松屋, 7 min walk); real POST `/api/daily-route` with GPS origin 200 (stops near Shinjuku); 0 runtime errors in the following hour. Rollback point: `dpl_GXH9RaKiS4FpELKoa7GDg5xgF2L5` (pre-merge main). Independent checker: 2 rounds, only non-blocking issues left (morning date-rating relaxation). Evidence `state/evidence/r10/production/`.
 - **Workstream merge (PR #26, branch `claude/nifty-ramanujan-szofu5`)**: Round 4–8 had been live via direct Vercel uploads (last: Round 7 `dpl_GRtU7onjopNWnQ1YrXRnQ9rM6eyA`) while `main` was still Round 3. On 2026-11-03 14:38–17:32 JST PR #27–#32 merged into `main` and Vercel's git integration replaced production, silently removing Round 4–7. PR #26 merges `main` back into Round 4–8 (only `src/app.tsx` conflicted; both kept) and adds Round 9–10 fixes. Preview-verified on real Places/Claude data; see `state/ROUND9-PROGRESS.md`, `state/ROUND10-PROGRESS.md`.
 - **Core app features (Round 4–10)**: scene picker for eat/rest (5 presets + free text), no empty-handed orders (convenience-store rescue), budget filter, 60-day trial log, in-train mode (report station when GPS is stale), Japanese keywords in Tokyo, exclusion lists (hookah bars, malls, karaoke, food courts, bars for takeout/date/late-night), shops must be open on arrival (≥10 min left, never relaxed).
 - **Fixed in Round 9 for 今日行程**: `addFixedTask` time regex was `\\d` (literal backslash) so every fixed appointment was rejected; `api/daily-route.ts` and `api/place-photo.ts` now export both named methods (wrong method → 405) so `npm run check:bundle` passes.
@@ -38,7 +39,7 @@
 - **P1 — Shuffle remaining coverage:** actual preview smoke PASS for alternate cafe + preserved meal/fixed stop; still missing browser E2E for manually overridden destinations, completed stops, multiple appointments and UI live feedback.
 - **P1 — UI device testing:** PR #32 removed independent editorial style and nested `<main>`; uses original 8-bit tokens and original 440px host container. **No verified real iPhone Safari/iPad/desktop screenshots or touch E2E** yet.
 - **P1 — live shop information:** Places returns place metadata/open-now when supplied; current implementation does not enforce opening hours for planned arrival, confirm product inventory, exhibitions, reservations or admission.
-- **P1 — current location:** no GPS. Default is Shibuya Station; a previous assumed residence label was replaced. Users must enter actual starting point.
+- ~~**P1 — current location**~~ — resolved 2026-11-04 (Round 10): 今日行程 can use GPS as the origin (server validates coordinates; bad coordinates → 400; denied permission keeps the previous itinerary).
 - ~~**P1 — stale documentation**~~ — resolved 2026-11-04: README status/structure rewritten; spec, strategy and old plans annotated (`docs/ROADMAP.md` N8). `DEPLOY.md` and `state/decide-mvp-build.md` remain historical.
 - ~~**P1 — code hygiene**~~ — resolved 2026-11-03: `npm run typecheck` exits 0 on the merged branch (no diagnostics in `src/diary.ts`); unit 614/614.
 - **P2 — sync and memory:** local-only browser persistence; no cross-device sync, no ChatGPT memory import, no canonical project vault sync.
@@ -55,7 +56,14 @@
 - User-editing a place must invalidate the previous candidate and ETA; otherwise stale location data contaminates route calculations.
 - Avoid falsely interpreting fixed appointment or Google Maps metadata as verified reservation/stock.
 
-## 5. Last session — 2026-11-03
+## 5. Last session — 2026-11-04 (core app workstream)
+- 2026-11-03 PM: discovered `main` (今日行程) had replaced the direct-uploaded Round 7 production. A direct Round 8 production upload was cancelled within ~20 s before taking the alias. Cross chose to merge both lines (PR #26).
+- Cross 2026-11-03 23:05: "do the whole roadmap, fix, verify, then go live". Six work lines (scene rules, go card, data export, daily GPS + e2e, streak, docs). Four parallel subagents hit the 5-hour usage limit at ~00:00 JST and nothing ran until 08:41; resumed and finished.
+- Independent checker 2 rounds; only non-blocking issues left (morning date-dinner rating). PR #26 merged 09:28 JST → production `dpl_6bFCi5QrsQXRrR9qiqp89ZQmSfPq`, verified with real POSTs.
+- Open for Cross: date-dinner walk cap (recommend 15 min), Google Routes 403, trial-data export from phone, Places daily cap, App Store items (deferred: PWA first).
+- Handoff: `state/HANDOFF-2026-11-03.md` → this file → `docs/ROADMAP.md` §6 → `state/ROUND10-PROGRESS.md` → `docs/FAILURE-MEMORY.md`. No scheduled tasks are enabled (Cross turned all off 2026-11-03).
+
+## Previous session — 2026-11-03 (今日行程 workstream)
 - User explicitly rejected the mismatched Daily UI and generic non-navigable cards. PR #32 makes Daily consistent with main 8-bit App; each resolved stop has a real Google place, image (or explicit unavailable state), address, place detail and walking navigation link.
 - PR #32 merge `46579a9` production READY; the official site and actual photo endpoint return 200. Routes is still 403, so complete itinerary ETA acceptance is FAIL.
 - Preview validation: named places 3/3 PASS, real place photos 3/3 PASS, single-stop Shuffle preservation PASS, Routes matrix FAIL (403). Next: enable Google Routes for the existing key, test real walking ETA with fixed times, and run iPhone/desktop UI E2E before declaring full product PASS.
