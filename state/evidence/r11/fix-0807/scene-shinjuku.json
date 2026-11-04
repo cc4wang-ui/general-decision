@@ -1,0 +1,489 @@
+{
+ "loc": "東京新宿駅",
+ "localHour": 8,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "わ蔵 新宿歌舞伎町店",
+   "type": "ramen_restaurant",
+   "rating": 4,
+   "walkMin": 8,
+   "distM": 627,
+   "radiusM": 1250,
+   "how": "text=\"ラーメン\" rank=RELEVANCE → text=\"ラーメン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 13,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走8分鐘抵達",
+    "點一碗丼飯或麵，速戰速決",
+    "08:35前吃完，不要拖"
+   ],
+   "bot": "一個人、趕時間，20分鐘內解決",
+   "ms": 2939
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "一汁旬菜 日本橋だし場 ニュウマン新宿店",
+   "type": "deli",
+   "rating": 3.8,
+   "walkMin": 2,
+   "distM": 140,
+   "radiusM": 600,
+   "closeIn": 772,
+   "how": "text=\"惣菜\" rank=RELEVANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 7,
+    "total": 7,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘到店",
+    "點一份主食搭湯",
+    "外帶回去吃"
+   ],
+   "bot": "出站直奔，點好提回去",
+   "ms": 2745
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "NO1焼肉しゃぶしゃぶ 新宿歌舞伎町店",
+   "type": "yakiniku_restaurant",
+   "rating": 4.3,
+   "walkMin": 8,
+   "distM": 566,
+   "radiusM": 3000,
+   "how": "text=\"お好み焼き\" rank=RELEVANCE → text=\"焼肉\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 14,
+    "total": 15,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走8分抵達",
+    "點2〜3盤肉、1盤蔬菜、白飯和湯一輪",
+    "09:45前吃完離開"
+   ],
+   "bot": "一起點肉盤和蔬菜，90分鐘慢慢涮",
+   "ms": 3318
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "すし屋のはなれ、",
+   "type": "meal_takeaway",
+   "rating": 4,
+   "walkMin": 2,
+   "distM": 145,
+   "radiusM": 3000,
+   "closeIn": 772,
+   "how": "text=\"和食\" rank=RELEVANCE → text=\"和食\" rank=RELEVANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 8,
+    "total": 19,
+    "relaxed": true
+   },
+   "ratingRelaxed": true,
+   "cands": [
+    {
+     "name": "おひつ膳 田んぼ 代々木本店",
+     "type": "japanese_restaurant",
+     "rating": 4.2,
+     "walkMin": 11,
+     "closeIn": 772
+    },
+    {
+     "name": "赤坂うまや新宿",
+     "type": "japanese_restaurant",
+     "rating": 4.1,
+     "walkMin": 4,
+     "closeIn": 142
+    },
+    {
+     "name": "炭火焼干物定食 しんぱち食堂 新宿東南口店",
+     "type": "japanese_restaurant",
+     "rating": 4.1,
+     "walkMin": 3,
+     "closeIn": 1132
+    },
+    {
+     "name": "まいどおおきに食堂 東新宿食堂",
+     "type": "japanese_restaurant",
+     "rating": 4.1,
+     "walkMin": 15
+    },
+    {
+     "name": "だし茶漬け えん ルミネ新宿店",
+     "type": "japanese_restaurant",
+     "rating": 4.1,
+     "walkMin": 2,
+     "closeIn": 832
+    },
+    {
+     "name": "すし屋のはなれ、",
+     "type": "meal_takeaway",
+     "rating": 4,
+     "walkMin": 2,
+     "closeIn": 772
+    },
+    {
+     "name": "炭火焼干物定食 しんぱち食堂 新宿店",
+     "type": "japanese_restaurant",
+     "rating": 4,
+     "walkMin": 4,
+     "closeIn": 872
+    },
+    {
+     "name": "しんぱち食堂 西武新宿店",
+     "type": "japanese_restaurant",
+     "rating": 4,
+     "walkMin": 8,
+     "closeIn": 1102
+    },
+    {
+     "name": "２４時間営業 居酒屋しいちゃんの家 西新宿",
+     "type": "japanese_izakaya_restaurant",
+     "rating": 4,
+     "walkMin": 11
+    },
+    {
+     "name": "レストランよよぎの森",
+     "type": "japanese_restaurant",
+     "rating": 3.9,
+     "walkMin": 12,
+     "closeIn": 742
+    },
+    {
+     "name": "ごちとん 代々木本店",
+     "type": "japanese_restaurant",
+     "rating": 3.9,
+     "walkMin": 10,
+     "closeIn": 832
+    },
+    {
+     "name": "だし茶漬け＋肉うどん えん 新宿小田急エース店",
+     "type": "japanese_restaurant",
+     "rating": 3.8,
+     "walkMin": 3,
+     "closeIn": 862
+    },
+    {
+     "name": "お座敷旬彩美食 夢吉 新宿店",
+     "type": "japanese_izakaya_restaurant",
+     "rating": 3.8,
+     "walkMin": 8
+    },
+    {
+     "name": "おむすび権米衛 京王新宿店",
+     "type": "japanese_restaurant",
+     "rating": 3.7,
+     "walkMin": 2,
+     "closeIn": 772
+    },
+    {
+     "name": "お茶漬けおにぎり 山本山 新宿店",
+     "type": "japanese_restaurant",
+     "rating": 3.7,
+     "walkMin": 2,
+     "closeIn": 892
+    },
+    {
+     "name": "東（あずま）新宿店",
+     "type": "japanese_izakaya_restaurant",
+     "rating": 3.5,
+     "walkMin": 3
+    },
+    {
+     "name": "ぼんたぼんた新宿西口店",
+     "type": "japanese_restaurant",
+     "rating": 3.3,
+     "walkMin": 3,
+     "closeIn": 742
+    },
+    {
+     "name": "西新宿小町食堂",
+     "type": "japanese_restaurant",
+     "rating": 3.4,
+     "walkMin": 17
+    },
+    {
+     "name": "大衆寿司酒場 すさび湯 新宿東口店",
+     "type": "japanese_izakaya_restaurant",
+     "rating": 3.3,
+     "walkMin": 5
+    }
+   ],
+   "steps": [
+    "出站後走2分鐘抵達",
+    "點招牌握壽司，90分鐘內享受"
+   ],
+   "bot": "你各位啊，約會就是要點招牌慢慢吃",
+   "ms": 2776
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "らぁめん ほりうち 新宿本店",
+   "type": "ramen_restaurant",
+   "rating": 3.9,
+   "walkMin": 6,
+   "distM": 423,
+   "radiusM": 1000,
+   "closeIn": 892,
+   "how": "text=\"ラーメン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 7,
+    "total": 7,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走6分鐘抵達",
+    "點一碗拉麵，配個小菜",
+    "08:43前吃完起身"
+   ],
+   "bot": "宵夜就吃輕一點，30分鐘內解決",
+   "ms": 2779
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "オールデイダイニング 樹林",
+   "type": "restaurant",
+   "rating": 4.2,
+   "walkMin": 8,
+   "distM": 568,
+   "radiusM": 2500,
+   "closeIn": 772,
+   "how": "text=\"食べ放題 レストラン\" rank=RELEVANCE → text=\"食べ放題 レストラン\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 6,
+    "total": 6,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 8 分鐘抵達",
+    "進店直接告訴店員吃到飽，點烤肉和海鮮",
+    "60 分鐘內吃完結帳"
+   ],
+   "bot": "別磨蹭，08:15 到店，點餐選肉類優先",
+   "ms": 3259
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "セガフレード・ザネッティ・エスプレッソ 新宿３丁目店",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 4,
+   "distM": 285,
+   "radiusM": 600,
+   "closeIn": 832,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 8,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走4分鐘抵達",
+    "坐下點一杯咖啡，不看手機",
+    "08:41前離開"
+   ],
+   "bot": "一杯咖啡，30分鐘放空，手機面朝下",
+   "ms": 2568
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "珈琲貴族エジンバラ",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 7,
+   "distM": 523,
+   "radiusM": 1000,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走7分鐘到店",
+    "進去先問店員插座位置在哪",
+    "點一杯咖啡，09:44前喝完，之後專心工作到09:44再休息"
+   ],
+   "bot": "一個口令一個動作，坐滿再走",
+   "ms": 2768
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "eggslut 新宿サザンテラス店",
+   "type": "hamburger_restaurant",
+   "rating": 4.1,
+   "walkMin": 2,
+   "distM": 122,
+   "radiusM": 1000,
+   "closeIn": 772,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 8,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘抵達",
+    "進去點兩杯咖啡，各點一份餐點",
+    "坐滿60分鐘再起身"
+   ],
+   "bot": "找個能坐兩人的位子，站好",
+   "ms": 2699
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "はかどり空間FEEEP（フィープ）新宿西口店",
+   "type": "cafe",
+   "rating": 4.5,
+   "walkMin": 5,
+   "distM": 368,
+   "radiusM": 2500,
+   "closeIn": 892,
+   "how": "text=\"静か カフェ\" rank=DISTANCE → text=\"静か カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 6,
+    "total": 23,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走5分鐘到店",
+    "進去找最裡面的角落位子坐下",
+    "立刻點咖啡，60分鐘內慢慢喝邊談"
+   ],
+   "bot": "角落位子、先點再談",
+   "ms": 3141
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "eggslut 新宿サザンテラス店",
+   "type": "hamburger_restaurant",
+   "rating": 4.1,
+   "walkMin": 2,
+   "distM": 122,
+   "radiusM": 400,
+   "closeIn": 772,
+   "how": "text=\"カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 7,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 2 分鐘到店",
+    "點一杯咖啡，坐下",
+    "08:29 時間到，起身離開"
+   ],
+   "bot": "點一杯咖啡，坐 20 分鐘，時間到就撤",
+   "ms": 2732
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Shinjuku CROSSING cafe&dining",
+   "type": "cafe",
+   "rating": 4.4,
+   "walkMin": 5,
+   "distM": 327,
+   "radiusM": 1000,
+   "closeIn": 862,
+   "how": "text=\"電源 カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 19,
+    "total": 19,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走5分鐘抵達",
+    "點一杯咖啡，坐靠窗邊或角落",
+    "到店先問店員插座在哪，手機接上，滑到10點前離開"
+   ],
+   "bot": "先確認插座位置，穩穩坐",
+   "ms": 2855
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 3318
+ }
+}
