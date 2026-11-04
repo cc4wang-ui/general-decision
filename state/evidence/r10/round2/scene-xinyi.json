@@ -1,0 +1,362 @@
+{
+ "loc": "台北信義（市府）",
+ "localHour": 8,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "餓補煎酥包",
+   "type": "restaurant",
+   "rating": 4.6,
+   "walkMin": 3,
+   "distM": 207,
+   "radiusM": 1250,
+   "closeIn": 280,
+   "how": "text=\"水餃 鍋貼\" rank=RELEVANCE → text=\"小吃\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 8,
+    "total": 12,
+    "relaxed": false
+   },
+   "steps": [
+    "08:22 到店，點一份煎酥包",
+    "邊走邊吃，20 分鐘內解決"
+   ],
+   "bot": "趕時間就不要想，08:22 點餐",
+   "ms": 2321
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "NSFW Pizza & Coffee",
+   "type": "pizza_restaurant",
+   "rating": 4.6,
+   "walkMin": 3,
+   "distM": 185,
+   "radiusM": 1500,
+   "closeIn": 700,
+   "how": "text=\"水餃 鍋貼\" rank=RELEVANCE → text=\"外帶\" rank=RELEVANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 12,
+    "total": 19,
+    "relaxed": false
+   },
+   "steps": [
+    "08:22 前到店，點一份披薩或咖啡",
+    "決定好再點，不要站在那邊發呆",
+    "拿了就走，回去吃"
+   ],
+   "bot": "別猶豫，08:22 到店，點餐外帶",
+   "ms": 2726
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Seasons by olivier e.",
+   "type": "french_restaurant",
+   "rating": 4.4,
+   "walkMin": 1,
+   "distM": 57,
+   "radiusM": 3000,
+   "closeIn": 790,
+   "how": "text=\"火鍋\" rank=RELEVANCE → text=\"餐廳\" rank=RELEVANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "08:20 到門口，點 3-4 道主菜、2 道配菜一起分",
+    "邊吃邊聊，90 分鐘內吃完散場",
+    "21:29 前走出來"
+   ],
+   "bot": "一群人，點菜分食，別磨蹭",
+   "ms": 2606
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "CuppaCuppa Cafe",
+   "type": "cafe",
+   "rating": 4.8,
+   "walkMin": 3,
+   "distM": 197,
+   "radiusM": 3750,
+   "closeIn": 520,
+   "how": "text=\"牛排\" rank=DISTANCE → text=\"餐廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 14,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "08:22 到達，點招牌餐點",
+    "細嚼慢嚥，不趕時間",
+    "09:52 前離開"
+   ],
+   "bot": "點招牌，慢慢享受，一個半小時",
+   "ms": 2585
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "飯丸屋-台北松菸店",
+   "type": "japanese_restaurant",
+   "rating": 4.6,
+   "walkMin": 3,
+   "distM": 214,
+   "radiusM": 2500,
+   "closeIn": 700,
+   "how": "text=\"拉麵\" rank=RELEVANCE → text=\"小吃\" rank=DISTANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 21,
+    "total": 21,
+    "relaxed": false
+   },
+   "steps": [
+    "08:22 到店，點一份飯丸（米飯類選一種）",
+    "咬碎吞快，不要邊吃邊滑手機",
+    "08:52 前離開回家"
+   ],
+   "bot": "進場、點餐、30分內吃完閃人",
+   "ms": 3091
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "茹曦酒店 SUNNY BUFFET 自助餐廳",
+   "type": "buffet_restaurant",
+   "rating": 4.5,
+   "walkMin": 27,
+   "distM": 2113,
+   "radiusM": 2500,
+   "closeIn": 130,
+   "how": "text=\"吃到飽 餐廳\" rank=DISTANCE → text=\"吃到飽 餐廳\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 6,
+    "total": 6,
+    "relaxed": false
+   },
+   "steps": [
+    "08:46 到店，確認有沒有插座跟Wi-Fi",
+    "點海鮮、肉品、熟食，一輪一輪夾，不要貪心堆盤子",
+    "10:20 前吃完離開"
+   ],
+   "bot": "走27分鐘現在出發，10點半關門前吃完",
+   "ms": 3224
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "CuppaCuppa Cafe",
+   "type": "cafe",
+   "rating": 4.8,
+   "walkMin": 3,
+   "distM": 197,
+   "radiusM": 600,
+   "closeIn": 520,
+   "how": "text=\"咖啡廳\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 8,
+    "total": 8,
+    "relaxed": false
+   },
+   "steps": [
+    "08:22 到店坐下，點一杯咖啡",
+    "手機面朝下，放桌上",
+    "坐滿 30 分鐘再走"
+   ],
+   "bot": "一杯咖啡，腦子放空",
+   "ms": 2181
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "CURISTA COFFEE奎士咖啡 市府旗艦店",
+   "type": "cafe",
+   "rating": 4.5,
+   "walkMin": 2,
+   "distM": 130,
+   "radiusM": 1000,
+   "closeIn": 700,
+   "how": "text=\"不限時 咖啡廳\" rank=RELEVANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 6,
+    "total": 6,
+    "relaxed": false
+   },
+   "steps": [
+    "到櫃台問店員插座位置在哪",
+    "點一杯咖啡，09:51前享用完",
+    "坐滿90分鐘後才休息或離開"
+   ],
+   "bot": "插座、咖啡、90分鐘專心",
+   "ms": 2352
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "飯丸屋-台北松菸店",
+   "type": "japanese_restaurant",
+   "rating": 4.6,
+   "walkMin": 3,
+   "distM": 214,
+   "radiusM": 1000,
+   "closeIn": 700,
+   "how": "text=\"咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 9,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "找能坐三人以上的位子，坐下",
+    "各點一杯咖啡，09:30 前點完",
+    "坐滿 60 分鐘再走，手機面朝下"
+   ],
+   "bot": "找位子坐定，一個口令一個動作",
+   "ms": 2433
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "彼得好咖啡市府松菸店",
+   "type": "coffee_shop",
+   "rating": 4.2,
+   "walkMin": 2,
+   "distM": 143,
+   "radiusM": 2500,
+   "closeIn": 520,
+   "how": "text=\"安靜 咖啡廳\" rank=RELEVANCE → text=\"安靜 咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 15,
+    "total": 21,
+    "relaxed": false
+   },
+   "steps": [
+    "08:21 到店，點一杯咖啡坐角落",
+    "咖啡到手立刻開始談",
+    "09:25 前講完，手機面朝下"
+   ],
+   "bot": "找角落坐定，事情談完再喝",
+   "ms": 2591
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "CuppaCuppa Cafe",
+   "type": "cafe",
+   "rating": 4.8,
+   "walkMin": 3,
+   "distM": 197,
+   "radiusM": 400,
+   "closeIn": 520,
+   "how": "text=\"咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 8,
+    "total": 8,
+    "relaxed": false
+   },
+   "steps": [
+    "點一杯中杯咖啡",
+    "坐滿20分鐘，08:42準時起身",
+    "手機面朝下，眼睛看窗外或人"
+   ],
+   "bot": "一個口令一個動作，20分鐘內解決",
+   "ms": 2271
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Wilbeck威爾貝克手烘咖啡吧-永吉店",
+   "type": "cafe",
+   "rating": 4.6,
+   "walkMin": 5,
+   "distM": 397,
+   "radiusM": 1000,
+   "closeIn": 520,
+   "how": "text=\"有插座 咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 8,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "一進門問店員哪裡有插座",
+    "點一杯咖啡坐下來",
+    "筆電插上，40 分鐘內喝完"
+   ],
+   "bot": "確認插座位置，別坐到沒電的角",
+   "ms": 2422
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 3224
+ }
+}
