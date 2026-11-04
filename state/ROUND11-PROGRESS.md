@@ -41,10 +41,15 @@
 - `state/handoff-tools/r11-check.mjs`：r10 的全部檢查＋約會走超過 15 分＋約會不是 15 分內最高分（自己用 `cands` 重算，不靠 `scene.ts`）。
 - 單元：`tests/unit/scene.test.ts`「Round 11」6 條。突變檢查：拿掉 `maxWalk: 15` → 5 條失敗。
 
-### 2 Routes 403（程式）✅ → 待測試版讀原因
+### 2 Routes 403 ✅ 原因查到 → 🔒 待 Cross 一個動作
 
-- `src/dailyRouting.ts`：`routesErrorDetail` 取 Google 錯誤的狀態、原因、專案編號、啟用網址，接在錯誤訊息後面，只進伺服器 log。不含金鑰（單元測試檢查）。
-- 單元：`tests/unit/dailyRouting.test.ts` 4 條（API 沒開、金鑰限制、壞內容、不帶金鑰）。
+- `src/dailyRouting.ts`：`routesErrorDetail` 取 Google 錯誤的狀態、原因、專案編號、啟用網址，接在錯誤訊息後面，只進伺服器 log。`computeRouteMatrix` 是串流 API，錯誤包在陣列裡（`7016204` 修）。解不出時留前 160 字原文，遮掉金鑰樣式字串。
+- 單元：`tests/unit/dailyRouting.test.ts` 6 條（API 沒開、金鑰限制、陣列格式、沒有結構化原因、不是 JSON、不帶金鑰）。
+- **原因（2026-11-04 18:20 東京，測試版真請求）**：`PERMISSION_DENIED SERVICE_DISABLED projects/919994638922`。是**專案沒開 Routes API**，不是金鑰限制。證據 `state/evidence/r11/routes/log.txt`、`daily2.json`（`routeVerified:false`，店家與照片照常）。
+- **Cross 的一個動作**：打開 https://console.developers.google.com/apis/api/routes.googleapis.com/overview?project=919994638922 → 按「啟用」。約 1 分鐘。
+- 費用：Compute Route Matrix 每月前 10,000 個元素免費；一次今日行程最多 10 點 ≈ 100 元素。
+- Claude 自己偵測：每次量測叫醒時打一次 `/api/daily-route`，看 `routeVerified:true`。
+- ⚠️ 開了之後若變成 `API_KEY_SERVICE_BLOCKED`＝金鑰有 API 限制，要再把 Routes API 加進金鑰允許清單（第二個動作，到時候附網址）。
 
 ### 3 Places 上限：方案（🔒 待 Cross 核准）
 
@@ -67,4 +72,32 @@
 
 ### 閘門（2026-11-04 18:2x 東京）
 
-typecheck ✅、單元 712/712 ✅、build ✅（`index-CMs7I1SA.js`）、check:bundle ✅、smoke ✅、e2e 全套 127/127 ✅（3.8 分）。
+- `f33dfb8`：typecheck ✅、單元 712/712 ✅、build ✅（`index-CMs7I1SA.js`）、check:bundle ✅、smoke ✅、e2e 全套 127/127 ✅（3.8 分）。
+- `7016204`（只改伺服器端 Routes 錯誤解析）：typecheck ✅、單元 714/714 ✅、build ✅（前端 hash 相同 `index-CMs7I1SA.js`，e2e 不受影響）、check:bundle ✅、smoke ✅。
+
+### 測試版
+
+| 名稱 | deployment | commit |
+|---|---|---|
+| R11 preview-1 | `dpl_2xJDRk4Q1kYRkS7oAxbZosMbi8R4` | `f33dfb8` |
+| R11 preview-2（量測用） | `dpl_65Z3btkfCR5Gvy8XzJ3E5TSUkbZF`（general-decision-pw257bw04-cc4wang-uis-projects.vercel.app） | `7016204` |
+
+### 實測
+
+| 時間（東京） | 地點 | 情境 | 派錯／還沒開／到店已關／約會酒吧 | 約會 | 證據 |
+|---|---|---|---|---|---|
+| 11-04 18:20 | 新宿 | 12/12 | 全 0 | JeMare 4.8★ 走 8 分 | `state/evidence/r11/evening/scene-shinjuku.*` |
+| 11-04 17:20（台北） | 信義 | 12/12 | 全 0 | PROMETTENTE 4.7★ 走 15 分 | `state/evidence/r11/evening/scene-xinyi.*` |
+
+整理：`node state/handoff-tools/r11-check.mjs <json>`。
+
+### 量測排程（send_later 叫醒這個 session，一次性）
+
+| 東京 | 做什麼 | 證據目錄 |
+|---|---|---|
+| 11-05 01:00 | 深夜：新宿＋信義；Routes 偵測 | `state/evidence/r11/night/` |
+| 11-05 07:00 | 清晨／早上第 1 次：新宿；Routes 偵測 | `state/evidence/r11/morning-0700/` |
+| 11-05 08:15 | 早上第 2 次：新宿（先重拿分享連結）；Routes 偵測 | `state/evidence/r11/morning-0815/` |
+| 11-05 09:30 | 早上第 3 次：新宿；Routes 偵測 → 獨立 checker → 回報 Cross | `state/evidence/r11/morning-0930/` |
+
+每次：分享連結在 scratchpad `share.txt`（過期就用 `get_access_to_vercel_url` 對 preview-2 重拿）→ `bash state/handoff-tools/preview-measure.sh <連結> <目錄> scene-shinjuku`（深夜加 `scene-xinyi`）→ `r11-check.mjs` 整理 → POST `/api/daily-route`（body：`{"origin":{"lat":35.6896,"lng":139.7006},"stops":[{"id":"meal","kind":"meal","minutes":45},{"id":"coffee","kind":"coffee","minutes":45}]}`）看 `routeVerified` → 寫回這份 → commit、push。

@@ -1,0 +1,12 @@
+HTTP/1.1 200 Connection Established
+
+HTTP/2 200 
+cache-control: no-store
+content-type: application/json; charset=utf-8
+date: Wed, 04 Nov 2026 09:20:23 GMT
+server: Vercel
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+x-robots-tag: noindex
+x-vercel-cache: MISS
+x-vercel-id: iad1::iad1::plf99-1793784022927-d4aba12afe50
+
