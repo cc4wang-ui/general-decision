@@ -1,7 +1,7 @@
 # Round 10 進度：路線圖全做（接手用）
 
 > 開始：2026-11-03 23:10 東京。分支 `claude/nifty-ramanujan-szofu5`（PR #26）。基底：Round 9 合併版 `421e925`。
-> 正式站仍是 `main` 的 `dpl_GXH9RaKiS4FpELKoa7GDg5xgF2L5`（Round 3＋今日行程）。
+> **2026-11-04 09:28 東京上線**：PR #26 合併進 `main`（`a9f9871`），Vercel 部署 `dpl_6bFCi5QrsQXRrR9qiqp89ZQmSfPq`。回復點：`dpl_GXH9RaKiS4FpELKoa7GDg5xgF2L5`（合併前的 main，Round 3＋今日行程）。
 
 ## 目標契約｜R10 路線圖全做
 
@@ -102,6 +102,34 @@ typecheck ✅、單元 699/699 ✅、build ✅（`index-COfU0ckM.js`）、check:
 - 評分不夠時只放寬評分，派附近評分最高的那幾家（差 0.2★ 內）。
 - 閘門：單元 702/702、e2e 124/124、build／bundle／smoke ✅。
 - 實測（`state/evidence/r10/round2/`，09:19 東京）：新宿第 1 次 12/12；第 2 次 11/12（約會放寬到 4.2★＝附近能找到的最高分，走 32 分）；信義 12/12。派錯、還沒開、到店已關全 0。
+
+### Checker 第 2 輪（2026-11-04 09:20 東京，最後一輪）：FAIL（只有「其他」類）→ 照規則上線
+
+- (b) 整批放回不派還沒開的店 ✅（本機腳本：5 種歇情境候選全沒開 → 全部超商救援）；(c) 快吃／外帶 ✅（沒派到還沒開的店，也沒變成常走超商）；(d) ✅。
+- (a) 約會評分：新宿三次 11、11、12/12，兩次派到 4.1★（規則 4.3★）。早上附近 4.3★ 的店多半還沒開。同一條件第二次 FAIL。
+- STOP 1、2 PASS（單元 702/702、e2e 124/124）；信義 12/12；派錯、酒吧、還沒開、到店已關全 0；今日行程、照片、「去」都過。
+- 依 Claude.md 規則 3「審查最多兩輪，之後只擋跑不完或壞資料」與本契約 STOP 4 → 上線，(a) 列已知未修，交 Cross 決定（checker 建議：接受派附近最高分，另加步行上限）。
+
+### 上線（STOP 5）✅ 2026-11-04 09:28 東京
+
+| 檢查 | 結果 |
+|---|---|
+| `general-decision.vercel.app` 指向 | `dpl_6bFCi5QrsQXRrR9qiqp89ZQmSfPq`（`main` `a9f9871`） |
+| 首頁 JS | `index-7SIEHx2k.js`（= 本機 build） |
+| `/api/probe` | 404 |
+| `/api/order`、`/api/weekly`、`/api/daily-route`、`/api/geocode` GET | 405 |
+| POST `/api/order`（新宿・一個人快吃） | 200，松屋 新宿靖国通り店，走 7 分 |
+| POST `/api/daily-route`（目前位置＝新宿） | 200，兩站在新宿附近 |
+| runtime error（1 小時） | 0 |
+
+證據 `state/evidence/r10/production/`。
+
+### 已知未修
+
+- 早上新宿「約會吃好一點」常找不到 4.3★，改派附近最高分（4.1–4.2★），可能走 30 分以上 → 待 Cross 決定（加步行上限？）。
+- Google Routes 403：今日行程的步行時間未驗證 → 待 Cross 在 Google Cloud 開 Routes API 🔒。
+- 量測工具不能指定時間；清晨、深夜這版還沒用真資料量（23:42 量的是 A 線版本）。
+- 手機實機（iPhone 分享面板、從「檔案」匯入記憶）沒測。
 
 ### E 線 ✅
 

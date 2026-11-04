@@ -1,0 +1,13 @@
+HTTP/1.1 200 Connection Established
+
+HTTP/2 200 
+cache-control: public, max-age=0, must-revalidate
+content-type: application/json; charset=utf-8
+date: Wed, 04 Nov 2026 00:28:20 GMT
+server: Vercel
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+x-places-calls: 1
+x-timing: places=341;claude=1953;model=claude-haiku-4-5
+x-vercel-cache: MISS
+x-vercel-id: iad1::iad1::cpxqj-1793752097654-8974d510d77e
+
