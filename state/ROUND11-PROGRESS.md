@@ -155,3 +155,39 @@
 
 - 深夜、清晨、早上量測（排程不變，見「量測排程」）。
 - 09:30 後獨立 checker。FAIL → 開下一輪修。
+
+## Checker 第 1 輪（2026-11-05 07:51–08:01 東京）：FAIL（只有「其他」類）
+
+獨立 checker（fresh 子代理，看不到 maker 推理），自己重跑閘門（單元 714/714、e2e 127/127）、自己用 `cands` 重算約會 5 次（全對）、自己打正式站 `/api/daily-route`（`routeVerified:true`）。
+
+| STOP | 判定 | 摘要 |
+|---|---|---|
+| 1 約會 | **FAIL** | 真資料 PASS；但失敗路徑沒過：15 分內最高分被記憶（又是這家／不要再來）擋掉，`orderHandler.ts:253` 一步退到整批候選 → 40 次裡 36–39 次派居酒屋、1–2 次派走 29 分的店。重現腳本 scratchpad `edge-mem-loop.mts` |
+| 2 Routes | PASS | 原因 `SERVICE_DISABLED`；之後都是 `routeVerified:true` |
+| 3 Places | PASS | 三個方案數字重算吻合；上限 40 沒改 |
+| 4 手機 | PASS | e2e 3 條過；實機列為 Cross 的事 |
+| 5 深夜／清晨 | PASS | 新宿 01:01、07:00 各 12/12，逐列重算全 0 |
+| 6 閘門 | PASS | 全過；前端 hash = 正式站 |
+| 7 checker | FAIL | 因為 1 |
+| 8 上線 | PASS | 合併在 Cross「上線」之後 |
+
+契約忠實度的兩個缺口（交 Cross）：
+1. 評分放寬後可能比原本抱怨的 4.1–4.2★ 更低（07:50 派到 3.7★）。要不要設評分下限，是 Cross 的決定。
+2. 實機測試沒給 Cross 步驟。步驟見下。
+
+其他觀察（下一輪候選，不影響判定）：深夜「一個人放空」派到 snack_bar（Artbar星男）；信義「等人」整批放回派到水煙吧；約會候選裡有購物中心（新宿サザンテラス）；`probe.ts` 放寬評分不算錯也適用「談事情」。
+
+### 第 2 輪前的修正（閘門：typecheck ✅、單元 717/717 ✅、build ✅ 前端 hash 不變 `index-CMs7I1SA.js`、check:bundle ✅、smoke ✅、e2e 127/127 ✅）
+
+- `src/scene.ts` 新增 `sceneTiers`：退路一層一層退——① `sceneFilter` 的 kept；② 情境規則只拿掉評分（步行上限、排除類型照舊）；③ 到店時開著的全部候選。每層都比上一層大才留。
+- `src/orderHandler.ts`：挑店改成依序試 `sceneTiers` 的每一層。
+- 重現腳本：修前「又是這家」36 居酒屋／2 走 29 分／2 B；修後 40/40 派 B（3.8★、走 5 分）。
+- 單元：`scene.test.ts`「Round 11 checker 第 1 輪」3 條（sceneTiers 分層、同大小不重複、handler 20 種子 × 2 種記憶都派 B）。突變檢查：換回舊的兩層退路 → handler 那條失敗。
+
+### 實機測試步驟（給 Cross，預設不做）
+
+1. iPhone Safari 開 https://general-decision.vercel.app 。
+2. 長按餐盤 1 秒 → 除錯畫面。
+3. 按「匯出記憶」→ 分享面板出現 → 選「儲存到檔案」。
+4. 按「匯入記憶」→ 從「檔案」選剛才的檔 → 看到「匯入完成：…現在記得 N 家」。
+5. 回首頁開今日行程 → 每站有步行分鐘。

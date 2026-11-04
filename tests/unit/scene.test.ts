@@ -790,3 +790,51 @@ describe('Round 11：約會步行上限 15 分', () => {
     expect(scenePasses(c('far', { walkMin: 30 }), party)).toBe(true)
   })
 })
+
+// Round 11 checker 第 1 輪（2026-11-05）：約會 15 分內最高分被記憶擋掉 → 原本一步退到整批候選，
+// 40 次裡 36 次派居酒屋、2 次派走 29 分的店。改成一層一層退：先只放寬評分（步行上限、不派酒吧照舊）。
+import { sceneTiers } from '../../src/scene.ts'
+describe('Round 11 checker 第 1 輪：被記憶擋掉時一層一層退', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+  const date = sceneOf('eat', { scene: '約會吃好一點' })
+  const A = c('A 4.2 近', { rating: 4.2, walkMin: 7 })
+  const B = c('B 3.8 近', { rating: 3.8, walkMin: 5 })
+  const C = c('C 4.6 遠', { rating: 4.6, walkMin: 29 })
+  const D = c('D 居酒屋', { rating: 4.7, walkMin: 8, primaryType: 'japanese_izakaya_restaurant' })
+  it('sceneTiers：第 1 層 15 分內最高分；第 2 層 15 分內不派酒吧的全部；第 3 層整批', () => {
+    expect(sceneTiers([A, B, C, D], date)).toEqual([[A], [A, B], [A, B, C, D]])
+  })
+  it('一樣大的層不重複（沒有評分門檻的情境：兩層）', () => {
+    const party = sceneOf('eat', { scene: '朋友聚餐' })
+    expect(sceneTiers([A, B, C, D], party)).toEqual([[A, B, C, D]])
+    expect(sceneTiers([A, B], null)).toEqual([[A, B]])
+    expect(sceneTiers([], date)).toEqual([])
+  })
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    process.env.GOOGLE_PLACES_KEY = 'test-places-key'
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+  it('handler：A 被「又是這家」或「不要再來」擋掉 → 派 B（走 ≤ 15 分、不是居酒屋），20 個種子', async () => {
+    const raw = [
+      at('A', 550, { rating: 4.2, userRatingCount: 800, primaryType: 'italian_restaurant' }),
+      at('B', 350, { rating: 3.8, userRatingCount: 800, primaryType: 'japanese_restaurant' }),
+      at('C', 2300, { rating: 4.6, userRatingCount: 800, primaryType: 'italian_restaurant' }),
+      at('D', 600, { rating: 4.7, userRatingCount: 800, primaryType: 'japanese_izakaya_restaurant' }),
+    ]
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) =>
+      String(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
+    for (const block of [Date.parse('2026-11-15'), 'forever' as const]) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const res = await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed, mem: [{ id: 'A', sh: [], dn: [], x: block }] }))
+        const body = (await res.json()) as Body
+        expect(body.place?.id, `seed ${seed} ${block}`).toBe('B')
+        expect(body.place!.walkMin).toBeLessThanOrEqual(15)
+      }
+    }
+  })
+})

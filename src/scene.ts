@@ -296,6 +296,21 @@ export function sceneFilter<T extends Cand>(cands: T[], scene: Scene | null): { 
   return { kept: pool, relaxed: pool.length > 0 }
 }
 
+/**
+ * Round 11（checker 2026-11-05：約會 15 分內最高分被「又是這家／不要再來」擋掉時，一步退到整批候選，派到居酒屋或走 29 分的店）。
+ * 挑店的退路，一層一層往下退，每層都比上一層大：
+ * 1. sceneFilter 的 kept；2. 情境規則只拿掉評分（步行上限、排除類型照舊）；3. 到店時開著的全部候選（寧可派得到）。
+ */
+export function sceneTiers<T extends Cand>(cands: T[], scene: Scene | null): T[][] {
+  const pool = reachablePool(cands, scene)
+  const tiers: T[][] = [sceneFilter(cands, scene).kept]
+  if (scene) tiers.push(pool.filter((c) => passes(c, { ...scene.rule, minRating: undefined })))
+  tiers.push(pool)
+  // 只留比前一層大的（各層是包含關係；同樣大小＝同一批，不用再挑一次）
+  let max = 0
+  return tiers.filter((t) => (t.length > max ? ((max = t.length), true) : false))
+}
+
 /** 單一店家是否符合情境偏好（handler 算「夠不夠 5 家」用）。 */
 export function scenePasses(c: Cand, scene: Scene | null): boolean {
   return reachablePool([c], scene).length === 1 && (!scene || passes(c, scene.rule))
