@@ -12,13 +12,37 @@ export function validPoint(v:unknown):Point|null{
 export type ScheduledStop={id:string;title?:string;minutes?:number;start?:string;locked?:boolean;custom?:boolean;done?:boolean;candidate?:Point;eta?:string;departure?:string;travelMin?:number;conflict?:string}
 const clock=(m:number)=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0')
 const minute=(t:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t)?Number(t.slice(0,2))*60+Number(t.slice(3)):null
+/**
+ * Round 11：403 要分得出「API 沒開」（SERVICE_DISABLED）還是「金鑰限制擋了」（API_KEY_SERVICE_BLOCKED），Cross 要做的事不一樣。
+ * 只取 Google 錯誤的狀態、原因、專案編號、啟用網址；不含金鑰。只進伺服器 log，不回給使用者。
+ */
+export async function routesErrorDetail(response:Response):Promise<string>{
+ let text=''
+ try{text=await response.text()}catch{return ''}
+ const scrub=(t:string)=>t.replace(/key=[^&\s"]+/gi,'key=…').replace(/AIza[0-9A-Za-z_-]{20,}/g,'AIza…').replace(/\s+/g,' ').trim()
+ try{
+  // computeRouteMatrix 是串流 API：錯誤可能包在陣列裡（[{error:{…}}]）。
+  type GErr={error?:{status?:string;message?:string;details?:Array<{reason?:string;metadata?:Record<string,string>}>}}
+  const raw=JSON.parse(text) as GErr|GErr[]
+  const err=(Array.isArray(raw)?raw.find(x=>x&&x.error):raw)?.error
+  const info=err?.details?.find(d=>d.reason)
+  const meta=info?.metadata??{}
+  // 沒有結構化原因時退回 Google 的說明文字（不含金鑰：Google 不回傳金鑰；保險起見把 key= 後面遮掉）。
+  const fallback=info||!err?.message?undefined:scrub(err.message).slice(0,200)
+  const parts=[err?.status,info?.reason,meta.consumer,meta.activationUrl,fallback].filter((x):x is string=>typeof x==='string'&&x.length>0)
+  if(parts.length)return ' '+parts.join(' ').slice(0,400)
+ }catch{/* 不是 JSON（例：代理的 HTML 錯誤頁）→ 下面留原文 */}
+ // 解不出原因：留前 160 字，遮掉金鑰樣式的字串。
+ const t=scrub(text).slice(0,160)
+ return t?' '+t:''
+}
 export async function travelMatrix(key:string,origin:Point,stops:ScheduledStop[]):Promise<{matrix:number[][];distances:number[][]}>{
  const points=[origin,...stops.map(s=>s.candidate).filter((p):p is Point=>!!p)]
  const waypoints=points.map(p=>({waypoint:{location:{latLng:{latitude:p.lat,longitude:p.lng}}}}))
  const response=await fetch((process.env.ROUTES_BASE_URL??'https://routes.googleapis.com')+'/distanceMatrix/v2:computeRouteMatrix',{
   method:'POST',headers:{'content-type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':'originIndex,destinationIndex,duration,distanceMeters,status,condition'},
   body:JSON.stringify({origins:waypoints,destinations:waypoints,travelMode:'WALK',routingPreference:'ROUTING_PREFERENCE_UNSPECIFIED'}),signal:AbortSignal.timeout(14000)})
- if(!response.ok)throw new Error('Google Routes 步行路線服務未啟用或暫時不可用（'+response.status+'）')
+ if(!response.ok)throw new Error('Google Routes 步行路線服務未啟用或暫時不可用（'+response.status+'）'+(await routesErrorDetail(response)))
  const body=await response.text()
  let elements:Array<{originIndex:number;destinationIndex:number;duration?:string;distanceMeters?:number;condition?:string;status?:{code?:number}}>=[] 
  try{const data=JSON.parse(body);elements=Array.isArray(data)?data:[data]}catch{elements=body.split('\n').filter(Boolean).map(line=>JSON.parse(line))}

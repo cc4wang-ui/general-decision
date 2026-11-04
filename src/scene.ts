@@ -112,7 +112,9 @@ const EAT: SceneRule[] = [
   },
   {
     // Round 10（路線圖 Q1 建議答案：擋）：約會不派酒吧類（Round 6 起派到 Bar Vier）。
-    id: '約會吃好一點', radius: 1500, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH, ...BARISH], minRating: 4.3,
+    // Round 11（Cross 2026-11-04「全部都處理」）：步行上限 15 分。早上 4.3★ 多半沒開，放寬評分時也不放寬步行（checker 2026-11-04 看到走 32 分）。
+    // 半徑跟著收到 1200 m（15 分 × 80 m），第一次查詢的 20 家才會落在走得到的範圍。
+    id: '約會吃好一點', radius: 1200, maxWalk: 15, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH, ...BARISH], minRating: 4.3,
     queries: {
       TW: [q('義大利麵', 'western', 2.5), q('餐酒館', 'western', 3), q('日式料理', 'jp', 3), q('牛排', 'western', 3, BEEF), q('鐵板燒', 'jp', 2.5), q('法式料理', 'western', 3.5)],
       JP: [q('イタリアン', 'western', 2.5), q('フレンチ', 'western', 3.5), q('寿司', 'jp', 2.5), q('天ぷら', 'jp', 2.5), q('和食', 'jp', 3)],
@@ -283,6 +285,7 @@ export function sceneFilter<T extends Cand>(cands: T[], scene: Scene | null): { 
   const kept = pool.filter((c) => passes(c, scene.rule))
   if (kept.length) return { kept, relaxed: false }
   // Round 10（checker 2026-11-04 09:07：早上約會整批放回派到 3.8★）：先只放寬評分，派附近評分最高的那幾家（差 0.2★ 內）。
+  // Round 11：只放寬評分，步行上限照舊（最高分是在「走得到的店」裡算）。
   if (scene.rule.minRating !== undefined) {
     const softer = pool.filter((c) => passes(c, { ...scene.rule, minRating: undefined }))
     if (softer.length) {

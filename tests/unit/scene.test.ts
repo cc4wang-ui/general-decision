@@ -756,3 +756,37 @@ describe('Round 10：到店要開著、約會擋酒吧、其他的需求換日�
     expect(sceneTimes(quickish, '09:07', 5, undefined, 2)!.opens).toBeUndefined()
   })
 })
+
+// Round 11（Cross 2026-11-04「全部都處理」）：約會步行上限 15 分。
+// checker 2026-11-04 09:20：早上新宿約會放寬到 4.2★，走 32 分。放寬評分時，步行上限不放寬。
+describe('Round 11：約會步行上限 15 分', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+  const date = sceneOf('eat', { scene: '約會吃好一點' })
+  it('規則：步行上限 15 分、半徑 1200 m（15 分 × 80 m）', () => {
+    expect(date!.rule.maxWalk).toBe(15)
+    expect(date!.rule.radius).toBe(1200)
+  })
+  it('4.3★ 以上但走超過 15 分的不派；15 分內有 4.3★ 就派它', () => {
+    const cands = [c('far4.6', { rating: 4.6, walkMin: 32 }), c('near4.4', { rating: 4.4, walkMin: 9 })]
+    expect(sceneFilter(cands, date)).toEqual({ kept: [cands[1]], relaxed: false })
+    expect(scenePasses(cands[0], date)).toBe(false)
+  })
+  it('15 分內沒有 4.3★ → 只放寬評分：派 15 分內最高分的（差 0.2★ 內），走 32 分的 4.2★ 不派', () => {
+    const cands = [c('far4.2', { rating: 4.2, walkMin: 32 }), c('near4.0', { rating: 4.0, walkMin: 12 }), c('near3.9', { rating: 3.9, walkMin: 6 }), c('near3.6', { rating: 3.6, walkMin: 4 })]
+    expect(sceneFilter(cands, date)).toEqual({ kept: [cands[1], cands[2]], relaxed: true })
+  })
+  it('15 分整算走得到；16 分不算', () => {
+    expect(scenePasses(c('15', { walkMin: 15 }), date)).toBe(true)
+    expect(scenePasses(c('16', { walkMin: 16 }), date)).toBe(false)
+  })
+  it('15 分內一家可派的都沒有 → 照舊整批放回（寧可派得到），不是空手', () => {
+    const cands = [c('far4.6', { rating: 4.6, walkMin: 20 }), c('far4.0', { rating: 4.0, walkMin: 25 })]
+    expect(sceneFilter(cands, date)).toEqual({ kept: cands, relaxed: true })
+  })
+  it('其他情境不受影響：朋友聚餐沒有步行上限', () => {
+    const party = sceneOf('eat', { scene: '朋友聚餐' })
+    expect(party!.rule.maxWalk).toBeUndefined()
+    expect(scenePasses(c('far', { walkMin: 30 }), party)).toBe(true)
+  })
+})
