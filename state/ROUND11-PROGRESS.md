@@ -1,7 +1,8 @@
 # Round 11 進度：交接待辦全處理（接手用）
 
 > 開始：2026-11-04 18:00 東京。分支 `claude/vigilant-clarke-dsrqfi`，基底 `main` `4688301`（＝正式站 `dpl_D5CHYjpdPqdmGADARnHpHvcKzWG2`）。
-> 回復點：`dpl_D5CHYjpdPqdmGADARnHpHvcKzWG2`（Round 10，#33）。
+> **2026-11-04 19:21 東京上線**：PR #34 合併進 `main`（`945088a`），Vercel 部署 `dpl_8XSAAmNtPTS9bmfbNaiJqc51Vx9f`。
+> 回復點：`dpl_D5CHYjpdPqdmGADARnHpHvcKzWG2`（Round 10，#33）。Vercel rollback 一鍵。
 
 ## 目標契約｜R11 交接待辦全處理
 
@@ -41,7 +42,7 @@
 - `state/handoff-tools/r11-check.mjs`：r10 的全部檢查＋約會走超過 15 分＋約會不是 15 分內最高分（自己用 `cands` 重算，不靠 `scene.ts`）。
 - 單元：`tests/unit/scene.test.ts`「Round 11」6 條。突變檢查：拿掉 `maxWalk: 15` → 5 條失敗。
 
-### 2 Routes 403 ✅ 原因查到 → 🔒 待 Cross 一個動作
+### 2 Routes 403 ✅ 已解決（Cross 開了 Routes API）
 
 - `src/dailyRouting.ts`：`routesErrorDetail` 取 Google 錯誤的狀態、原因、專案編號、啟用網址，接在錯誤訊息後面，只進伺服器 log。`computeRouteMatrix` 是串流 API，錯誤包在陣列裡（`7016204` 修）。解不出時留前 160 字原文，遮掉金鑰樣式字串。
 - 單元：`tests/unit/dailyRouting.test.ts` 6 條（API 沒開、金鑰限制、陣列格式、沒有結構化原因、不是 JSON、不帶金鑰）。
@@ -110,3 +111,24 @@
 - 排好的量測照常做，改當上線後驗證（測試版 preview-2 跟上線的程式相同）；09:30 的 checker 也照跑，FAIL 就開下一輪修。
 - Places 上限：Cross 沒選 → 維持 40 次（不改程式，不動錢）。
 - Routes：等 Cross 按「啟用」；量測時自己偵測。
+
+## 上線（2026-11-04 19:21 東京）✅
+
+| 檢查 | 結果 |
+|---|---|
+| `general-decision.vercel.app` 指向 | `dpl_8XSAAmNtPTS9bmfbNaiJqc51Vx9f`（`main` `945088a`，PR #34） |
+| 首頁 JS | `index-CMs7I1SA.js`（= 本機 build） |
+| `/api/probe` | 404 |
+| `/api/order`、`/api/weekly`、`/api/daily-route`、`/api/geocode` GET | 405 |
+| POST `/api/order`（新宿・約會吃好一點，19:21） | 200，【割烹和食と会津地酒】御椀 ふぅ，走 3 分。log：`r=1200`（新半徑）、`relaxed=-` |
+| POST `/api/daily-route`（目前位置＝新宿） | 200，**`routeVerified:true`、`Google Places + Google Routes`**，每站有步行分鐘（3、5 分） |
+| runtime error（1 小時） | 0 |
+
+證據 `state/evidence/r11/production/`。
+
+**Routes**：18:20 測試版還是 `SERVICE_DISABLED`；19:21 正式站已回 `routeVerified:true`。Cross 在這之間按了「啟用」。今日行程的步行時間現在是 Google 實算。
+
+### 上線後還要做（不是閘門）
+
+- 深夜、清晨、早上量測（排程不變，見「量測排程」）。
+- 09:30 後獨立 checker。FAIL → 開下一輪修。
