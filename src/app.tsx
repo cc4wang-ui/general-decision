@@ -1,13 +1,15 @@
 // 單頁狀態機 home→intake→cmd→(log|stand)；diary；weekly（第 4 節）。
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DailyDecision } from './dailyDecision.tsx'
-import { CARD_BY_ID, MAJOR_IDS, MINOR_IDS, MODULE_BARKS } from './cards.ts'
+import { CARD_BY_ID, MAJOR_IDS, MINOR_IDS, MODULE_BARKS, SCENE_BARKS } from './cards.ts'
 import { OFFICER_BY_LEVEL } from './officers.ts'
 import { Avatar } from './avatar.tsx'
 import { InsigniaMark } from './insignia.tsx'
+import { computeStreak, insigniaOf, type StreakResult } from './streak.ts'
+import { tzOf } from './tz.ts'
 import { MemeCard, StepsCard } from './meme.tsx'
 import {
-  ApiError, ERROR_TEXT, GEO_DENIED_LINE, getLocation, requestGeocode, requestOrder, requestWeekly,
+  ApiError, ERROR_TEXT, GEO_DENIED_LINE, GEO_DOUBT_LINE, geoDoubt, getLocation, requestGeocode, requestOrder, requestWeekly, type GeoDoubt, type GeoReason,
   underPlacesCap, type GeoResult,
 } from './api.ts'
 import {
@@ -17,12 +19,15 @@ import {
 import { SHARE_FALLBACK, shareNode } from './share.ts'
 import { clearDebug, formatCandidate, formatDebug, formatPick, formatPrice, readDebug, type DebugEntry } from './debug.ts'
 import {
-  cuisineStats, discoveryStats, markClosed, markDone, markNeverAgain, markNotThisKind, markShown, memSummary, setFav,
+  cuisineStats, discoveryStats, exportMem, importMem, markClosed, markDone, markNeverAgain, markNotThisKind, markRepeat, markShown,
+  memSummary, setFav, type MemFile, type MemImport,
 } from './placeMem.ts'
+import { clearTrial, exportTrial, readTrial, recordTrial, summarize, tagTrial, trialGeo, type GeoPick, type TrialGeo } from './trial.ts'
 import {
-  effectiveBudget, loadBudget, loadCountry, loadNovelty, lunchHidesTop, nextNovelty, NOVELTY_LABEL,
-  saveBudget, saveCountry, saveNovelty, toggleBand,
+  effectiveBudget, loadBudget, loadCountry, loadLastScene, loadStations, saveStation, loadNovelty, lunchHidesTop, nextNovelty, NOVELTY_LABEL,
+  orderScenes, saveBudget, saveCountry, saveLastScene, saveNovelty, toggleBand,
 } from './prefs.ts'
+import { SCENE_KEY, SCENE_OTHER, SCENE_TEXT_KEY, SCENE_TEXT_MAX, sanitizeSceneText } from './scene.ts'
 import { bandLabels, countryOf } from './price.ts'
 import { Consent, CONSENT_KEY, CONSENT_VERSION } from './consent.tsx'
 import { Privacy } from './privacy.tsx'
@@ -31,7 +36,7 @@ import type {
   Band, Country, DiaryEntry, Level, ModuleCard, ModuleId, Novelty, Order, ReissueReason, WeeklyReport,
 } from './types.ts'
 
-type Screen = 'home' | 'intake' | 'waiting' | 'cmd' | 'log' | 'stand' | 'error' | 'diary' | 'weekly' | 'debug' | 'privacy' | 'daily'
+type Screen = 'home' | 'scene' | 'intake' | 'waiting' | 'cmd' | 'log' | 'stand' | 'error' | 'diary' | 'weekly' | 'debug' | 'privacy' | 'daily'
 
 const LEVEL_KEY = 'decide.level'
 
@@ -68,6 +73,8 @@ export function safe<T>(fn: () => Promise<T>, fallback: T, ms: number = SAFE_TIM
 }
 
 type Loc = { lat: number; lng: number }
+/** Round 6：出發點。label = 使用者自己報的「下車的站」站名（GPS 座標沒有 label）。 */
+type Origin = Loc & { label?: string }
 type MemModule = 'eat' | 'rest'
 const isMemModule = (id: ModuleId): id is MemModule => id === 'eat' || id === 'rest'
 
@@ -87,16 +94,32 @@ export function App() {
   // ── Round 3 ──
   const [novelty, setNovelty] = useState<Novelty>(loadNovelty)
   const [country, setCountry] = useState<Country>(loadCountry)
+  // 連勝由日記推導；回首頁（screen 變）時重算，跨午夜也跟著換。
+  const streak = useMemo(
+    () => computeStreak(entries, new Date(), country === 'JP' ? 'Asia/Tokyo' : tzOf(undefined)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, country, screen],
+  )
   const [budgets, setBudgets] = useState<Record<'TW' | 'JP', Band[]>>(() => ({ TW: loadBudget('TW'), JP: loadBudget('JP') }))
   /** 這次 intake 解析到的位置——只活在記憶體，用來判斷午餐時段（當地時間）；不存。 */
   const [geoLoc, setGeoLoc] = useState<Loc | undefined>(undefined)
   const [reasonOpen, setReasonOpen] = useState(false)
+  /** Round 5：「沒做」先問原因（不符合情境 → 不罰站；就是不想做 → 罰站）。 */
+  const [skipOpen, setSkipOpen] = useState(false)
+  /**
+   * Round 6：「從哪裡出發」底部選單。doubt 有值 = 送出時定位太舊／太粗，先問再派；loc 是那個可疑的座標。
+   * geo（N6）：那個定位有多舊多粗，使用者選完後連同選了什麼記進試用紀錄。
+   */
+  const [locOpen, setLocOpen] = useState<{ doubt?: GeoDoubt; loc?: Loc; geo?: TrialGeo } | null>(null)
+  /** Round 6：這道口令選的「下車的站」（null = 目前位置）。 */
+  const [station, setStation] = useState<string | null>(null)
+  const [stations, setStations] = useState<string[]>(loadStations)
   const [discovery, setDiscovery] = useState({ newPlaces: 0, revisits: 0 })
   const excluded = useRef<string[]>([])
   /** 這道口令已經說過「今天不想吃這類」的細類（換口令時送給伺服器降權）。 */
   const rejectedCuisines = useRef<string[]>([])
   /** 手動報座標換來的位置：只在這道口令的換口令之間沿用，不存本機（C2）。 */
-  const manualLoc = useRef<Loc | undefined>(undefined)
+  const manualLoc = useRef<Origin | undefined>(undefined)
   /** 這一道口令的時間戳，換口令時沿用，讓日記只留一筆（第 10 節）。 */
   const issuedAt = useRef<string>('')
 
@@ -144,6 +167,7 @@ export function App() {
     // Round 3：日記不再寫店名（Google 條款），只留 place_id 以便之後對回 PlaceMem。
     // R2-01：只有吃／歇才寫 placeId 與 mode；其他卡就算模型帶了 place 也不記。
     const p = isMemModule(c.id) ? o.place : undefined
+    tagTrial(c.id, outcome, reason) // Round 4 試用紀錄：這道口令後來怎麼了
     const list = await putEntry(
       makeEntry(issuedAt.current, c.id, level, o.meme.big, outcome, { placeId: p?.id, reason, mode: p?.mode }),
     )
@@ -182,38 +206,65 @@ export function App() {
     setGeoDenied(false)
     setError(null)
     setReasonOpen(false)
+    setSkipOpen(false)
     excluded.current = []
     rejectedCuisines.current = []
     manualLoc.current = undefined
+    setStation(null)
+    setLocOpen(null)
     issuedAt.current = ''
-    setScreen('intake')
+    // Round 5：吃／歇第一步先選情境（獨立一頁：原本的選單維持 ≤ 3 題、一屏放得下）。
+    setScreen(c.intake.some((f) => f.type === 'scene') ? 'scene' : 'intake')
   }, [])
 
-  const fetchOrder = useCallback(async (c: ModuleCard, ch: Record<string, string | number>, locOverride?: Loc) => {
+  /** geoNote（N6）：定位可疑、問過「你在車上？」之後重送時帶著，記進試用紀錄。 */
+  const fetchOrder = useCallback(async (c: ModuleCard, ch: Record<string, string | number>, locOverride?: Origin, geoNote?: TrialGeo) => {
     setScreen('waiting')
     setError(null)
 
     // 第 8 節：需要 Places 且今天還沒超過上限，才去要定位。
     // 手動報座標（C2）換來的位置優先，而且不再去問 GPS。
     if (c.needsPlaces && !underPlacesCap()) {
+      recordTrial({ module: c.id, level, ok: false, error: 'over_cap' })
       setError(new ApiError('over_cap', ERROR_TEXT.over_cap.line))
       setScreen('error')
       return
     }
-    let loc: Loc | undefined = locOverride ?? manualLoc.current
+    let loc: Origin | undefined = locOverride ?? manualLoc.current
+    let geoReason: GeoReason = 'ok'
+    let trialNote = geoNote
     if (loc) {
       setGeoDenied(false)
     } else if (c.needsPlaces && underPlacesCap()) {
-      const geo = await (geoAhead.current ?? getLocation())
-      geoAhead.current = null // 用過即丟；換口令會重新要一次（maximumAge 120s，通常瞬間回）
+      const ahead = geoAhead.current
+      let geo = await (ahead ?? getLocation())
+      geoAhead.current = null // 用過即丟；換口令會重新要一次（maximumAge 30s，通常瞬間回）
+      // Round 10：預先抓的定位是進選單時拿的；在選單停超過 1 分鐘再送出，會被誤判成「舊定位」而問「你在車上？」。
+      // 先重抓一次：拿到新的就用新的；重抓失敗（地下收不到）才用原本的，照舊問。
+      if (ahead && geoDoubt(geo) === 'stale') {
+        const fresh = await getLocation()
+        if (fresh.loc) geo = fresh
+      }
       loc = geo.loc
+      geoReason = geo.reason
       setGeoDenied(geo.denied)
+      // Round 6：車上的定位常是上一站的或誤差幾百公尺。先問「在車上？」，不直接派店。
+      const doubt = geoDoubt(geo)
+      if (loc && doubt) {
+        setLocOpen({ doubt, loc, geo: trialGeo(geo, doubt) })
+        setScreen('intake')
+        return
+      }
+      if (loc) trialNote = trialGeo(geo, null)
     } else {
       setGeoDenied(false)
     }
     // 2026-09-18：吃／歇沒定位就不能點真店，不再「班長用常識」降級——直接說要座標。
+    // Round 6：分兩種——使用者拒絕（開定位）vs 地下收不到（報下車的站）。
     if (c.needsPlaces && !loc) {
-      setError(new ApiError('no_location', ERROR_TEXT.no_location.line))
+      const kind = geoReason === 'denied' || geoReason === 'unsupported' ? 'no_location' : 'no_signal'
+      recordTrial({ module: c.id, level, ok: false, error: kind })
+      setError(new ApiError(kind, ERROR_TEXT[kind].line))
       setScreen('error')
       return
     }
@@ -228,7 +279,12 @@ export function App() {
     const memModule = isMemModule(c.id) ? c.id : null
     const mem = memModule ? await safe(() => memSummary(memModule, now), []) : []
     const cuisine = memModule ? await safe(cuisineStats, {}) : {}
-    const clean = Object.fromEntries(Object.entries(ch).filter(([k]) => c.intake.some((f) => f.key === k && f.type !== 'bands')))
+    const hasScene = c.intake.some((f) => f.type === 'scene')
+    const clean = Object.fromEntries(Object.entries(ch).filter(([k]) =>
+      c.intake.some((f) => f.key === k && f.type !== 'bands')
+      // 情境「其他」的手動輸入跟著送（只在選了「其他」時）。
+      || (hasScene && k === SCENE_TEXT_KEY && ch[SCENE_KEY] === SCENE_OTHER)))
+    if (SCENE_TEXT_KEY in clean) clean[SCENE_TEXT_KEY] = sanitizeSceneText(clean[SCENE_TEXT_KEY])
 
     try {
       const o = await requestOrder({
@@ -244,7 +300,7 @@ export function App() {
         ...(mem.length ? { mem } : {}),
         ...(Object.keys(cuisine).length ? { cuisine } : {}),
         ...(rejectedCuisines.current.length ? { rejectedCuisines: [...rejectedCuisines.current] } : {}),
-      })
+      }, trialNote)
       if (!issuedAt.current) issuedAt.current = new Date().toISOString()
       // 修 STRATEGY §2⑦：拿到口令的當下就記 shown，不等使用者回報。
       // R2-05：不 await——IndexedDB 慢或卡住不能擋換畫面；失敗由 safe 吞掉。
@@ -260,26 +316,72 @@ export function App() {
     }
   }, [level, entries, country, budgets, novelty])
 
-  const submit = useCallback(() => { if (card) void fetchOrder(card, choices) }, [card, choices, fetchOrder])
+  const submit = useCallback(() => {
+    if (!card || !sceneReady(card, choices)) return
+    const sc = choices[SCENE_KEY]
+    if (typeof sc === 'string' && sc) saveLastScene(card.id, sc)
+    void fetchOrder(card, choices)
+  }, [card, choices, fetchOrder])
+
+  /** Round 6：報「下車的站」→ /api/geocode → 當這道口令的出發點。站名記最近 5 個（不記座標）。 */
+  const pickStation = useCallback(async (q: string): Promise<{ err: string } | { origin: Origin }> => {
+    if (!underPlacesCap()) return { err: ERROR_TEXT.over_cap.line }
+    try {
+      const g = await requestGeocode(q)
+      const origin: Origin = { ...g.loc, label: g.label }
+      manualLoc.current = origin
+      setStation(g.label)
+      setStations(saveStation(g.label))
+      setLocOpen(null)
+      return { origin }
+    } catch (e) {
+      return { err: e instanceof ApiError ? ERROR_TEXT[e.kind].line : ERROR_TEXT.upstream.line }
+    }
+  }, [])
 
   /** C2：沒有定位時手動報地點。回傳錯誤文字（顯示在輸入列下面）；成功就直接重送，畫面會換掉。 */
   const reportLocation = useCallback(async (q: string): Promise<string | null> => {
     if (!card) return null
-    if (!underPlacesCap()) return ERROR_TEXT.over_cap.line
-    try {
-      const g = await requestGeocode(q)
-      manualLoc.current = g.loc
-      void fetchOrder(card, choices, g.loc)
-      return null
-    } catch (e) {
-      return e instanceof ApiError ? ERROR_TEXT[e.kind].line : ERROR_TEXT.upstream.line
-    }
-  }, [card, choices, fetchOrder])
+    const r = await pickStation(q)
+    if ('err' in r) return r.err
+    void fetchOrder(card, choices, r.origin)
+    return null
+  }, [card, choices, fetchOrder, pickStation])
+
+  /** N6：問過「你在車上？」的話，那個定位的品質加上使用者選了什麼；沒問就沒有。 */
+  const doubtNote = (pick: GeoPick): TrialGeo | undefined => (locOpen?.doubt && locOpen.geo ? { ...locOpen.geo, pick } : undefined)
+
+  /** Round 6：選單上的「從哪裡出發」。送出前選站只換出發點；定位可疑時選站就直接派。 */
+  const chooseStation = useCallback(async (q: string): Promise<string | null> => {
+    const go = !!locOpen?.doubt
+    const r = await pickStation(q)
+    if ('err' in r) return r.err
+    if (go && card) void fetchOrder(card, choices, r.origin, doubtNote('station'))
+    return null
+  }, [card, choices, fetchOrder, locOpen, pickStation])
+
+  const useCurrent = useCallback(() => {
+    const doubtLoc = locOpen?.loc
+    manualLoc.current = undefined
+    setStation(null)
+    setLocOpen(null)
+    // 定位可疑但使用者說就用它：帶著這個座標直接派（不再問一次）。
+    if (doubtLoc && card) void fetchOrder(card, choices, doubtLoc, doubtNote('current'))
+  }, [card, choices, fetchOrder, locOpen])
+
+  /** 收起「從哪裡出發」。問過「你在車上？」卻關掉沒選＝這道沒派出去，也記一筆（N6：問太多次的代價）。 */
+  const closeLoc = useCallback(() => {
+    const note = doubtNote('cancel')
+    if (note && card) recordTrial({ module: card.id, level, ok: false, error: 'geo_cancel', geo: note })
+    setLocOpen(null)
+  }, [card, level, locOpen])
 
   /** 換一家。吃／歇要先問原因（底部選單），其他卡（去／飛）維持原樣直接換。 */
   const reissue = useCallback(() => {
     if (!card || reissued) return
-    if (card.needsPlaces) { setReasonOpen(true); return }
+    if (card.needsPlaces && isMemModule(card.id)) { setReasonOpen(true); return }
+    // Round 10：去也查真地點，但沒有到訪記憶（原因選單是吃／歇的）：直接換，這次排除剛派的地點。
+    if (order?.place?.id) excluded.current.push(order.place.id)
     setReissued(true) // 第 10 節：一次口令最多換 1 次
     void record('reissued', order, card)
     void fetchOrder(card, choices)
@@ -296,6 +398,8 @@ export function App() {
     if (id) {
       if (reason === 'closed') await safe(() => markClosed(id, now, m), undefined)
       else if (reason === 'never_again') await safe(() => markNeverAgain(id, now, m), undefined)
+      else if (reason === 'repeat') await safe(() => markRepeat(id, now, m), undefined)
+      else if (reason === 'price') { /* 價格不對：不動記憶，只在這次排除；原因記進日記與試用紀錄 */ }
       else {
         await safe(() => markNotThisKind(cuisineKey), undefined)
         if (cuisineKey && !rejectedCuisines.current.includes(cuisineKey)) rejectedCuisines.current.push(cuisineKey)
@@ -318,9 +422,35 @@ export function App() {
     setScreen('log')
   }, [card, order, record])
 
+  /** 沒做：有情境的卡（吃／歇）先問原因；其他卡照舊直接罰站。 */
   const skip = useCallback(() => {
+    if (card?.intake.some((f) => f.type === 'scene')) { setSkipOpen(true); return }
     void record('punished', order, card)
     setScreen('stand')
+  }, [card, order, record])
+
+  const refuse = useCallback(() => {
+    setSkipOpen(false)
+    void record('punished', order, card)
+    setScreen('stand')
+  }, [card, order, record])
+
+  /**
+   * Round 5（Cross 2026-11-01「使用者按沒做很冤枉」）：派的不符合情境 → 不罰站、不算服從率，記進日記與試用紀錄；
+   * 回到選單、情境清空重選。這家這次排除（這一輪換口令之間），其他選項保留。
+   */
+  const mismatch = useCallback(() => {
+    setSkipOpen(false)
+    void record('mismatch', order, card)
+    const id = order?.place?.id
+    if (id && !excluded.current.includes(id)) excluded.current.push(id)
+    setChoices((c) => { const { [SCENE_TEXT_KEY]: _t, ...rest } = c; return { ...rest, [SCENE_KEY]: '' } })
+    setOrder(null)
+    setReissued(false)
+    setError(null)
+    issuedAt.current = '' // 重選情境後是新的一道口令，日記另記一筆
+    if (card?.needsPlaces && underPlacesCap()) geoAhead.current = getLocation()
+    setScreen('scene')
   }, [card, order, record])
 
   const goHome = useCallback(() => setScreen('home'), [])
@@ -363,17 +493,30 @@ export function App() {
       <main data-level={level}>
         {screen === 'home' && (
           <Home
-            level={level} novelty={novelty} onCycle={cycleOfficer} onPick={openIntake} onNovelty={cycleNovelty}
+            level={level} novelty={novelty} onCycle={cycleOfficer} onPick={openIntake} onNovelty={cycleNovelty} streak={streak}
             onDaily={() => setScreen('daily')} onDiary={() => setScreen('diary')} onDebug={() => setScreen('debug')} onPrivacy={() => setScreen('privacy')}
           />
         )}
         {screen === 'daily' && <DailyDecision onBack={goHome} />}
         {screen === 'privacy' && <Privacy onBack={goHome} />}
+        {screen === 'scene' && card && (
+          <ScenePick
+            card={card} level={level} value={String(choices[SCENE_KEY] ?? '')} text={String(choices[SCENE_TEXT_KEY] ?? '')}
+            onPick={(o) => {
+              setChoices((c) => { const { [SCENE_TEXT_KEY]: t, ...rest } = c; return o === SCENE_OTHER ? { ...rest, [SCENE_KEY]: o, ...(t !== undefined ? { [SCENE_TEXT_KEY]: t } : {}) } : { ...rest, [SCENE_KEY]: o } })
+              if (o !== SCENE_OTHER) setScreen('intake')
+            }}
+            onText={(t) => setChoices((c) => ({ ...c, [SCENE_TEXT_KEY]: t }))}
+            onNext={() => { if (sceneReady(card, choices)) setScreen('intake') }}
+            onBack={goHome}
+          />
+        )}
         {screen === 'intake' && card && (
           <Intake
             card={card} level={level} choices={choices}
             onChange={(k, v) => setChoices((c) => ({ ...c, [k]: v }))}
-            onBack={goHome} onSubmit={submit}
+            onBack={goHome} onSubmit={submit} onScene={() => setScreen('scene')}
+            origin={card.needsPlaces ? (station ?? '目前位置') : undefined} onOrigin={() => setLocOpen({})}
             country={country} budget={effectiveBudget(country === 'TW' || country === 'JP' ? budgets[country] : [], hideTop)}
             hideTop={hideTop} onBudget={changeBudget}
           />
@@ -382,7 +525,8 @@ export function App() {
         {screen === 'error' && error && (
           <ErrorScreen
             level={level} error={error} onRetry={submit} onHome={goHome} onDiary={() => setScreen('diary')}
-            onManualLoc={error.kind === 'no_location' ? reportLocation : undefined}
+            onManualLoc={error.kind === 'no_location' || error.kind === 'no_signal' ? reportLocation : undefined}
+            stations={stations}
           />
         )}
         {screen === 'cmd' && card && order && (
@@ -396,7 +540,7 @@ export function App() {
         {screen === 'stand' && <Stand level={level} onDone={goHome} />}
         {screen === 'diary' && (
           <Diary
-            level={level} entries={entries} weeklyFailed={weeklyFailed} discovery={discovery} onBack={goHome}
+            level={level} entries={entries} weeklyFailed={weeklyFailed} discovery={discovery} streak={streak} onBack={goHome}
             onWeekly={() => { void loadWeekly(true); setScreen('weekly') }}
           />
         )}
@@ -407,6 +551,20 @@ export function App() {
           />
         )}
         {screen === 'debug' && <Debug level={level} onHome={goHome} />}
+        {locOpen && card && (
+          <LocSheet doubt={locOpen.doubt} stations={stations} onCurrent={useCurrent} onPick={chooseStation} onClose={closeLoc} />
+        )}
+        {skipOpen && card && (
+          <Sheet title="為什麼沒做？" sub="照實報告，班長不冤枉人。" onClose={() => setSkipOpen(false)} testid="skip-sheet">
+            <button className="sheet-opt" data-testid="skip-mismatch" onClick={mismatch}>
+              <b>不符合我現在的情境</b><span>不罰站。重選情境，班長重派</span>
+            </button>
+            <button className="sheet-opt" data-testid="skip-refuse" onClick={refuse}>
+              <b>我就是不想做</b><span>照規矩罰站</span>
+            </button>
+            <button className="sheet-cancel" data-testid="skip-cancel" onClick={() => setSkipOpen(false)}>我再想想</button>
+          </Sheet>
+        )}
         {reasonOpen && card && (
           <Sheet title="報告原因，班長記下。" onClose={() => setReasonOpen(false)} testid="reason-sheet">
             <button className="sheet-opt" data-testid="reason-closed" onClick={() => void reissueWith('closed')}>
@@ -415,6 +573,14 @@ export function App() {
             {card.id !== 'rest' && (
               <button className="sheet-opt" data-testid="reason-kind" onClick={() => void reissueWith('not_this_kind')}>
                 <b>今天不想吃這類</b><span>今天少派這一類，班長記一筆</span>
+              </button>
+            )}
+            <button className="sheet-opt" data-testid="reason-repeat" onClick={() => void reissueWith('repeat')}>
+              <b>又是這家</b><span>14 天不派這家</span>
+            </button>
+            {card.id === 'eat' && (
+              <button className="sheet-opt" data-testid="reason-price" onClick={() => void reissueWith('price')}>
+                <b>價格不對</b><span>這次換掉，班長記一筆</span>
               </button>
             )}
             <button className="sheet-opt" data-testid="reason-never" onClick={() => void reissueWith('never_again')}>
@@ -477,15 +643,22 @@ function OfficerPlate({ level, mood, onCycle, onLongPress, meta, tap }: {
   )
 }
 
-function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, onNovelty, onPrivacy, onDaily }: {
-  level: Level; novelty?: Novelty; onCycle: () => void; onPick: (id: ModuleId) => void
+function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, onNovelty, onPrivacy, onDaily, streak }: {
+  streak?: StreakResult; level: Level; novelty?: Novelty; onCycle: () => void; onPick: (id: ModuleId) => void
   onDiary: () => void; onDebug: () => void; onNovelty?: () => void; onPrivacy?: () => void; onDaily?: () => void
 }) {
   const o = OFFICER_BY_LEVEL[level]
+  const freezeNote = useFreezeNotice(streak?.usedYesterday ?? false)
   return (
     <section className="screen" data-screen="home">
       <OfficerPlate level={level} mood="idle" onCycle={onCycle} onLongPress={onDebug} meta="決斷連 · 大事不受理" tap />
       <div className="topnav">
+        {streak && streak.streak > 0 && (
+          <span className="streak" data-testid="streak-chip" style={{ marginRight: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '.75rem', fontWeight: 700 }}>
+            {streak.milestone && <span className="rank"><InsigniaMark insignia={insigniaOf(streak.milestone)} title={streak.milestone.rank} /></span>}
+            連勝 {streak.streak} 天{streak.freezes > 0 && ` · 假單 ${streak.freezes}`}
+          </span>
+        )}
         {onNovelty && (
           <button
             className="nov" data-testid="novelty" onClick={onNovelty}
@@ -515,6 +688,7 @@ function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, 
         ))}
       </div>
       <p className="hint">大事不受理。班長只管小事，大事你自己去找連長。</p>
+      {freezeNote && <p className="hint" role="status" data-testid="freeze-note">昨天用了一張公差假單，連勝保住了。今天自己出勤。</p>}
       {onPrivacy && <button className="linkbtn" data-testid="privacy-link" onClick={onPrivacy}>隱私</button>}
     </section>
   )
@@ -532,19 +706,99 @@ function breakAfterDash(label: string) {
 }
 function Wbr(key: number) { return <wbr key={`w${key}`} /> }
 
-function Intake({ card, level, choices, onChange, onBack, onSubmit, country = 'TW', budget = [], hideTop = false, onBudget }: {
+/** 有情境的卡（吃／歇）：情境必選；選「其他」要打字（Round 5）。沒有情境欄位的卡一律 true。 */
+export function sceneReady(card: Pick<ModuleCard, 'intake'>, choices: Record<string, string | number>): boolean {
+  if (!card.intake.some((f) => f.type === 'scene')) return true
+  const sc = choices[SCENE_KEY]
+  if (typeof sc !== 'string' || !sc) return false
+  return sc !== SCENE_OTHER || sanitizeSceneText(choices[SCENE_TEXT_KEY]) !== ''
+}
+
+/**
+ * Round 5 第一步：情境（吃／歇）。點一個預設就直接進下一步；「其他」展開輸入框（≤ 20 字）＋「下一步」。
+ * 上次選的排第一個，但不幫使用者選。順序在進畫面時決定，點選時不跳動。
+ */
+function ScenePick({ card, level, value, text, onPick, onText, onNext, onBack }: {
+  card: ModuleCard; level: Level; value: string; text: string
+  onPick: (o: string) => void; onText: (t: string) => void; onNext: () => void; onBack: () => void
+}) {
+  const field = card.intake.find((f) => f.type === 'scene')
+  const [opts] = useState(() => orderScenes(field?.options ?? [], loadLastScene(card.id), SCENE_OTHER))
+  const ready = sceneReady(card, { [SCENE_KEY]: value, [SCENE_TEXT_KEY]: text })
+  return (
+    <section className="screen" data-screen="scene">
+      <OfficerPlate level={level} mood="bark" />
+      <button className="back" onClick={onBack}>← 回報告</button>
+      <div className="bubble" data-testid="bubble">{SCENE_BARKS[level]}</div>
+      <div>
+        <p className="lab">{card.title} · 情境<small className="req">必選</small></p>
+        <div className="chips scene-chips" data-field={SCENE_KEY} role="group" aria-label="情境">
+          {opts.map((o) => (
+            <button key={o} className="chip" aria-pressed={value === o} onClick={() => onPick(o)}>{o}</button>
+          ))}
+        </div>
+        {value === SCENE_OTHER && (
+          <form className="manual-in scene-in" onSubmit={(e) => { e.preventDefault(); onNext() }}>
+            <input
+              data-testid="scene-text" type="text" enterKeyHint="next" autoComplete="off" maxLength={SCENE_TEXT_MAX}
+              aria-label="你的情境" placeholder="例如：有插座、安靜、吃到飽" value={text} autoFocus
+              onChange={(e) => onText(e.target.value)}
+            />
+            <button className="btn" type="submit" data-testid="scene-next" disabled={!ready}>下一步</button>
+          </form>
+        )}
+        {value === SCENE_OTHER && !ready && (
+          <p className="hint scene-need" data-testid="scene-required">寫一下你的情境（{SCENE_TEXT_MAX} 字內），班長才派得準。</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function Intake({ card, level, choices, onChange, onBack, onSubmit, onScene, origin, onOrigin, country = 'TW', budget = [], hideTop = false, onBudget }: {
   card: ModuleCard; level: Level; choices: Record<string, string | number>
   onChange: (k: string, v: string | number) => void; onBack: () => void; onSubmit: () => void
+  /** Round 5：回第一步改情境（只有吃／歇）。 */
+  onScene?: () => void
+  /** Round 6：出發點標籤（「目前位置」或站名）；undefined = 這張卡不用定位，不顯示。 */
+  origin?: string; onOrigin?: () => void
   /** 預算 chips 的幣別看座標（不看手機語系）；other = 整列隱藏。 */
   country?: Country; budget?: Band[]; hideTop?: boolean; onBudget?: (n: Band | null) => void
 }) {
+  const ready = sceneReady(card, choices)
+  const hasScene = card.intake.some((f) => f.type === 'scene')
+  // Round 5：從情境頁進來時捲動位置是 0（情境頁比較短），375×667 的送出鍵會掉出第一屏約 20px。
+  // 進畫面時若送出鍵不在第一屏，就捲到剛好看得到（使用者不用自己捲）。
+  const submitRow = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = submitRow.current
+    if (!el) return
+    const over = el.getBoundingClientRect().bottom - window.innerHeight
+    if (over > 0) window.scrollBy(0, over + 8)
+  }, [])
+  const sc = String(choices[SCENE_KEY] ?? '')
+  const scLabel = sc === SCENE_OTHER ? sanitizeSceneText(choices[SCENE_TEXT_KEY]) || SCENE_OTHER : sc
   return (
     <section className="screen" data-screen="intake">
       <OfficerPlate level={level} mood="bark" />
-      <button className="back" onClick={onBack}>← 回報告</button>
+      {/* 情境標籤跟返回鍵同一行：不加高度（選單仍要一屏放得下）。 */}
+      <div className="intake-top">
+        <button className="back" onClick={onBack}>← 回報告</button>
+        {hasScene && (
+          <button className="scene-tag" data-testid="scene-change" onClick={onScene}>
+            情境：{scLabel || '未選'}<span aria-hidden="true">　改</span>
+          </button>
+        )}
+        {origin !== undefined && (
+          <button className="scene-tag loc-tag" data-testid="loc-change" onClick={onOrigin} aria-label={`出發點：${origin}，改`}>
+            📍{origin}
+          </button>
+        )}
+      </div>
       <div className="bubble" data-testid="bubble">{MODULE_BARKS[card.id][level]}</div>
       <div>
         {card.intake.map((f) => {
+          if (f.type === 'scene') return null // 第一步（ScenePick）選過了
           if (f.type === 'bands' && bandLabels(country).length === 0) return null // 台日以外：沒有幣別，整列隱藏
           return (
           <div key={f.key}>
@@ -583,7 +837,7 @@ function Intake({ card, level, choices, onChange, onBack, onSubmit, country = 'T
           )
         })}
       </div>
-      <div className="row"><button className="btn" onClick={onSubmit}>是！班長</button></div>
+      <div className="row" ref={submitRow}><button className="btn" onClick={onSubmit} disabled={!ready}>是！班長</button></div>
     </section>
   )
 }
@@ -601,7 +855,7 @@ function Waiting({ level }: { level: Level }) {
 }
 
 /** C2：沒有定位時手動報座標。輸入車站或地標 → /api/geocode → 用回來的位置重送（不存本機）。 */
-function ManualLoc({ onGo }: { onGo: (q: string) => Promise<string | null> }) {
+function ManualLoc({ onGo, label = '下車的站或地標' }: { onGo: (q: string) => Promise<string | null>; label?: string }) {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -616,11 +870,11 @@ function ManualLoc({ onGo }: { onGo: (q: string) => Promise<string | null> }) {
   }
   return (
     <form className="manual" data-testid="manual-loc-row" onSubmit={(e) => void go(e)}>
-      <label className="lab" htmlFor="manual-loc">手動報座標</label>
+      <label className="lab" htmlFor="manual-loc">{label}</label>
       <div className="manual-in">
         <input
           id="manual-loc" data-testid="manual-loc" type="text" inputMode="search" enterKeyHint="go"
-          autoComplete="off" maxLength={60} placeholder="車站或地標，例如：台北車站" value={q} onChange={(e) => setQ(e.target.value)}
+          autoComplete="off" maxLength={60} placeholder="例如：新宿駅、台北車站" value={q} onChange={(e) => setQ(e.target.value)}
         />
         <button className="btn" type="submit" data-testid="manual-loc-go" disabled={busy || !q.trim()}>{busy ? '查詢中' : '報座標'}</button>
       </div>
@@ -629,10 +883,20 @@ function ManualLoc({ onGo }: { onGo: (q: string) => Promise<string | null> }) {
   )
 }
 
-function ErrorScreen({ level, error, onRetry, onHome, onDiary, onManualLoc }: {
+function ErrorScreen({ level, error, onRetry, onHome, onDiary, onManualLoc, stations = [] }: {
   level: Level; error: ApiError; onRetry: () => void; onHome: () => void; onDiary: () => void
   onManualLoc?: (q: string) => Promise<string | null>
+  /** Round 6：最近報過的站，一鍵再用。 */
+  stations?: string[]
 }) {
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  const tap = async (name: string) => {
+    if (!onManualLoc || busy) return
+    setBusy(name); setErr('')
+    const msg = await onManualLoc(name)
+    if (msg) { setErr(msg); setBusy('') }
+  }
   const t = ERROR_TEXT[error.kind]
   return (
     <section className="screen" data-screen="error">
@@ -642,6 +906,12 @@ function ErrorScreen({ level, error, onRetry, onHome, onDiary, onManualLoc }: {
         {t.line}
         {t.sub && <small>{t.sub}</small>}
       </div>
+      {onManualLoc && stations.length > 0 && (
+        <div className="chips loc-recent" data-testid="loc-recent" aria-label="最近報過的站">
+          {stations.map((s) => <button key={s} className="chip" disabled={!!busy} onClick={() => void tap(s)}>{busy === s ? '查詢中' : s}</button>)}
+        </div>
+      )}
+      {err && <p className="manual-err" role="alert">{err}</p>}
       {onManualLoc && <ManualLoc onGo={onManualLoc} />}
       <div className="row">
         <button className="btn" data-testid="retry" onClick={onRetry}>再報告一次</button>
@@ -664,7 +934,7 @@ function Cmd({ card, level, order, canReissue, geoDenied, onDone, onReissue, onS
         top={order.meme.top} big={order.meme.big} bot={order.meme.bot}
         level={level} mood="bark"
       />
-      <StepsCard steps={order.steps} place={order.place} />
+      <StepsCard steps={order.steps} place={order.place && card.id === 'go' ? { ...order.place, noPrice: true } : order.place} />
       {/* C3（App Store 1.2）：檢舉不當口令。mailto 就夠，不需要後端；極小文字，不是第二個動作。 */}
       <p className="report"><a href={reportHref(order, level)} target="_blank" rel="noopener noreferrer" data-testid="report-link">回報這道口令</a></p>
       <div className="row">
@@ -746,6 +1016,7 @@ const OUTCOME_LABEL: Record<DiaryEntry['outcome'], [string, string]> = {
   done: ['完成', 'ok'],
   reissued: ['換口令', 're'],
   punished: ['罰則', 'bad'],
+  mismatch: ['不符情境', 'mis'],
 }
 
 const entryLabel = (e: DiaryEntry): string => e.placeName ?? e.big
@@ -782,7 +1053,38 @@ function DiaryRow({ e, onLongPress }: { e: DiaryEntry; onLongPress?: (e: DiaryEn
   )
 }
 
-function Diary({ level, entries, weeklyFailed, discovery, onBack, onWeekly }: {
+const FREEZE_ACK_KEY = 'decide.streak.ack'
+
+/** 「昨天用了假單」只提示一次：顯示後把當天記進 localStorage；讀寫失敗（無痕）就照樣顯示。 */
+function useFreezeNotice(usedYesterday: boolean): boolean {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    if (!usedYesterday) return
+    const stamp = new Date().toDateString()
+    let seen = false
+    try { seen = localStorage.getItem(FREEZE_ACK_KEY) === stamp } catch { /* 忽略 */ }
+    if (seen) return
+    setShow(true)
+    try { localStorage.setItem(FREEZE_ACK_KEY, stamp) } catch { /* 忽略 */ }
+  }, [usedYesterday])
+  return show
+}
+
+function StreakCard({ streak }: { streak: StreakResult }) {
+  const m = streak.milestone
+  return (
+    <div className="notice" data-testid="streak-card">
+      <b>出勤連勝 {streak.streak} 天</b> · 公差假單 {streak.freezes}/2
+      {m && <div className="rank"><InsigniaMark insignia={insigniaOf(m)} title={m.rank} />{m.rank}　{m.line}</div>}
+      <small style={{ display: 'block', fontWeight: 400 }}>
+        {streak.nextIn !== null ? `再 ${streak.nextIn} 天升階。` : '已到頂。'}每連勝 7 天發 1 張假單，漏一天自動頂上。
+      </small>
+    </div>
+  )
+}
+
+function Diary({ level, entries, weeklyFailed, discovery, streak, onBack, onWeekly }: {
+  streak?: StreakResult
   level: Level; entries: DiaryEntry[]; weeklyFailed: boolean; discovery?: { newPlaces: number; revisits: number }
   onBack: () => void; onWeekly: () => void
 }) {
@@ -801,6 +1103,7 @@ function Diary({ level, entries, weeklyFailed, discovery, onBack, onWeekly }: {
         <div className="stat"><b data-testid="stat-rate">{s.complianceRate}%</b><span>服從率</span></div>
         <div className="stat"><b data-testid="stat-punish">{s.punishments}</b><span>次罰則</span></div>
       </div>
+      {streak && <StreakCard streak={streak} />}
       {discovery && (
         <div className="stats two" data-testid="stats-discovery">
           <div className="stat"><b data-testid="stat-new">{discovery.newPlaces}</b><span>本週新占領</span></div>
@@ -886,6 +1189,35 @@ function Weekly({ level, report, failed, onBack, onHome }: {
 }
 
 // 底部選單（像 iOS action sheet）：從下面升起，點背景、「不換了」或 Esc 收起。
+/** Round 6：「從哪裡出發」底部選單。目前位置／最近 5 站／打字報站。doubt 有值＝定位可疑，選了就直接派。 */
+function LocSheet({ doubt, stations, onCurrent, onPick, onClose }: {
+  doubt?: GeoDoubt; stations: string[]; onCurrent: () => void; onPick: (q: string) => Promise<string | null>; onClose: () => void
+}) {
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  const tap = async (name: string) => {
+    if (busy) return
+    setBusy(name); setErr('')
+    const msg = await onPick(name)
+    if (msg) { setErr(msg); setBusy('') }
+  }
+  return (
+    <Sheet title={doubt ? GEO_DOUBT_LINE[doubt] : '從哪裡出發？'} sub="在車上就報下車的站。步行時間從那一站算。" onClose={onClose} testid="loc-sheet">
+      <button className="sheet-opt" data-testid="loc-current" onClick={onCurrent}>
+        <b>{doubt ? '就用目前位置' : '目前位置'}</b><span>{doubt ? '班長照這個座標派' : 'GPS 在哪就從哪算'}</span>
+      </button>
+      {stations.length > 0 && (
+        <div className="chips loc-recent" data-testid="loc-recent" aria-label="最近報過的站">
+          {stations.map((s) => <button key={s} className="chip" disabled={!!busy} onClick={() => void tap(s)}>{busy === s ? '查詢中' : s}</button>)}
+        </div>
+      )}
+      {err && <p className="manual-err" role="alert">{err}</p>}
+      <ManualLoc onGo={onPick} label="下車的站" />
+      <button className="sheet-cancel" data-testid="loc-cancel" onClick={onClose}>我再想想</button>
+    </Sheet>
+  )
+}
+
 function Sheet({ title, sub, onClose, children, testid }: {
   title: string; sub?: string; onClose: () => void; children: ReactNode; testid?: string
 }) {
@@ -910,7 +1242,41 @@ function Sheet({ title, sub, onClose, children, testid }: {
 }
 
 // 僅供獨立設計預覽入口使用；正式 App 入口與狀態機不變。
-export { Home, Intake, Cmd, LogScreen, Stand, Diary, Weekly }
+export { Home, ScenePick, Intake, Cmd, LogScreen, Stand, Diary, Weekly }
+
+/**
+ * 把一個 JSON 檔帶出這支手機。iPhone：分享面板（存到檔案、AirDrop、貼給 Claude）；不支援就下載；再不行就複製。
+ * 回傳按鈕上要顯示的字；使用者自己關掉分享面板回 null（按鈕不變）。
+ * 呼叫前不要 await 別的東西：Safari 的分享面板要在點擊後馬上叫，晚了會被擋。
+ */
+async function saveJson(text: string, name: string, title: string): Promise<string | null> {
+  try {
+    const file = new File([text], name, { type: 'application/json' })
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title })
+      return '已匯出'
+    }
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') return null
+  }
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    return '已下載'
+  } catch {
+    try { await navigator.clipboard.writeText(text); return '已複製' } catch { return '匯出失敗' }
+  }
+}
+
+/** 匯入檔大小上限：記憶 600 家約 0.2 MB、試用紀錄 1,500 筆約 1 MB；選錯成影片之類的大檔直接擋。 */
+const IMPORT_MAX_BYTES = 5 * 1024 * 1024
+const today = () => new Date().toISOString().slice(0, 10)
 
 /**
  * 除錯畫面（長按班長名牌進來）。顯示最近 10 次 /api/order 的真實經過：
@@ -920,6 +1286,54 @@ export { Home, Intake, Cmd, LogScreen, Stand, Diary, Weekly }
 function Debug({ level, onHome }: { level: Level; onHome: () => void }) {
   const [entries, setEntries] = useState<DebugEntry[]>(readDebug)
   const [copied, setCopied] = useState(false)
+  // Round 4：60 天試用紀錄（src/trial.ts）。匯出成一個 JSON 檔，交給 Claude 分析。
+  const [trial, setTrial] = useState(() => summarize(readTrial()))
+  const [exported, setExported] = useState('')
+  // X4：店家記憶（src/placeMem.ts）。進畫面就先讀好，按匯出時不用再等 IndexedDB（見 saveJson）。
+  const [mem, setMem] = useState<MemFile | 'loading' | 'failed'>('loading')
+  const [memExported, setMemExported] = useState('')
+  const [memMsg, setMemMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const loadMem = useCallback(() => {
+    void safe<MemFile | 'failed'>(() => exportMem(), 'failed', 3000).then(setMem)
+  }, [])
+  useEffect(loadMem, [loadMem])
+
+  // N4：一鍵匯出＝試用紀錄＋店家記憶同一個檔，Cross 一次交出全部資料。記憶讀不到也照樣匯出紀錄，按鈕上說沒帶到。
+  const exportFile = useCallback(() => {
+    const memory = typeof mem === 'string' ? undefined : mem
+    void saveJson(exportTrial(readTrial(), Date.now(), memory), `decide-trial-${today()}.json`, '決斷連試用紀錄').then((r) => {
+      if (r !== null) setExported(memory || r === '匯出失敗' ? r : `${r}（記憶沒帶到）`)
+    })
+  }, [mem])
+
+  const exportMemFile = useCallback(() => {
+    if (typeof mem === 'string') return
+    void saveJson(JSON.stringify(mem, null, 1), `decide-memory-${today()}.json`, '決斷連店家記憶').then((r) => {
+      if (r !== null) setMemExported(r)
+    })
+  }, [mem])
+
+  /** 匯入：壞檔不動現有記憶，原因顯示在按鈕下面；好檔合併後重讀筆數。 */
+  const importFile = useCallback((f: File | undefined) => {
+    if (!f) return
+    void (async () => {
+      setMemMsg(null)
+      if (f.size > IMPORT_MAX_BYTES) { setMemMsg({ ok: false, text: '檔案太大，不像記憶檔。原本的記憶沒動。' }); return }
+      let r: MemImport
+      try {
+        r = await importMem(await f.text())
+      } catch {
+        setMemMsg({ ok: false, text: '匯入失敗：讀不到檔案或手機存不進去（無痕模式、空間滿了）。原本的記憶沒動。' })
+        return
+      }
+      if (!r.ok) { setMemMsg({ ok: false, text: `沒有匯入：${r.why}原本的記憶沒動。` }); return }
+      setMemMsg({ ok: true, text: `匯入完成：新增 ${r.added} 家、合併 ${r.merged} 家，現在記得 ${r.total} 家。` })
+      loadMem()
+    })()
+  }, [loadMem])
+  const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`)
 
   const copy = useCallback(() => {
     void (async () => {
@@ -939,6 +1353,33 @@ function Debug({ level, onHome }: { level: Level; onHome: () => void }) {
         <button className="btn line" data-testid="debug-copy" onClick={copy}>{copied ? '已複製' : '複製全部'}</button>
         <button className="btn ghost" data-testid="debug-clear" onClick={() => { clearDebug(); setEntries([]) }}>清掉</button>
       </div>
+      <div className="notice" data-testid="trial-summary">
+        試用紀錄 {trial.days} 天 · {trial.orders} 道 · 給出口令 {trial.ok} · 7 天內重複 {pct(trial.repeat7d)} · 預算命中 {pct(trial.budgetHit)}
+        {trial.rescue + trial.fallback > 0 ? ` · 救援 ${trial.rescue}／模板 ${trial.fallback}` : ''}
+        {trial.mismatch > 0 ? ` · 不符情境 ${trial.mismatch}` : ''}
+        {trial.geo.fixes > 0 ? ` · 問在車上 ${trial.geo.asked}／${trial.geo.fixes}` : ''}
+      </div>
+      <div className="row">
+        <button className="btn line" data-testid="trial-export" onClick={exportFile}>{exported || '匯出全部（紀錄＋記憶）'}</button>
+        <button
+          className="btn ghost" data-testid="trial-clear"
+          onClick={() => { if (window.confirm('清掉 60 天試用紀錄？匯出後再清。')) { clearTrial(); setTrial(summarize([])) } }}
+        >清掉試用紀錄</button>
+      </div>
+      <div className="notice" data-testid="mem-count">
+        {mem === 'loading' ? '店家記憶讀取中' : mem === 'failed' ? '讀不到店家記憶（無痕模式？）' : `店家記憶 ${mem.places.length} 家`}
+      </div>
+      <div className="row">
+        <button className="btn line" data-testid="mem-export" disabled={typeof mem === 'string'} onClick={exportMemFile}>{memExported || '匯出記憶'}</button>
+        <button className="btn ghost" data-testid="mem-import" onClick={() => fileRef.current?.click()}>匯入記憶</button>
+        <input
+          ref={fileRef} type="file" accept=".json,application/json,text/plain" hidden data-testid="mem-file"
+          onChange={(e) => { importFile(e.target.files?.[0]); e.target.value = '' }}
+        />
+      </div>
+      {memMsg && (
+        <p className={memMsg.ok ? 'notice' : 'manual-err'} role={memMsg.ok ? 'status' : 'alert'} data-testid="mem-result">{memMsg.text}</p>
+      )}
       {entries.length === 0 && <div className="notice" data-testid="debug-empty">還沒有紀錄。出一道口令再回來看。</div>}
       {entries.map((e, i) => (
         <article key={`${e.at}-${i}`} className="dbg" data-testid="debug-entry">

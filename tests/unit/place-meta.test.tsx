@@ -11,6 +11,9 @@ describe('口令卡 place-meta', () => {
   })
   it('價位沒資料寫價位未知；還沒開門寫 HH:MM 開（opensAt 優先）', () => {
     expect(formatPlaceMeta({ name: 'x', walkMin: 3, opensAt: '11:30', openUntil: '21:00' })).toBe('步行 3 分 · 11:30 開 · 價位未知')
+    // Round 10：「去」的目的地不寫價位；有價位資料時照寫
+    expect(formatPlaceMeta({ name: 'x', walkMin: 10, openUntil: '21:00', noPrice: true })).toBe('步行 10 分 · 營業到 21:00')
+    expect(formatPlaceMeta({ name: 'x', walkMin: 10, priceText: '¥1,000', noPrice: true })).toBe('步行 10 分 · ¥1,000')
   })
   it('沒有的欄位就不寫；步行 0 分也要寫', () => {
     expect(formatPlaceMeta({ name: 'x' })).toBe('價位未知')
@@ -42,5 +45,7 @@ describe('口令卡 place-meta', () => {
     const { queryByTestId, container } = render(<StepsCard steps={['一。']} place={real} />)
     expect(container.querySelector('.place-head')).not.toBeNull()
     for (const id of ['mode-stamp', 'place-link', 'place-meta', 'attribution']) expect(queryByTestId(id)).not.toBeNull()
+    // Round 10（T10）：歸屬緊跟在 place-meta 後面（店家區裡），不在步驟之後——放最後一行在 375×667 會掉出第一屏。
+    expect(queryByTestId('place-meta')!.nextElementSibling).toBe(queryByTestId('attribution'))
   })
 })

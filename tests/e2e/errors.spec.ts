@@ -1,6 +1,6 @@
 // 第 13.2 節 Error ×4：定位拒絕→要座標（2026-09-18 起不再降級）；API 500→重試訊息與重試鍵；非法 JSON→同 500 路徑；離線→離線訊息且日記可開。
 import { expect, test } from '@playwright/test'
-import { FIXED_ORDER, mockOrder, mockOrderFailure, prime } from './fixtures.ts'
+import { FIXED_ORDER, mockOrder, mockOrderFailure, prime, openCard } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => { await prime(page) })
 
@@ -11,7 +11,7 @@ test('① 定位被拒 → 班長要座標，不打 API', async ({ page, context
   let called = 0
   await page.route('**/api/order', async (route) => { called++; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FIXED_ORDER) }) })
   await page.goto('/')
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="error"]')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByTestId('error-line')).toContainText('不報座標，班長就點不了店。開定位再報告。')
@@ -55,7 +55,10 @@ test('④ 離線 → 離線訊息，且日記仍可開', async ({ page, context 
   await context.setOffline(false)
 })
 
-test('429 → 一樣是班長在開會', async ({ page }) => {
+test('429 → 一樣是班長在開會', async ({ page, context }) => {
+  // Round 10 X2：去也查真地點，要有定位才會打 API（不然停在「開定位」）。
+  await context.grantPermissions(['geolocation'])
+  await context.setGeolocation({ latitude: 25.033, longitude: 121.5654 })
   await mockOrderFailure(page, 429, '{"error":"rate_limited","message":"班長在開會。30 秒後再報告。"}')
   await page.goto('/')
   await page.locator('[data-card="go"]').click()

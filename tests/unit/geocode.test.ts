@@ -71,3 +71,35 @@ describe('/api/geocode', () => {
     expect((await handler(new Request('http://localhost/api/geocode'))).status).toBe(405)
   })
 })
+
+// Round 6：日文站名用 ja 查；查詢本體在 src/geocode.ts。
+import { geocodeLanguage, geocodeLookup } from '../../src/geocode.ts'
+describe('Round 6：日文站名', () => {
+  it('有假名或「駅」→ ja；中文 → zh-TW', () => {
+    expect(geocodeLanguage('新宿駅')).toBe('ja') // checker：zh-TW 會回「新宿」，標籤要日文站名
+    expect(geocodeLanguage('新宿站')).toBe('zh-TW')
+    expect(geocodeLanguage('しんじゅく')).toBe('ja')
+    expect(geocodeLanguage('東京スカイツリー')).toBe('ja')
+    expect(geocodeLanguage('台北車站')).toBe('zh-TW')
+  })
+  it('geocodeLookup：ok／not_found／http／timeout 四種結果', async () => {
+    const okFetch = (async () => new Response(JSON.stringify({ places: [{ location: { latitude: 35.6896, longitude: 139.7006 }, displayName: { text: '新宿駅' } }] }), { status: 200 })) as unknown as typeof fetch
+    expect(await geocodeLookup('新宿駅', 'k', 'https://x', okFetch)).toEqual({ kind: 'ok', loc: { lat: 35.6896, lng: 139.7006 }, label: '新宿駅' })
+    const empty = (async () => new Response(JSON.stringify({}), { status: 200 })) as unknown as typeof fetch
+    expect(await geocodeLookup('asdf', 'k', 'https://x', empty)).toEqual({ kind: 'not_found' })
+    const http = (async () => new Response('', { status: 429 })) as unknown as typeof fetch
+    expect(await geocodeLookup('x', 'k', 'https://x', http)).toEqual({ kind: 'http', status: 429 })
+    const boom = (async () => { throw new Error('abort') }) as unknown as typeof fetch
+    expect(await geocodeLookup('x', 'k', 'https://x', boom)).toEqual({ kind: 'timeout' })
+  })
+  it('/api/geocode 用假名查 → languageCode ja', async () => {
+    const f = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
+      places: [{ location: { latitude: 35.6896, longitude: 139.7006 }, displayName: { text: '新宿駅' } }],
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', f)
+    const res = await handler(post({ q: 'しんじゅく駅' }))
+    expect(res.status).toBe(200)
+    expect(JSON.parse(String(f.mock.calls[0]?.[1]?.body)).languageCode).toBe('ja')
+    expect((await res.json()) as GeocodeResponse).toEqual({ loc: { lat: 35.6896, lng: 139.7006 }, label: '新宿駅' })
+  })
+})

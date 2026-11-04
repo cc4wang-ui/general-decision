@@ -1,4 +1,5 @@
 // 八張模組卡 — DECIDE-DEV-DOC-v1.md 第 6 節。
+import { SCENE_KEY, sceneOptions } from './scene.ts'
 import type { ModuleCard, ModuleId } from './types.ts'
 
 export const CARDS: ModuleCard[] = [
@@ -7,6 +8,8 @@ export const CARDS: ModuleCard[] = [
     title: '吃',
     subtitle: '中午、晚上，吃什麼',
     intake: [
+      // Round 5（Cross 2026-11-01）：第一步先問情境，必選、沒有預設（上次選的排第一個，但不幫他選）。
+      { key: SCENE_KEY, label: '情境', type: 'scene', options: sceneOptions('eat'), default: '' },
       { key: 'diet', label: '忌口', type: 'chips', options: ['不辣', '不吃牛', '素', '都可以'], default: '都可以' },
       { key: 'taste', label: '想吃', type: 'chips', options: ['鹹食', '甜食', '都可以'], default: '都可以' },
       // Round 3：預算（每人每餐）。標籤依國家由 src/price.ts bandLabels() 產生，值走 OrderRequest.budget，不走 choices。
@@ -16,7 +19,7 @@ export const CARDS: ModuleCard[] = [
     // 甜食時伺服器端改查 bakery / cafe / ice_cream_shop（src/places.ts placesTypesFor）。
     placesQuery: { includedTypes: ['restaurant'], radiusByTransport: { default: 800 } },
     promptHint:
-      '店已由班長決定（見【店已決定】），meme.big = 店名（≤10 字，太長就用店家慣稱）。steps 必須含「點什麼」與「幾分鐘內吃完」。' +
+      '店已由班長決定（見【店已決定】），meme.big = 店名（≤10 字，太長就用店家慣稱）。steps 必須含「點什麼」與時間（幾分鐘內吃完）；有「情境：」那一行時，時間照那一行寫（聚餐、約會不催）。' +
       '使用者選「甜食」時派的是甜點／麵包／咖啡店，點的東西要是甜的；選「鹹食」就不得點甜點當正餐。' +
       'meme.top／meme.bot 先照 mode 講（沒去過／第 N 次／偵察），語氣照火力層；不要自己數這週吃了幾次。',
     reissueLabel: '換一家', // Round 3：原因（店關了／不想吃這類／不要再來）在底部選單
@@ -30,11 +33,12 @@ export const CARDS: ModuleCard[] = [
       { key: 'transport', label: '交通', type: 'chips', options: ['走路', '捷運', '計程車', '開車'], default: '捷運' },
       { key: 'minutes', label: '可接受', type: 'chips', options: ['15 分', '30 分', '60 分'], default: '30 分' },
     ],
-    needsPlaces: false,
+    // Round 10 X2：查真地點。交通＋可接受 → 半徑、時段 → 目的地關鍵字，都在 src/go.ts（不用 placesQuery）。
+    needsPlaces: true,
     promptHint:
-      'MVP 不查 Places，用常識加定位城市選一個真實存在、此刻合理的地點。meme.big = 地點名。' +
-      'steps 三條：怎麼去（含交通方式與時間）、到那裡做一件具體的事、回家。' +
-      '必須符合時間帶：晚上不排早市、深夜不排登山、雨天不排純戶外。單程時間不得超過使用者選的「可接受」。',
+      '地點已由班長決定（見【店已決定】），meme.big = 地點名（≤10 字，太長就用慣稱）。' +
+      'steps 三條：用使用者選的交通方式怎麼去、到那裡做一件具體的事、幾點前回家。' +
+      '交通方式只准寫使用者選的那一種；不准編路線、站名、出口、車資、車程分鐘。到那裡做的事要符合現在的時段。',
     reissueLabel: '路封了',
     stopVerdictAllowed: false,
   },
@@ -59,6 +63,7 @@ export const CARDS: ModuleCard[] = [
     title: '歇',
     subtitle: '現在，去哪喝一杯',
     intake: [
+      { key: SCENE_KEY, label: '情境', type: 'scene', options: sceneOptions('rest'), default: '' },
       { key: 'drink', label: '喝什麼', type: 'chips', options: ['咖啡', '酒吧', '居酒屋', '熱炒燒烤'], default: '咖啡' },
     ],
     needsPlaces: true,
@@ -149,6 +154,13 @@ export const MINOR_IDS: ModuleId[] = ['sleep', 'reply', 'buy', 'travel']
  * 點名台詞：每張卡 × 三段火力。介面 ModuleCard 由第 5 節鎖定，故另存一張表。
  * index = Level。
  */
+/** Round 5：情境（吃／歇的第一步）的班長台詞，依火力層。 */
+export const SCENE_BARKS: [string, string, string] = [
+  '那、那個…現在是什麼情況？',
+  '先報告情境！一個人還是一群人？趕不趕？',
+  '情況都講不清楚就想派店？報告情境！',
+]
+
 export const MODULE_BARKS: Record<ModuleId, [string, string, string]> = {
   eat: [
     '有、有沒有忌口？',

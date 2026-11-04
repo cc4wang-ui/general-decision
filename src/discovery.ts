@@ -9,7 +9,7 @@
 //   3 打分（log 域）：Thompson 品質抽樣 + 細類偏好 Beta 抽樣 − λ·曝光 + 連鎖 ×0.6 − 步行/25 + 價位適配 + 今天不想吃這類 ×0.5 + 愛店（熟門熟路）×2
 //   4 Efraimidis–Spirakis 加權隨機取一家。
 import { ratingScore } from './places.ts'
-import { bandOf, priceFit } from './price.ts'
+import { effectiveBand, priceFit } from './price.ts'
 import type { Band, Country, CuisineStats, Novelty, PickMode, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
 
 // ── 亂數（可重現）──────────────────────────────────────────────────
@@ -114,7 +114,9 @@ export const PARAMS = {
   //   理由：「熟門熟路」的語意就是不怕回訪，曝光懲罰本來就該接近 0；
   //   連續派同一家仍由 cooldown（最近 3 次出過的店不再出）擋住，不靠 λ。
   //   0.05 低於 R3§2.4 建議範圍下緣，是裁定後的例外，不是調參漂移；balanced／recon 仍在範圍內。
-  lambda: { familiar: 0.05, balanced: 0.8, recon: 1.2 } as Record<Novelty, number>,
+  // balanced 0.8 → 1.5（Round 4，2026-11-01 preview 60 天模擬：信義 30 天內只有 38 家，門檻 40）。
+  //   仍在 R3§2.4 範圍 0.8–2.0；離線重播 oracleGap 0.070 → 0.061（≤0.08）、7 天重複率 0.07 → 0.023、平均評分降 0.02。
+  lambda: { familiar: 0.05, balanced: 1.5, recon: 1.2 } as Record<Novelty, number>,
   wildcard: { familiar: 0, balanced: 0.2, recon: 1 } as Record<Novelty, number>,
 }
 
@@ -126,7 +128,7 @@ const LN2 = Math.LN2
 /**
  * Σ exp(−ln2·Δt/半衰期)：被出成口令（shown）半衰期 PARAMS.halfShownDays（目前 3 天）、
  * 去過（done）半衰期 PARAMS.halfDoneDays（目前 7 天）。未來的時間戳當作現在。
- * 打分時乘上 PARAMS.lambda[方針]（familiar 0.05／balanced 0.8／recon 1.2）。
+ * 打分時乘上 PARAMS.lambda[方針]（familiar 0.05／balanced 1.5／recon 1.2）。
  */
 export function exposure(entry: Pick<PlaceMemSummary, 'sh' | 'dn'> | undefined, now: number): number {
   if (!entry) return 0
@@ -163,6 +165,7 @@ export interface PickOutcome extends PickResult {
   /** 被選的店 14 天內有沒有任何事件（匿名 log 的 seen14d）。 */
   seen14d: boolean
   band: number | null
+  bandEst: boolean
   cuisine: CuisineGroup
 }
 
@@ -224,14 +227,16 @@ export function pickPlace(
   for (const s of lastShown) { if (cooldown.size >= PARAMS.cooldown) break; cooldown.add(s.id) }
   const lastShownAt = (id: string) => Math.max(0, ...(memById.get(id)?.sh ?? []))
 
-  type Row = { c: PlaceCandidate; i: number; b: number; band: number | null; fit: number; E: number; seen: boolean; chain: boolean; g: CuisineGroup }
+  type Row = { c: PlaceCandidate; i: number; b: number; band: number | null; est: boolean; fit: number; E: number; seen: boolean; chain: boolean; g: CuisineGroup }
   let rows: Row[] = cands.map((c, i) => {
     const ms = merged(c.id)
-    const band = bandOf(c, ctx.country)
+    // Round 4：Google 沒有價位資料時用推估（關鍵字 lane 或店的類型），不再讓「價位未知」直接過預算關。
+    const { band, est } = effectiveBand(c, ctx.country)
     return {
       c, i,
       b: bayes(c),
       band,
+      est,
       fit: priceFit(band, ctx.budget),
       E: ms.reduce((s, m) => s + exposure(m, now), 0),
       seen: ms.some((m) => (m.sh?.length ?? 0) > 0 || (m.dn?.length ?? 0) > 0),
@@ -248,8 +253,14 @@ export function pickPlace(
   rows = rows.filter((r) => !ctx.exclude.has(r.c.id))
   rows = stage(rows, (r) => !cooldown.has(r.c.id), (a, b) => lastShownAt(a.c.id) - lastShownAt(b.c.id), 'cooldown', relaxed)
   if (ctx.budget?.length) {
-    // 預算內或價位未知才算過；相鄰檔、再遠的只在不夠 5 家時依適配度補回（R3§4.4：本區沒這價位不硬塞）。
-    rows = stage(rows, (r) => r.fit === 1 || r.band === null, (a, b) => b.fit - a.fit, 'price', relaxed)
+    // Round 4（Cross 2026-10-30「沒辦法按照價格找店」）：只有預算內（Google 資料或推估）才算過。
+    // 不夠 5 家才依適配度補回：價位未知（0.5）先於相鄰檔（0.35），再遠的不補（R3§4.4：本區沒這價位不硬塞）。
+    const mark = relaxed.length
+    rows = stage(rows, (r) => r.fit === 1, (a, b) => b.fit - a.fit, 'price', relaxed)
+    // 實測（2026-11-01）：預算內 2 家＋補回 3 家一起抽，補回的店（相鄰檔 0.35、未知 0.5）常被抽中。
+    // 有任何一家預算內 → 只在預算內抽；補回的店只在一家都沒有時才派（relaxed price 只在那時才記）。
+    const inBudget = rows.filter((r) => r.fit === 1)
+    if (inBudget.length) { rows = inBudget; relaxed.splice(mark) }
   }
   if (rows.length === 0) return null
   const afterFilter = rows.length
@@ -331,6 +342,7 @@ export function pickPlace(
     afterFilter,
     seen14d,
     band: pick.band,
+    bandEst: pick.est,
     cuisine: pick.g,
   }
 }

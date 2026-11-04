@@ -58,6 +58,54 @@ export function bandOf(p: Pick<PlaceCandidate, 'priceLevel' | 'priceRange'>, cou
   return (p.priceLevel && LEVEL_BAND[p.priceLevel]) ?? null
 }
 
+/**
+ * Round 4：Google 沒有價位資料時的推估（我方資料，不是 Google 內容）。依店的類型給一個檔位，可為 x.5。
+ * 切點不同所以台日分開：同樣是拉麵，台灣 NT$250–350（第 2 檔），日本 ¥900–1,300（跨 1、2 檔）。
+ * 只用在挑店與「推估」標籤；畫面不准把推估換算成金額（T6）。
+ */
+const TYPE_EST: Record<'TW' | 'JP', Record<string, number>> = {
+  TW: {
+    convenience_store: 1, bakery: 1, breakfast_restaurant: 1, ice_cream_shop: 1, noodle_shop: 1, chinese_noodle_restaurant: 1,
+    taiwanese_restaurant: 1.5, fast_food_restaurant: 1.5, coffee_shop: 1.5, vegetarian_restaurant: 1.5, dessert_shop: 1, tea_house: 1.5,
+    cafe: 2, hamburger_restaurant: 2, brunch_restaurant: 2, ramen_restaurant: 2, chinese_restaurant: 2, korean_restaurant: 2,
+    thai_restaurant: 2, vietnamese_restaurant: 2, pizza_restaurant: 2, vegan_restaurant: 2, japanese_curry_restaurant: 2,
+    japanese_restaurant: 2.5, sushi_restaurant: 2.5, italian_restaurant: 2.5, american_restaurant: 2.5, indian_restaurant: 2.5, hot_pot_restaurant: 2.5,
+    seafood_restaurant: 3, steak_house: 3, yakiniku_restaurant: 3, japanese_izakaya_restaurant: 3, bar: 3,
+    fine_dining_restaurant: 4,
+  },
+  JP: {
+    convenience_store: 1, fast_food_restaurant: 1, hamburger_restaurant: 1, udon_noodle_restaurant: 1, soba_noodle_shop: 1, japanese_curry_restaurant: 1,
+    bakery: 1, coffee_shop: 1, cafe: 1.5, ramen_restaurant: 1.5, chinese_restaurant: 1.5, noodle_shop: 1.5,
+    japanese_restaurant: 2, tonkatsu_restaurant: 2, korean_restaurant: 2, italian_restaurant: 2.5, sushi_restaurant: 2.5, seafood_restaurant: 2.5,
+    yakitori_restaurant: 2.5, japanese_izakaya_restaurant: 2.5, bar: 2.5, yakiniku_restaurant: 3, steak_house: 3, fine_dining_restaurant: 4,
+  },
+}
+
+/**
+ * 挑店用的價位檔：Google 有資料就用（est=false）；沒有就用店的類型推估，類型太泛再用 lane 的推估（關鍵字 lane，例「便當」）（est=true）；
+ * 都沒有 → band=null（價位未知）。台日以外不推估。
+ */
+export function effectiveBand(p: Pick<PlaceCandidate, 'priceLevel' | 'priceRange' | 'primaryType' | 'types' | 'estBand'>, country: Country): { band: number | null; est: boolean } {
+  const real = bandOf(p, country)
+  if (real !== null) return { band: real, est: false }
+  if (country !== 'TW' && country !== 'JP') return { band: null, est: false }
+  // 店自己的類型比 lane 準（「火鍋」查到的 fine_dining 還是高價）；類型太泛（restaurant）才用 lane 的推估。
+  for (const t of [p.primaryType, ...(p.types ?? [])]) {
+    const v = t ? TYPE_EST[country][t] : undefined
+    if (v !== undefined) return { band: v, est: true }
+  }
+  if (typeof p.estBand === 'number' && Number.isFinite(p.estBand)) return { band: p.estBand, est: true }
+  return { band: null, est: false }
+}
+
+/** 推估價位的顯示字串：只講平價／中價位這種描述，不出現金額（T6）。 */
+export function estText(band: number): string {
+  if (band <= 1.5) return '推估平價'
+  if (band <= 2.5) return '推估中價位'
+  if (band <= 3.5) return '推估偏高價位'
+  return '推估高價位'
+}
+
 /** x.5 代表同時落在兩檔。 */
 function bandsCovered(band: number): number[] {
   return Number.isInteger(band) ? [band] : [Math.floor(band), Math.ceil(band)]

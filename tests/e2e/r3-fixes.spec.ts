@@ -1,6 +1,6 @@
 // Round 3 修正輪（CLIENT 組）：R2-01、R2-05、R2-07/12、R2-10、R2-11、手動報座標 maxLength。
 import { expect, test, type Page } from '@playwright/test'
-import { FIXED_ORDER, captureOrders, prime } from './fixtures.ts'
+import { FIXED_ORDER, captureOrders, prime, openCard } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => { await prime(page) })
 
@@ -10,7 +10,7 @@ const bands = (page: Page) => page.locator('[data-field="budget"]')
 
 async function submitCard(page: Page, id: string) {
   await page.goto('/')
-  await page.locator(`[data-card="${id}"]`).click()
+  await openCard(page, id)
   await page.getByRole('button', { name: '是！班長' }).click()
 }
 
@@ -64,7 +64,7 @@ test.describe('定位在台北', () => {
     await page.clock.setFixedTime(new Date('2026-10-22T12:30:00+08:00'))
     await page.addInitScript(() => localStorage.setItem('decide.budget.TW', '[3,4]'))
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page).getByText('400–1,000')).toHaveAttribute('aria-pressed', 'true')
     await bands(page).getByText('400–1,000').click()
     expect(await page.evaluate(() => localStorage.getItem('decide.budget.TW'))).toBe('[4]')

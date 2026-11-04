@@ -43,3 +43,20 @@ describe('over_cap 文案', () => {
     expect(ERROR_TEXT.over_cap.line).toBe('今天的偵察額度用完了。明天再報告。')
   })
 })
+
+describe('Places 掛掉（checker 2026-11-01）', () => {
+  it('伺服器回 503 places_down → 手機顯示「地圖服務暫時連不上」，試用紀錄記 places_down（不是 upstream／no_places）', async () => {
+    const { ApiError, requestOrder } = await import('../../src/api.ts')
+    const { readTrial } = await import('../../src/trial.ts')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ error: 'places_down', message: 'x', debug: { module: 'eat', level: 1, error: 'places_down' } }),
+      { status: 503, headers: { 'content-type': 'application/json' } },
+    )))
+    const err = await requestOrder({ module: 'eat', level: 1, choices: {}, recentOrders: [], now: '2026-11-01T12:00:00+08:00' }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as InstanceType<typeof ApiError>).kind).toBe('places_down')
+    expect((err as Error).message).toBe(ERROR_TEXT.places_down.line)
+    expect(ERROR_TEXT.places_down.line).toContain('地圖服務暫時連不上')
+    expect(readTrial()[0]).toMatchObject({ ok: false, error: 'places_down' })
+  })
+})

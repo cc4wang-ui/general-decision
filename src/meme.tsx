@@ -54,6 +54,8 @@ export interface PlaceMetaInput {
   openUntil?: string
   opensAt?: string
   priceText?: string
+  /** Round 10：「去」的目的地（公園、美術館…）沒有價位可言，不寫「價位未知」。 */
+  noPrice?: boolean
   /** Round 3：伺服器算的選店理由，畫成印章（B1：讓發掘被看見）。 */
   mode?: 'new' | 'revisit' | 'wildcard'
   visits?: number
@@ -78,7 +80,8 @@ export function formatPlaceMeta(p: PlaceMetaInput): string {
   if (typeof p.walkMin === 'number') bits.push(`步行 ${p.walkMin} 分`)
   if (p.opensAt) bits.push(`${p.opensAt} 開`)
   else if (p.openUntil) bits.push(`營業到 ${p.openUntil}`)
-  bits.push(p.priceText ?? '價位未知')
+  if (p.priceText) bits.push(p.priceText)
+  else if (!p.noPrice) bits.push('價位未知')
   return bits.join(' · ')
 }
 
@@ -88,7 +91,10 @@ export function formatPlaceMeta(p: PlaceMetaInput): string {
  * 掛在店名上、不另開一顆按鈕——多一顆按鈕就是第二個動作，跟「一個口令一個動作」衝突。
  * 沒有 mapUrl（Places 降級／比不中）就整個店家區（印章、店名、meta、歸屬）都不畫：
  * 不會出現空連結，也不會把模型編的店名顯示出來（R2-01）。
- * Round 3（T10、R3§3.3）：有店就在店名下一行補 place-meta，最後一行標「Google Maps」歸屬。
+ * Round 3（T10、R3§3.3）：有店就在店名下一行補 place-meta，再下一行標「Google Maps」歸屬。
+ * Round 10：歸屬原本在三步驟之後（卡片最後一行），375×667 預設字級就落到第一屏外 11–13px，
+ * iOS 預設字級（-apple-system-body 17px）更多；T10 要求不捲動就看得到 → 移到 place-meta 正下方，
+ * 跟它標示的 Google 資料放在一起。
  */
 export function StepsCard({ steps, place }: { steps: string[]; place?: PlaceMetaInput }) {
   // R2-01：只有伺服器真的比中店（有 mapUrl）才畫店家區。沒有 mapUrl 的 place 可能是模型編的，不准流到畫面。
@@ -105,10 +111,10 @@ export function StepsCard({ steps, place }: { steps: string[]; place?: PlaceMeta
             <span aria-hidden="true"> ↗</span>
           </p>
           <p className="place-meta" data-testid="place-meta">{formatPlaceMeta(real)}</p>
+          <small className="attribution" translate="no" data-testid="attribution">Google Maps</small>
         </div>
       )}
       {steps.map((s, i) => <p key={i}>{s}</p>)}
-      {real && <small className="attribution" translate="no" data-testid="attribution">Google Maps</small>}
     </div>
   )
 }

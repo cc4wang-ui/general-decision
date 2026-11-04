@@ -128,6 +128,8 @@ main[data-level="2"]{--officer-green:#005800;--officer-deep:#000000;--meme-edge:
 .stamp[data-mode="revisit"]{border-color:var(--line)}
 .stamp[data-mode="wildcard"],.stamp[data-mode="exhausted"]{border-color:var(--signal);color:var(--ink);background:var(--card)}
 .steps .attribution{padding-left:0;margin-top:10px}
+/* Round 10：歸屬移進 place-head（place-meta 正下方），間距跟著 head 的 2px gap，不另加高度。 */
+.steps .place-head .attribution{margin-top:0}
 /* ③ 同意畫面：第一屏先講產品承諾，再講三件資料去向。 */
 .consent-hero{display:flex;gap:14px;align-items:center;padding:4px 0 14px;border-bottom:1px solid var(--line)}
 .consent-hero .av{width:88px;height:96px;flex:none;overflow:hidden;border-radius:var(--radius);background:var(--card);border:var(--card-edge) solid var(--line)}
@@ -145,3 +147,18 @@ main[data-level="2"]{--officer-green:#005800;--officer-deep:#000000;--meme-edge:
 .consent-body small{display:block;font-size:.75rem;color:var(--mute);line-height:1.55}
 .consent-foot{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
 .linkish{font:inherit;color:var(--mute);background:none;border:0;padding:8px 0;min-height:36px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+/* Round 5 情境列 */
+.lab .req{margin-left:8px;font-size:.6875rem;font-weight:650;color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:1px 6px}
+.scene-chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.scene-chips .chip{text-align:left}
+.scene-in{margin-top:12px}
+.scene-need{margin-top:10px}
+.intake-top{display:flex;justify-content:space-between;align-items:center;gap:8px;align-self:stretch}
+.scene-tag{font:inherit;font-size:.8125rem;font-weight:650;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;min-height:44px;padding:8px 0;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scene-tag span{color:var(--mute);font-weight:500}
+/* Round 6：出發點標籤跟情境標籤同一行，一起擠在返回鍵右邊；都用省略號，不換行、不加高度。 */
+.intake-top .scene-tag{max-width:44%}.intake-top .loc-tag{max-width:30%;flex:0 1 auto}
+.loc-recent{padding:10px 0 4px}.loc-recent .chip{min-height:48px}
+.sheet .manual{padding:10px 0 4px;border-top:1px solid var(--line)}.sheet .manual .lab{margin:0}
+[data-screen="error"] .loc-recent{padding:0}
+.ent .r.mis{background:var(--khaki);color:var(--ink)}

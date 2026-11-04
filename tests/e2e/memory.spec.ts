@@ -1,6 +1,6 @@
 // Round 3 B14：換一家 → 底部選單三個原因 → 每個原因都寫進 PlaceMem；重新整理後 request 的 mem 還帶得出來。
 import { expect, test, type Page } from '@playwright/test'
-import { FIXED_ORDER, SECOND_ORDER, captureOrders, prime } from './fixtures.ts'
+import { FIXED_ORDER, SECOND_ORDER, captureOrders, prime, openCard, refuseOrder } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => { await prime(page) })
 test.use({ geolocation: { latitude: 25.033, longitude: 121.5654 }, permissions: ['geolocation'] })
@@ -10,7 +10,7 @@ const memOf = (body: Record<string, unknown> | undefined, id: string) => (body?.
 
 async function toCmd(page: Page) {
   await page.goto('/')
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
 }
@@ -37,7 +37,7 @@ test('B14 換一家：選單有三個原因；選「這家不要再來」→ 下
 
   // 關掉 App 重開：記憶在 IndexedDB，不在記憶體
   await page.reload()
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   const again = memOf(sent[2], 'p1')
@@ -60,13 +60,16 @@ test('「店關了」只擋 24 小時、不動細類；「今天不想吃這類�
   expect(sent[1]?.rejectedCuisines).toBeUndefined()
 
   // 同一台手機再換一道（上一道已結束）：這次選「今天不想吃這類」
-  await page.getByRole('button', { name: '沒做' }).click()
+  await refuseOrder(page)
   await expect(page.locator('[data-screen="home"]')).toBeVisible({ timeout: 25_000 })
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   await page.getByTestId('reissue').click()
   await page.getByTestId('reason-kind').click()
+  // 換的那一道跟原本同樣回 SECOND_ORDER，畫面看不出差別；cmd 本來就在畫面上，等它可見不會等到請求。
+  // 要等第 4 個請求真的送出（reissueWith 先寫 IndexedDB 才 fetch），才讀 sent.at(-1)。
+  await expect.poll(() => sent.length).toBe(4)
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   const last = sent.at(-1)!
   expect(last.rejectedCuisines).toEqual(['noodle']) // 被換掉的那一道的細類
@@ -76,9 +79,9 @@ test('「店關了」只擋 24 小時、不動細類；「今天不想吃這類�
 test('完成 → 細類 a+1、dn 有紀錄；沒做 → PlaceMem 不動', async ({ page }) => {
   const sent = await captureOrders(page, [FIXED_ORDER])
   await toCmd(page)
-  await page.getByRole('button', { name: '沒做' }).click()
+  await refuseOrder(page)
   await expect(page.locator('[data-screen="home"]')).toBeVisible({ timeout: 25_000 })
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   const afterSkip = memOf(sent[1], 'p1')
@@ -92,7 +95,7 @@ test('完成 → 細類 a+1、dn 有紀錄；沒做 → PlaceMem 不動', async 
   await page.getByTestId('fav').click()
   await expect(page.getByTestId('fav')).toHaveText('已列入愛店')
   await page.getByRole('button', { name: '解散' }).click()
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   const last = sent.at(-1)!
@@ -118,7 +121,7 @@ test('偵察方針：首頁一顆鍵循環三段、記住、送進 request', asy
   await expect(nov).toHaveText('全面偵察')
   await page.reload()
   await expect(page.getByTestId('novelty')).toHaveText('全面偵察')
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   expect(sent[0]?.novelty).toBe('recon')

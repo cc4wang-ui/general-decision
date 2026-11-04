@@ -1,6 +1,6 @@
 // Round 3 B15、T5：預算 chips 依座標切幣別、相鄰補齊、午餐隱藏最高檔、記住上次；吃的 intake 在 375×667 不捲動。
 import { expect, test, type Page } from '@playwright/test'
-import { captureOrders, prime } from './fixtures.ts'
+import { captureOrders, prime, openCard } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => {
   await prime(page)
@@ -20,7 +20,7 @@ test.describe('東京', () => {
   test.use({ geolocation: TOKYO, permissions: ['geolocation'] })
   test('B15 在東京：預算 chips 是日圓', async ({ page }) => {
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page)).toContainText('¥')
     await expect(bands(page)).not.toContainText('NT$')
     await expect(bands(page).locator('.chip')).toHaveText(['不限', '〜¥1,000', '¥1,000〜2,500', '¥2,500〜6,000', '¥6,000〜'])
@@ -29,7 +29,7 @@ test.describe('東京', () => {
   test('日圓檔位送進 request.budget；下次進來記得（分國家記）', async ({ page }) => {
     const sent = await captureOrders(page)
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page)).toContainText('¥')
     await bands(page).getByText('¥1,000〜2,500').click()
     await page.getByRole('button', { name: '是！班長' }).click()
@@ -38,7 +38,7 @@ test.describe('東京', () => {
     expect((sent[0]?.choices as Record<string, unknown>).budget).toBeUndefined() // bands 不進 choices
 
     await page.reload()
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page)).toContainText('¥')
     await expect(bands(page).getByText('¥1,000〜2,500')).toHaveAttribute('aria-pressed', 'true')
     // 台幣那一邊的記憶是另一份
@@ -52,7 +52,7 @@ test.describe('台北', () => {
   test('B15 在台北：預算 chips 是台幣；選 1,000+ 再點 ≤150 → 中間兩檔自動補上', async ({ page }) => {
     const sent = await captureOrders(page)
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page)).toContainText('≤150')
     await expect(bands(page).locator('.chip')).toHaveText(['不限', '≤150', '150–400', '400–1,000', '1,000+'])
     expect(await pressed(page)).toEqual(['不限:true', '≤150:false', '150–400:false', '400–1,000:false', '1,000+:false'])
@@ -69,10 +69,10 @@ test.describe('台北', () => {
   test('點「不限」回到不限、不送 budget；重新整理後記得上次的選擇', async ({ page }) => {
     const sent = await captureOrders(page)
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await bands(page).getByText('150–400').click()
     await page.reload()
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page).getByText('150–400')).toHaveAttribute('aria-pressed', 'true')
     await bands(page).getByText('不限').click()
     expect(await pressed(page)).toEqual(['不限:true', '≤150:false', '150–400:false', '400–1,000:false', '1,000+:false'])
@@ -85,7 +85,7 @@ test.describe('台北', () => {
     await page.clock.setFixedTime(new Date('2026-10-22T12:30:00+08:00'))
     const sent = await captureOrders(page)
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page).locator('.chip')).toHaveText(['不限', '≤150', '150–400', '400–1,000'])
     await bands(page).getByText('≤150').click()
     await bands(page).getByText('400–1,000').click()
@@ -97,7 +97,7 @@ test.describe('台北', () => {
   test('T5：吃的 intake ≤3 列、每列 ≤5 chips、沒有輸入框；375×667 不捲動就按得到送出，點擊目標 ≥48px', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 })
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page)).toContainText('≤150')
     await expectIntakeFits(page)
   })
@@ -108,7 +108,7 @@ test.describe('日本版面', () => {
   test('T5（日圓字比較長）：375×667 一樣不捲動、按得到送出', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 })
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(bands(page)).toContainText('¥')
     await expectIntakeFits(page)
   })
@@ -119,7 +119,7 @@ test.describe('台日以外', () => {
   test('座標在台日以外：預算整列隱藏，不顯示幣別，也不送 budget', async ({ page }) => {
     const sent = await captureOrders(page)
     await page.goto('/')
-    await page.locator('[data-card="eat"]').click()
+    await openCard(page, 'eat')
     await expect(page.locator('[data-screen="intake"]')).toBeVisible()
     // 定位回來才知道國家：等一下再斷言「沒有」
     await expect(page.locator('[data-field="diet"]')).toBeVisible()

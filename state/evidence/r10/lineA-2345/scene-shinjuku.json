@@ -1,0 +1,361 @@
+{
+ "loc": "東京新宿駅",
+ "localHour": 23,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "和牛らーめん 極 歌舞伎町",
+   "type": "ramen_restaurant",
+   "rating": 4.9,
+   "walkMin": 8,
+   "distM": 622,
+   "radiusM": 1250,
+   "closeIn": 258,
+   "how": "text=\"定食\" rank=DISTANCE → text=\"ラーメン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 16,
+    "total": 22,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 8 分鐘抵達",
+    "點一碗和牛らーめん，湯快喝完",
+    "23:59 前吃完閃人"
+   ],
+   "bot": "菜鳥就是要吃得快，20 分鐘內解決",
+   "ms": 2831
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "やきとり家 すみれ 新宿西口店",
+   "type": "yakitori_restaurant",
+   "rating": 4.3,
+   "walkMin": 4,
+   "distM": 309,
+   "radiusM": 1500,
+   "closeIn": 18,
+   "how": "text=\"弁当\" rank=RELEVANCE → text=\"テイクアウト\" rank=DISTANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 10,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 4 分鐘抵達",
+    "點串燒組合，¥3,000〜4,000 內自選",
+    "外帶回去邊走邊吃"
+   ],
+   "bot": "時間緊，動作快",
+   "ms": 2929
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "新宿っ子居酒屋 とととりとん",
+   "type": "japanese_izakaya_restaurant",
+   "rating": 4.5,
+   "walkMin": 4,
+   "distM": 309,
+   "radiusM": 1200,
+   "closeIn": 138,
+   "how": "text=\"居酒屋\" rank=RELEVANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 8,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 4 分鐘抵達",
+    "點烤雞串、炸物、醃漬菜各一份，啤酒配起來",
+    "2 小時內慢慢聊，一個口令一個動作"
+   ],
+   "bot": "一群人就是要點多，分著吃",
+   "ms": 3055
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "ナドニエ",
+   "type": "japanese_restaurant",
+   "rating": 4.4,
+   "walkMin": 8,
+   "distM": 568,
+   "radiusM": 3750,
+   "closeIn": 198,
+   "how": "text=\"和食\" rank=RELEVANCE → text=\"レストラン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 4,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 8 分鐘到店",
+    "點招牌，90 分鐘內享受"
+   ],
+   "bot": "約會就是慢慢吃，招牌點下去，不准趕時間",
+   "ms": 2827
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "bar moon walk 新宿靖国通り店",
+   "type": "bar",
+   "rating": 4.7,
+   "walkMin": 7,
+   "distM": 502,
+   "radiusM": 1000,
+   "closeIn": 318,
+   "how": "text=\"居酒屋\" rank=DISTANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 19,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 7 分鐘抵達",
+    "點一份下酒菜，一杯飲料",
+    "23:58 前點完，00:10 前吃完起身"
+   ],
+   "bot": "23:48 到店，23:58 點餐，00:10 前吃完",
+   "ms": 2904
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "手ぶらBBQ食べ放題×ハワイアンビアガーデン 天空グリル 新宿東口",
+   "type": "beer_garden",
+   "rating": 4.1,
+   "walkMin": 8,
+   "distM": 629,
+   "radiusM": 2500,
+   "closeIn": 318,
+   "how": "text=\"食べ放題 レストラン\" rank=RELEVANCE → text=\"食べ放題 レストラン\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 8,
+    "total": 19,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走8分鐘抵達",
+    "點燒肉與飲料，確認有無插座",
+    "90分鐘內吃完，不要拖"
+   ],
+   "bot": "站好、點餐、時間到就起來",
+   "ms": 2986
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "ShandyLove -シャンラブ-",
+   "type": "cafe",
+   "rating": 4.9,
+   "walkMin": 8,
+   "distM": 581,
+   "radiusM": 1500,
+   "closeIn": 78,
+   "how": "text=\"カフェ\" rank=RELEVANCE → text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 6,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 8 分鐘抵達",
+    "點一杯咖啡坐下，手機面朝下",
+    "00:19 前起身離開"
+   ],
+   "bot": "一杯咖啡，三十分鐘放空",
+   "ms": 2450
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "珈琲貴族エジンバラ",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 7,
+   "distM": 523,
+   "radiusM": 2500,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE → text=\"電源 カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 4,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 7 分鐘抵達",
+    "進門先問店員插座在哪裡",
+    "點一杯咖啡，23:48 坐下專心工作到 01:18"
+   ],
+   "bot": "點一杯，插座查好，卡位 90 分鐘",
+   "ms": 2893
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "ShandyLove -シャンラブ-",
+   "type": "cafe",
+   "rating": 4.9,
+   "walkMin": 8,
+   "distM": 581,
+   "radiusM": 2500,
+   "closeIn": 78,
+   "how": "text=\"カフェ\" rank=RELEVANCE → text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 6,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走8分鐘抵達",
+    "找能坐2人以上的位子坐下，各點一杯咖啡",
+    "坐滿60分鐘再起身，23:49前點完、00:49前離開"
+   ],
+   "bot": "你各位啊，朋友就是要好好聊",
+   "ms": 2999
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "BAR&CAFE Sonora+s／ソノラス",
+   "type": "cafe",
+   "rating": 5,
+   "walkMin": 2,
+   "distM": 131,
+   "radiusM": 2500,
+   "closeIn": 138,
+   "how": "text=\"静か カフェ\" rank=DISTANCE → text=\"静か カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 3,
+    "total": 19,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘到店",
+    "找角落四人座坐下，點好咖啡再開始談",
+    "00:43前離開"
+   ],
+   "bot": "角落位子、先點再談、預留一小時",
+   "ms": 2670
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "中国茶房8 新宿店",
+   "type": "chinese_restaurant",
+   "rating": 3.6,
+   "walkMin": 6,
+   "distM": 464,
+   "radiusM": 1000,
+   "closeIn": 318,
+   "how": "text=\"カフェ\" rank=RELEVANCE → text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 2,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走6分鐘抵達",
+    "點一杯茶，坐滿20分鐘",
+    "04:59準時起身離開"
+   ],
+   "bot": "20分鐘等人，時間到就撤",
+   "ms": 2644
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "花のある棲家",
+   "type": "cafe",
+   "rating": 4.3,
+   "walkMin": 7,
+   "distM": 524,
+   "radiusM": 2500,
+   "closeIn": 78,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE → text=\"電源 カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 5,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走7分鐘抵達",
+    "進門先問有沒有插座座位",
+    "點一杯咖啡、一份點心，坐滿60分鐘"
+   ],
+   "bot": "插座先問店員，咖啡配點心",
+   "ms": 2674
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 3055
+ }
+}

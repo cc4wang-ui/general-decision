@@ -1,0 +1,361 @@
+{
+ "loc": "東京新宿駅",
+ "localHour": 9,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "たつ屋",
+   "type": "japanese_restaurant",
+   "rating": 4.4,
+   "walkMin": 3,
+   "distM": 215,
+   "radiusM": 500,
+   "opensAt": "10:00",
+   "how": "text=\"うどん\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 9,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走3分鐘抵達",
+    "點一道主食，09:04點",
+    "09:24前吃完出門"
+   ],
+   "bot": "一個人快吃，20分鐘內解決",
+   "ms": 2712
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "サンドイッチハウス メルヘン ニュウマン新宿店",
+   "type": "sandwich_shop",
+   "rating": 4.1,
+   "walkMin": 2,
+   "distM": 97,
+   "radiusM": 1500,
+   "closeIn": 718,
+   "how": "text=\"テイクアウト\" rank=DISTANCE → text=\"惣菜\" rank=RELEVANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 11,
+    "total": 18,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分抵達",
+    "選一款三明治，決定快",
+    "外帶回去，別在店裡磨"
+   ],
+   "bot": "出站就走，三分鐘內拿到手",
+   "ms": 3287
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "人生酒場 新大久保店",
+   "type": "korean_restaurant",
+   "rating": 4.4,
+   "walkMin": 14,
+   "distM": 1092,
+   "radiusM": 3000,
+   "how": "text=\"韓国料理\" rank=DISTANCE → text=\"居酒屋\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 19,
+    "total": 21,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走14分鐘抵達",
+    "點3到4道下酒菜一起分，別喬",
+    "09:15到店，90分鐘內吃完再聊"
+   ],
+   "bot": "一群人一起點，別猶豫",
+   "ms": 3342
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "THE FRAME",
+   "type": "restaurant",
+   "rating": 4.6,
+   "walkMin": 26,
+   "distM": 2015,
+   "radiusM": 3750,
+   "closeIn": 868,
+   "how": "text=\"天ぷら\" rank=RELEVANCE → text=\"イタリアン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 1,
+    "total": 16,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 26 分鐘抵達",
+    "點招牌餐點，90 分鐘內享受",
+    "10:57 前離開"
+   ],
+   "bot": "招牌點起來，給我慢慢吃",
+   "ms": 8200
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "中華料理 岐阜屋",
+   "type": "chinese_restaurant",
+   "rating": 4,
+   "walkMin": 6,
+   "distM": 419,
+   "radiusM": 2500,
+   "closeIn": 958,
+   "how": "text=\"居酒屋\" rank=RELEVANCE → text=\"ラーメン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 21,
+    "total": 21,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 6 分抵達",
+    "點一碗麵類或小菜，不點大餐",
+    "09:37 前吃完起身"
+   ],
+   "bot": "出發，09:07 到，30 分鐘內解決",
+   "ms": 3282
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "オールデイダイニング 樹林",
+   "type": "restaurant",
+   "rating": 4.2,
+   "walkMin": 8,
+   "distM": 568,
+   "radiusM": 2500,
+   "closeIn": 718,
+   "how": "text=\"食べ放題 レストラン\" rank=DISTANCE → text=\"食べ放題 レストラン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 4,
+    "total": 4,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 8 分鐘到店",
+    "點套餐，一輪一輪夾，不要貪心堆盤子",
+    "60 分鐘內吃完，再來一輪，到 10:09 滾出去"
+   ],
+   "bot": "菜鳥怎樣都填不滿肚子，動起來",
+   "ms": 8978
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "eggslut 新宿サザンテラス店",
+   "type": "hamburger_restaurant",
+   "rating": 4.1,
+   "walkMin": 2,
+   "distM": 122,
+   "radiusM": 600,
+   "closeIn": 718,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 9,
+    "total": 11,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘抵達",
+    "點一杯咖啡坐下，手機收起來",
+    "30分鐘內不看螢幕"
+   ],
+   "bot": "坐下來，放空",
+   "ms": 2845
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "珈琲貴族エジンバラ",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 7,
+   "distM": 523,
+   "radiusM": 1000,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走7分鐘到店",
+    "進店先問店員哪裡有插座",
+    "點一杯咖啡，09:15 坐下"
+   ],
+   "bot": "先問插座，點一杯，認真坐滿",
+   "ms": 3339
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "DEAN & DELUCA 新宿",
+   "type": "deli",
+   "rating": 3.8,
+   "walkMin": 1,
+   "distM": 61,
+   "radiusM": 1000,
+   "closeIn": 778,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 9,
+    "total": 11,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走1分鐘抵達",
+    "找到雙人座位坐下，各點一杯咖啡",
+    "手機面朝下，聊滿60分鐘"
+   ],
+   "bot": "你各位啊，找個能坐兩個人的位子",
+   "ms": 3060
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "はかどり空間FEEEP（フィープ）新宿東口-新宿三丁目店",
+   "type": "coworking_space",
+   "rating": 4.5,
+   "walkMin": 4,
+   "distM": 293,
+   "radiusM": 2500,
+   "closeIn": 838,
+   "how": "text=\"静か カフェ\" rank=RELEVANCE → text=\"静か カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 5,
+    "total": 27,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 4 分鐘抵達",
+    "進門找角落位置坐下",
+    "點一杯咖啡，坐滿 60 分鐘再起身"
+   ],
+   "bot": "角落位置、先點再談、預留 60 分鐘",
+   "ms": 3368
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "eggslut 新宿サザンテラス店",
+   "type": "hamburger_restaurant",
+   "rating": 4.1,
+   "walkMin": 2,
+   "distM": 122,
+   "radiusM": 400,
+   "closeIn": 718,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 9,
+    "total": 11,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘抵達",
+    "點一杯咖啡，坐下就喝",
+    "09:23準時起身離開"
+   ],
+   "bot": "點一杯、坐穩、20分鐘準時起身",
+   "ms": 2957
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "DEAN & DELUCA カフェ NEWoMan新宿",
+   "type": "cafe",
+   "rating": 3.8,
+   "walkMin": 2,
+   "distM": 142,
+   "radiusM": 1000,
+   "closeIn": 778,
+   "how": "text=\"電源 カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 19,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘抵達",
+    "進門後先問店員哪些座位有插座",
+    "點一杯咖啡，坐定後手機插上充電"
+   ],
+   "bot": "出站就近，先確認座位插座夠用",
+   "ms": 8486
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 8978
+ }
+}

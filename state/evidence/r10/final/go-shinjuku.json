@@ -1,0 +1,95 @@
+{
+ "loc": "東京新宿駅",
+ "localHour": 9,
+ "part": "day",
+ "minutes": 30,
+ "seed": 4090006452,
+ "rows": [
+  {
+   "transport": "走路",
+   "minutes": 30,
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "杉大門商店街 人気会",
+   "distM": 1922,
+   "opensAt": "10:00",
+   "radiusM": 2000,
+   "walkMin": 25,
+   "fingerprint": "text=\"商店街\" rank=DISTANCE r=2000",
+   "how": "text=\"商店街\" rank=DISTANCE",
+   "steps": [
+    "照地圖走路過去，單程 30 分內",
+    "到了先走一圈，看看有什麼",
+    "12:00 前走回來"
+   ],
+   "ms": 2537
+  },
+  {
+   "transport": "捷運",
+   "minutes": 30,
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "常盤台銀座商店街",
+   "type": "shopping_mall",
+   "distM": 7558,
+   "radiusM": 8000,
+   "fingerprint": "text=\"商店街\" rank=DISTANCE r=8000",
+   "how": "text=\"商店街\" rank=DISTANCE",
+   "steps": [
+    "搭電車單程30分內過去",
+    "到了走一圈、看看有什麼",
+    "16:00前回家"
+   ],
+   "ms": 2357
+  },
+  {
+   "transport": "計程車",
+   "minutes": 30,
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "佐竹商店街",
+   "type": "shopping_mall",
+   "distM": 7472,
+   "opensAt": "10:00",
+   "radiusM": 7500,
+   "fingerprint": "text=\"商店街\" rank=DISTANCE r=7500",
+   "how": "text=\"商店街\" rank=DISTANCE",
+   "steps": [
+    "叫計程車，跟司機報佐竹商店街，單程30分內",
+    "到了下車走一圈，挑三家店看招牌與商品",
+    "11:30前上車回家"
+   ],
+   "ms": 8129
+  },
+  {
+   "transport": "開車",
+   "minutes": 30,
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "新井薬師駅商店街",
+   "type": "tourist_attraction",
+   "distM": 3928,
+   "radiusM": 6000,
+   "fingerprint": "text=\"商店街\" rank=DISTANCE r=6000",
+   "how": "text=\"商店街\" rank=DISTANCE",
+   "steps": [
+    "開車過去，到了先停好車",
+    "進去走一圈，看看有什麼",
+    "12:00前開回來"
+   ],
+   "ms": 2602
+  }
+ ],
+ "summary": {
+  "transports": 4,
+  "ok": 4,
+  "pass": 4,
+  "distinctFingerprints": 4,
+  "failed": [],
+  "maxMs": 8129
+ }
+}

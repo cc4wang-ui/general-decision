@@ -41,4 +41,5 @@ async function handler(request:Request):Promise<Response>{
  }
 }
 export function GET(request:Request){return handler(request)}
+export function POST(request:Request){return handler(request)}
 export default {fetch:handler}

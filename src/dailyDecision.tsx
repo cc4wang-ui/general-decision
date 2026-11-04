@@ -1,11 +1,16 @@
 import { useState } from 'react'
 import './dailyDecision.css'
 import { PlacePhoto } from './PlacePhoto.tsx'
+import { getLocation, type GeoReason } from './api.ts'
 
 export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean}; eta?:string;departure?:string;travelMin?:number;conflict?:string }
 export type DailyState = {
   day: string; area: string; currentPlace: string; mode: 'creative'|'practical'
   tasks: DailyTask[]; notes: string[]; avoid: string[]
+  /** 出發地用目前位置（GPS）。只存這個選擇，不存座標：每次搜尋都重新定位。 */
+  useHere?: boolean
+  /** 目前行程是用哪個出發地排的（originKey）。出發地換了，自動挑的店要在新出發地附近重找。 */
+  routedFrom?: string
 }
 const KEY = 'decide.daily.v1'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
@@ -43,6 +48,23 @@ export function replanDaily(s: DailyState): DailyState {
   const done = s.tasks.filter(t=>t.done || t.locked || t.custom)
   const pending = buildDaily(s).filter(t=>!t.done && !done.some(d=>d.id===t.id))
   return { ...s, tasks: [...done,...pending] }
+}
+/** 出發地的身分：目前位置，或輸入的地名。 */
+export const originKey = (s: DailyState): string => s.useHere ? 'here' : 'text:' + s.currentPlace.trim()
+/**
+ * 整份重新搜尋時送出的行程。出發地沒換：保留已選的店，只重排路線。
+ * 出發地換了（例如澀谷站 → 目前位置）：自動挑的店丟掉，讓伺服器在新出發地附近重找；
+ * 已完成、固定安排、你指定的地點照留。舊資料沒有 routedFrom：當作用當時輸入的地名排的。
+ */
+export function routeProposal(s: DailyState): DailyState {
+  const from = s.routedFrom ?? 'text:' + s.currentPlace.trim()
+  const base = from === originKey(s) ? s : { ...s, tasks: s.tasks.filter(t => t.done || t.locked || t.custom || t.specified) }
+  return base.tasks.length ? replanDaily(base) : { ...base, tasks: buildDaily(base) }
+}
+/** 定位拿不到的原因（畫面文字）。 */
+export const GEO_FAIL_TEXT: Record<GeoReason, string> = {
+  ok: '沒有拿到座標', denied: '你沒有允許定位', unsupported: '這個瀏覽器不能定位',
+  timeout: '定位逾時（可能在地下或室內）', unavailable: '收不到定位訊號',
 }
 const choices: Record<string, { title: string; place: string; detail: string }[]> = {
  gym: [
@@ -86,7 +108,7 @@ export function shuffleTask(s: DailyState, id: string): DailyState {
  }) }
 }
 export function addFixedTask(s: DailyState, title: string, place: string, start: string, minutes: number): DailyState {
- if(!title.trim() || !place.trim() || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(start) || !Number.isFinite(minutes) || minutes<5 || minutes>720) return s
+ if(!title.trim() || !place.trim() || !/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !Number.isFinite(minutes) || minutes<5 || minutes>720) return s
  const task:DailyTask={id:'fixed-'+Date.now()+'-'+s.tasks.length,title:title.trim().slice(0,100),place:place.trim().slice(0,120),start,minutes,kind:'rest',done:false,locked:true,custom:true,detail:'既有固定安排：不會被重排或洗牌。'}
  return {...s,tasks:[...s.tasks,task].sort((a,b)=>(a.start||'99:99').localeCompare(b.start||'99:99'))}
 }
@@ -112,15 +134,25 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [fixedTime,setFixedTime] = useState('15:00')
   const [fixedMinutes,setFixedMinutes] = useState('60')
   const change = (fn:(s:DailyState)=>DailyState) => setState(s=>{ const next=fn(s); saveDaily(next); return next })
-  const searchRoute = async (shuffle?:string) => {
+  const clearRoute = () => {setRouteKm(null);setTravelMin(null);setConflicts([])}
+  const searchRoute = async (shuffle?:string, s:DailyState=state) => {
     if(busy)return
-    const proposed=shuffle ? state : state.tasks.length?replanDaily(state):{...state,tasks:buildDaily(state)}
-    setBusy(shuffle??'all');setStatus('正在搜尋真實店家並優化路線…')
+    setBusy(shuffle??'all')
+    // 目前位置：每次搜尋都重新定位。拿不到就停在這裡——原行程不動，也不改用預設的澀谷站。
+    let here:{lat:number;lng:number}|undefined
+    if(s.useHere){
+      setStatus('正在取得目前位置…')
+      const geo=await getLocation()
+      if(!geo.loc){setStatus('無法使用目前位置：'+GEO_FAIL_TEXT[geo.reason]+'。原行程已保留；可按「改用輸入地點」輸入車站或地址。');setBusy(null);return}
+      here=geo.loc
+    }
+    const proposed=shuffle ? s : routeProposal(s)
+    setStatus('正在搜尋真實店家並優化路線…')
     try {
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({location:state.currentPlace,stops:proposed.tasks,shuffle,exclude:shuffle?proposed.tasks.filter(t=>t.id!==shuffle).map(t=>t.candidate?.id).filter(Boolean):[]})})
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),stops:proposed.tasks,shuffle,exclude:shuffle?proposed.tasks.filter(t=>t.id!==shuffle).map(t=>t.candidate?.id).filter(Boolean):[]})})
       const data=await response.json()
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
-      change(old=>({...old,tasks:data.stops}))
+      change(old=>({...old,tasks:data.stops,...(shuffle?{}:{routedFrom:originKey(s)})}))
       setRouteKm(data.routeVerified?data.distanceKm:null)
       setTravelMin(data.routeVerified?data.travelMinutes:null)
       setConflicts(data.conflicts??[])
@@ -129,6 +161,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     finally{setBusy(null)}
   }
   const generate = () => {void searchRoute()}
+  // 按「用目前位置」＝切到目前位置並立刻搜尋（定位拿不到就只顯示原因）。
+  const pickHere = () => {change(s=>({...s,useHere:true}));clearRoute();void searchRoute(undefined,{...state,useHere:true})}
+  const pickTyped = () => {change(s=>({...s,useHere:false}));clearRoute();setStatus('起點變更，請重新搜尋路線')}
   const addFeedback = () => {
     const v=feedback.trim()
     if(!v) return
@@ -151,9 +186,14 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       <div className="dd-columns">
         <aside className="dd-panel">
           <div className="dd-panel-title"><span>▸ 今日設定</span><span>MISSION SETTINGS</span></div>
-          <label htmlFor="daily-location">目前位置</label>
-          <input id="daily-location" aria-label="目前位置" value={state.currentPlace} onChange={e=>{change(s=>({...s,currentPlace:e.target.value.slice(0,80)}));setRouteKm(null);setTravelMin(null);setConflicts([]);setStatus('起點變更，請重新搜尋路線')}} placeholder="例如：宮下公園" />
-          <small>預設以澀谷站為出發點；可改成你現在的確切地點。未使用 GPS。</small>
+          <label htmlFor={state.useHere?undefined:'daily-location'}>出發地</label>
+          {state.useHere
+            ?<p className="dd-origin-here" data-testid="daily-origin">📍 目前位置</p>
+            :<input id="daily-location" aria-label="出發地" value={state.currentPlace} onChange={e=>{change(s=>({...s,currentPlace:e.target.value.slice(0,80)}));clearRoute();setStatus('起點變更，請重新搜尋路線')}} placeholder="例如：宮下公園" />}
+          {state.useHere
+            ?<button className="dd-secondary" data-testid="daily-origin-typed" disabled={busy!==null} onClick={pickTyped}>改用輸入地點</button>
+            :<button className="dd-secondary" data-testid="daily-origin-here" disabled={busy!==null} onClick={pickHere}>📍 用目前位置</button>}
+          <small>{state.useHere?'每次搜尋都重新定位；座標只送去查店、排路線，不存在手機。':'預設以澀谷站為出發點；可輸入確切地點，或按「用目前位置」。'}</small>
           <label>今天想怎麼過？</label>
           <div className="dd-mode" role="group" aria-label="今日模式">
             <button aria-pressed={state.mode==='creative'} onClick={()=>change(s=>replanDaily({...s,mode:'creative'}))}>偵察探索</button>

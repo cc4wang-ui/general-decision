@@ -5,6 +5,9 @@ import { stripBranch } from './chains.ts'
 import { localizeFields, localizeText, stripUrls } from './locale.ts'
 import { NEUTRAL_LOG, NEUTRAL_STEP, hasWrongCount, lineSalt, modeLine, neutralBot, satisfiesMode } from './modeLines.ts'
 import { amountsIn, priceText } from './price.ts'
+import { fixSceneClock, sceneOf, sceneTimes } from './scene.ts'
+import { goTransportSteps, transportOf } from './go.ts'
+import { hhmmIn } from './tz.ts'
 import type { Country, EnforceCtx, Level, ModuleId, Order, PickResult } from './types.ts'
 
 /** attend：★≤2 且非婚禮 → 不去。 */
@@ -74,7 +77,70 @@ export function enforceRules(
   if (pick) order = fixHours(order, pick, level, now)
   order = scrubBanned(order, level, pick, now)
   if (pick) order = enforceMode(order, level, pick, now)
+  order = fixClocks(order)
+  if (pick) order = fixSceneClocks(order, module, choices, pick, now, ctx?.country ?? 'TW')
+  if (pick && module === 'go') order = goTransport(order, choices)
+  if (pick && ctx?.origin) order = stationStart(order, ctx.origin, pick.place.walkMin)
   return localizeOrder(order, ctx?.country ?? 'TW')
+}
+
+/** Round 10 X2：去的口令一定寫到使用者選的交通（只靠 prompt 不算保證；src/go.ts goTransportSteps）。 */
+function goTransport(order: Order, choices: Record<string, string | number>): Order {
+  const steps = goTransportSteps(order.steps, transportOf(choices))
+  if (steps === order.steps) return order
+  console.warn(`[rules] 去的口令沒寫到選的交通（${transportOf(choices)}），已補上`)
+  return { ...order, steps }
+}
+
+/**
+ * Round 6：使用者報了「下車的站」→ 口令第一步一定從出站寫起（Round 6 checker：只靠 prompt 不算證據，伺服器保證）。
+ * 模型已經寫到站／出站／站名就不動；沒有就在第一步前面補「從 X 出站走 N 分，」。
+ */
+export const STATION_RE = /出站|車站|駅|站/
+export function stationStart(order: Order, origin: string, walkMin?: number): Order {
+  const label = origin.trim()
+  if (!label) return order
+  const steps = order.steps ?? []
+  if (steps.some((s) => STATION_RE.test(s) || s.includes(label))) return order
+  const head = walkMin ? `從${label}出站走 ${walkMin} 分，` : `從${label}出站後，`
+  return { ...order, steps: steps.length ? [head + steps[0]!, ...steps.slice(1)] : [head.replace(/，$/, '。')] }
+}
+
+/**
+ * Round 5 實測（2026-11-01 內湖）：模型自己往後加分鐘會算錯進位，寫出「19:67分」。
+ * 分鐘 ≥ 60 就進位到小時（19:67 → 20:07），小時 ≥ 24 就繞回（24:10 → 00:10）。合法的鐘點不動。
+ */
+export function fixClock(text: string): string {
+  return text.replace(/(?<!\d)(\d{1,2})([:：])(\d{2})(?!\d)/g, (all, hh: string, sep: string, mm: string) => {
+    let h = Number(hh)
+    let m = Number(mm)
+    if (m < 60 && h < 24) return all
+    h += Math.floor(m / 60)
+    m %= 60
+    h %= 24
+    return `${String(h).padStart(2, '0')}${sep}${String(m).padStart(2, '0')}`
+  })
+}
+
+/** 情境的鐘點（到店、最早離開、關門）由伺服器算，口令裡違反的改掉（src/scene.ts fixSceneClock）。 */
+function fixSceneClocks(order: Order, module: ModuleId, choices: Record<string, string | number>, pick: PickResult, now: Date, country: Country): Order {
+  const t = sceneTimes(sceneOf(module, choices), hhmmIn(now.toISOString(), country === 'JP' ? 'Asia/Tokyo' : 'Asia/Taipei'), pick.place.walkMin, pick.place.closeInMin, pick.place.opensInMin)
+  if (!t) return order
+  const top = fixSceneClock(order.meme.top, t)
+  const bot = fixSceneClock(order.meme.bot, t)
+  const steps = order.steps.map((s) => fixSceneClock(s, t))
+  if (top === order.meme.top && bot === order.meme.bot && steps.every((x, i) => x === order.steps[i])) return order
+  console.warn(`[rules] 口令的鐘點跟情境對不上，已照伺服器算的時間改 module=${module}`)
+  return { ...order, meme: { ...order.meme, top, bot }, steps }
+}
+
+function fixClocks(order: Order): Order {
+  const top = fixClock(order.meme.top)
+  const bot = fixClock(order.meme.bot)
+  const steps = order.steps.map(fixClock)
+  const log = fixClock(order.log)
+  if (top === order.meme.top && bot === order.meme.bot && log === order.log && steps.every((x, i) => x === order.steps[i])) return order
+  return { ...order, meme: { ...order.meme, top, bot }, steps, log }
 }
 
 /** meme.big 用的店名：模型寫的若是店名的一段（慣稱）且 ≤10 字就留；否則去分店字尾；還太長就截 10 字。 */

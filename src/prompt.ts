@@ -2,7 +2,10 @@
 import { OFFICER_BY_LEVEL, sampleCorpus } from './officers.ts'
 import { CARD_BY_ID } from './cards.ts'
 import { attendVerdict, buyVerdict, lightsOut } from './rules.ts'
-import { bandOf, priceFit, priceText } from './price.ts'
+import { bandOf, estText, priceFit, priceText } from './price.ts'
+import { sceneOf, sceneTimes, sceneTimesLine } from './scene.ts'
+import { hhmmIn, hourIn, tzOf } from './tz.ts'
+import { TRANSPORT_HOW, goTrip } from './go.ts'
 import type { Band, Country, Level, ModuleId, OrderRequest, PickResult } from './types.ts'
 
 // Round 3：PlaceCandidate 搬到 types.ts（DEV-PLAN-3 §B.1），這裡轉出口讓既有 import 不用動。
@@ -46,12 +49,17 @@ export function buildOrderPrompt(req: OrderRequest, pick: PickResult | null, cou
   ].filter(Boolean).join('\n')
 
   const user = [
-    `現在時間：${req.now}`,
+    // checker 2026-11-01：以前給 UTC 的 ISO 字串，模型照 UTC 寫鐘點（當地 19:32 寫「11:52 前吃完」）。改給當地時間。
+    `現在時間：${localStamp(req.now, tzOf(req.loc))}（${tzOf(req.loc) === 'Asia/Tokyo' ? '日本' : '台灣'}當地時間）。steps 裡的鐘點一律從這個時間往後算。`,
     // 資料最小化（Team Lead，2026-10-22）：店已由伺服器挑好，模型用不到座標——只告訴它在哪個國家，不送經緯度、不送地點名稱。
     req.loc ? `使用者人在${country === 'JP' ? '日本' : country === 'TW' ? '台灣' : '台灣與日本以外的地方'}。` : '使用者沒有給定位。依規則 6 降級，不得編造店名與距離。',
     country === 'JP' ? '使用者人在日本：交通講電車／地下鐵，不講捷運；金額只有日圓。' : '',
+    // Round 6：使用者自己報「下車的站」。步行分鐘已從車站算；口令從出站寫起。
+    req.loc?.label ? `使用者剛在「${req.loc.label}」下車，從車站出發。steps 第一步從出站寫起（例如「出站後走 N 分」），N 用給你的步行分鐘數。` : '',
     `使用者的選擇：${JSON.stringify(req.choices, null, 0)}`,
-    pick ? decidedBlock(req, pick, country) : '',
+    // Round 5：情境一行（口令要對得上：外帶不寫內用、聚餐寫幾道一起分…）。
+    sceneOf(req.module, req.choices ?? {})?.rule.hint ?? '',
+    pick ? (req.module === 'go' ? goDecidedBlock(req, pick) : decidedBlock(req, pick, country)) : '',
     req.recentOrders.length
       ? `近 7 天口令：\n${req.recentOrders.map((r) => `・${r.at} ${r.module} ${r.big}`).join('\n')}`
       : '近 7 天沒有紀錄。',
@@ -61,28 +69,50 @@ export function buildOrderPrompt(req: OrderRequest, pick: PickResult | null, cou
   return { system, user }
 }
 
+/** ISO → 當地「YYYY-MM-DD HH:MM」。 */
+export function localStamp(iso: string, tz: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(d).replace('T', ' ')
+}
+
 /**
  * 店跟預算對不上時要講清楚，方向也要對（PR #22 紅隊）：比預算貴才講「貴」，比預算便宜就講「便宜」。
  * 差一檔 → 准了；差兩檔以上 → 附近預算內的沒得挑（深夜打烊最常見）。對得上或沒資料 → 不講。
  */
 export function budgetLine(band: number | null, budget: Band[] | undefined): string {
+  const bot = budgetBot(band, budget)
+  if (!bot) return ''
+  const why: Record<string, string> = {
+    '超出預算一檔，我准了': '這家超出使用者選的預算一檔',
+    '預算內的沒開，這家比較貴': '附近預算內的店現在沒得挑，這家比使用者選的預算貴',
+    '比預算省一點，我准了': '這家比使用者選的預算便宜一檔',
+    '預算內的沒開，這家比較便宜': '附近預算內的店現在沒得挑，這家比使用者選的預算便宜',
+  }
+  const verb = bot.startsWith('預算內') ? '直說' : '講'
+  return `${why[bot]}：在 meme.bot ${verb}「${bot}」。`
+}
+
+/** 預算對不上時 meme.bot 要講的那句（模板口令也用，Claude 失敗時一樣講實話）。對得上或沒資料 → ''。 */
+export function budgetBot(band: number | null, budget: Band[] | undefined): string {
   if (!budget?.length || band === null || priceFit(band, budget) === 1) return ''
   const pricier = Math.floor(band) > Math.max(...budget)
   const near = priceFit(band, budget) > 0
-  if (pricier) return near ? '這家超出使用者選的預算一檔：在 meme.bot 講「超出預算一檔，我准了」。' : '附近預算內的店現在沒得挑，這家比使用者選的預算貴：在 meme.bot 直說「預算內的沒開，這家比較貴」。'
-  return near ? '這家比使用者選的預算便宜一檔：在 meme.bot 講「比預算省一點，我准了」。' : '附近預算內的店現在沒得挑，這家比使用者選的預算便宜：在 meme.bot 直說「預算內的沒開，這家比較便宜」。'
+  if (pricier) return near ? '超出預算一檔，我准了' : '預算內的沒開，這家比較貴'
+  return near ? '比預算省一點，我准了' : '預算內的沒開，這家比較便宜'
 }
 
 /** 附錄 2 的【店已決定】段落。數字（步行、營業、價位、第 N 次）全部是伺服器算好的，模型照講不准改（T6）。 */
 function decidedBlock(req: OrderRequest, pick: PickResult, country: Country): string {
   const p = pick.place
   const hours = p.opensAt ? `${p.opensAt} 開` : p.openUntil ? `營業到 ${p.openUntil}` : '營業中'
-  const price = priceText(p, country) ?? '價位未知'
+  // Round 4：Google 沒有價位資料時，pick 帶我方推估（「推估平價」），只講描述不講金額。
+  const band = pick.band !== undefined ? pick.band : bandOf(p, country)
+  const price = priceText(p, country) ?? (pick.bandEst && band !== null ? `${estText(band)}（我方推估，不准講成確定價位）` : '價位未知')
   const modeRule =
     pick.mode === 'new' ? 'mode=new：在 meme.top 或 meme.bot 講這家他沒去過（新據點）。'
       : pick.mode === 'revisit' ? `mode=revisit：在 meme.top 或 meme.bot 講「第 ${pick.visits} 次」，數字照抄。`
         : 'mode=wildcard：在 meme.top 或 meme.bot 講這是偵察任務。'
-  const band = bandOf(p, country)
   return [
     // R3 修正 S-9：不送 place.id——模型用不到，id 由 withPlace 填（資料最小化，跟不送座標同一個理由）。
     `【店已決定】place.name=${p.name}　${p.walkMin ? `步行 ${p.walkMin} 分　` : ''}${hours}　價位：${price}`,
@@ -90,10 +120,36 @@ function decidedBlock(req: OrderRequest, pick: PickResult, country: Country): st
     '你只負責寫口令：meme.big 就是這家店名（≤10 字，太長用店家慣稱）。',
     modeRule,
     pick.exhausted ? '附近能偵察的新店都偵察完了，這次派的是已知據點。' : '',
+    // Round 4 救援：前兩次查詢之後附近一家都派不出去，派的是營業中的便利商店。
+    p.lane === 'rescue' ? '附近營業中的店都派不出去，這次派的是便利商店：在 meme.bot 直說「附近都收了，去超商」，steps 寫在超商買什麼、幾分鐘內吃完。' : '',
     budgetLine(band, req.budget),
+    // Round 5：到店、最早離開、關門都先算好（preview-5 實測：模型自己加減會算錯）。
+    sceneTimesLine(sceneTimes(sceneOf(req.module, req.choices ?? {}), hhmmIn(req.now, tzOf(req.loc)), p.walkMin, p.closeInMin, p.opensInMin)),
     '禁止提到任何別家店或類別；禁止寫出「價位」以外的金額；禁止寫連結。',
     // Team Lead 設計修訂：口令卡最上面已經印了店名、步行、營業、價位，steps 再講一次就是廢話。
     '口令卡上已經印好店名、步行分鐘、營業時間、價位：steps 不要重複這些，只寫點什麼、怎麼吃、幾分鐘內吃完這類動作（「HH:MM 開」的店例外，要講幾點到）。',
+  ].filter(Boolean).join('\n')
+}
+
+/**
+ * Round 10 X2：去的【店已決定】。距離是座標算的直線距離（真數字）；車程沒有資料（Routes API 未開），
+ * 只准寫使用者選的單程上限，不准自己編分鐘、站名、路線、車資。不是走路就不給步行分鐘（src/go.ts goKeep 已拿掉）。
+ */
+function goDecidedBlock(req: OrderRequest, pick: PickResult): string {
+  const p = pick.place
+  const trip = goTrip(req.choices ?? {}, hourIn(new Date(req.now), tzOf(req.loc)))
+  const hours = p.opensAt ? `${p.opensAt} 開` : p.openUntil ? `營業到 ${p.openUntil}` : '營業中'
+  const walk = p.walkMin ? `步行 ${p.walkMin} 分　` : ''
+  const km = p.distM !== undefined ? `直線 ${(p.distM / 1000).toFixed(1)} 公里　` : ''
+  return [
+    `【店已決定】place.name=${p.name}　${walk}${km}${hours}`,
+    `使用者選的交通：${trip.transport}，單程上限 ${trip.minutes} 分（地點已照這個範圍挑好）。`,
+    `steps 第一條：${TRANSPORT_HOW[trip.transport]}。只准寫這一種交通；不准編路線、站名、出口、車資、車程分鐘，要寫時間只准寫「單程 ${trip.minutes} 分內」。`,
+    'steps 第二條：到了做一件具體的事（看展、走一圈、找位子坐下看書…），要符合現在的時段。第三條：幾點前回家。',
+    '你只負責寫口令：meme.big 就是這個地點名（≤10 字，太長用慣稱）。mode=wildcard：在 meme.top 或 meme.bot 講這是偵察任務；不要說他去過或沒去過。',
+    p.lane === 'rescue' ? '附近營業中的地點都派不出去，這次派的是便利商店：在 meme.bot 直說「附近都收了，去超商」，steps 寫怎麼去、買一杯熱的、回家。' : '',
+    '禁止提到任何別的地點；禁止寫金額；禁止寫連結。',
+    '口令卡上已經印好地點名與營業時間：steps 不要重複（「HH:MM 開」的例外，要講幾點到）。',
   ].filter(Boolean).join('\n')
 }
 
@@ -118,6 +174,7 @@ function computedFacts(req: OrderRequest, now: Date): string {
 export const WEEKLY_SYSTEM_PROMPT = `${ORDER_SYSTEM_PROMPT}
 
 【本次任務】讀 entries（本週 DiaryEntry[]）。用同一位班長口吻寫 WeeklyReport.body（≤180 字）：
+outcome=mismatch 是班長派的店不符合使用者的情境，錯在班長：不罵、不算罰則。
 ① 數字：口令數、服從率、罰則次數 ② 一個規律（例：只在不用出門的事上偷懶／晚上意志最弱）③ 下週一個對策 ④ verdict 一句（≤14 字）。
 只輸出 WeeklyReport JSON：{"weekStart":"","level":0,"stats":{"orders":0,"complianceRate":0,"punishments":0,"weakestModule":null},"body":"","verdict":""}`
 

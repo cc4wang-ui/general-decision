@@ -1,0 +1,138 @@
+# Round 6 進度（接手用）
+
+> 最後更新：2026-11-02 13:55（東京）。分支 `claude/nifty-ramanujan-szofu5`，repo `cc4wang-ui/general-decision`（舊網址 crosswang-collab 會自動轉）。
+> **2026-11-02 13:52 正式站上線 Round 6**（Cross 回「上線」）：`dpl_EFM2ouyUzAqQC1KEzJaxCK1bh7i5`，程式碼 `fe698f4`，檔案跟 preview-3 相同，直傳 target production。別名 general-decision.vercel.app。
+> 上線驗證：首頁回 `index-Bhx1KeXk.js`（跟 preview-3 同一份）、`/api/probe` 404、`/api/order` GET 405、`/api/geocode` GET 405、runtime error 0。
+> 回復點：Round 5 `dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`（Vercel rollback 一鍵）。
+> ⚠️ Vercel 接在 repo：合併到 `main` 會從 git 重新部署正式站（程式碼相同）。合併時機由 Cross 決定 🔒。
+> 新的 session 先讀 `state/ROUND4-PROGRESS.md`（直傳做法）、`state/ROUND5-PROGRESS.md`，再讀這份。
+
+## 起因
+
+Cross 2026-11-01（東京地鐵上）：「在日本捷運會失效，想辦法適應這邊交通環境。」
+
+查到三個壞掉的地方（都是「假設使用者站在街上」造成）：
+
+1. 地下收不到 GPS → 等 6 秒 → 錯誤頁寫「開定位再報告」（定位明明開著）。手動報站每次重打，不記上次。
+2. 車在動 → 定位是 2 分鐘前的或誤差幾百公尺 → 派到上一站附近的店。
+3. 手動報站只用 zh-TW 查，範例寫「台北車站」。
+
+## STOP 條件（Cross 回「ok」）
+
+| # | 條件 | 現況 |
+|---|---|---|
+| 1 | 地下沒定位：不再叫人開定位；錯誤頁和選單都能一鍵報最近的站 | ✅ e2e `r6-station.spec.ts`：錯誤訊息「地下收不到定位。報你要下車的站。」、最近站 chips 一鍵派 |
+| 2 | 10 個日文站名換得到座標，誤差 ≤ 300 m | ✅ preview-3（`fe698f4`，含「駅 → ja」查法）真資料 10/10，最大 95 m（六本木駅），其餘 ≤ 40 m；標籤全回「○○駅」。preview-1 的舊查法也是 10/10 |
+| 3 | 舊或粗的定位不直接派店 | ✅ 單元 `geo.test.ts`＋e2e：超過 60 秒或誤差 > 300 m → 先問「你在車上？」 |
+| 4 | 選了站，派出的店離該站 ≤ 情境半徑（附近沒有時 ≤ 2.5 倍，Cross 2026-11-02 接受），口令以該站為起點 | preview-3 真資料（新宿駅 11:13）：12/12 距離 ≤ 情境半徑（含 2 筆放大查詢也在原半徑內）、12/12 口令從出站寫起 ✅。前兩輪 FAIL 的原因（放大後的店、「歇」的查詢沒切圓）→ Cross 接受放大＋`withinRadius` 對所有關鍵字查詢生效（`fe698f4`）。待 checker 第 3 輪 |
+| 5 | 閘門過 → preview → checker → Cross 決定上線 🔒 | 閘門 ✅；preview-3 ✅；checker 第 3 輪 PASS；Cross 2026-11-02 13:50「上線」→ 正式站 `dpl_EFM2ouyUzAqQC1KEzJaxCK1bh7i5` ✅ |
+
+## 做了什麼（`edf8948`）
+
+- `src/api.ts`：定位結果多 `reason`（denied／unavailable／timeout／unsupported）、`accuracy`、`fixAt`。`geoDoubt()`：超過 60 秒或誤差 > 300 m → stale／coarse。maximumAge 120s → 30s。新錯誤種類 `no_signal`。
+- `src/prefs.ts`：最近 5 站，**只存站名不存座標**（座標每次重查；R12 不落地的原則不變）。
+- `src/app.tsx`：
+  - 選單右上「📍目前位置／站名」標籤，跟情境標籤同一行（不加高度，T5 一屏規則仍過）。點開底部選單：目前位置／最近 5 站／打字報站。
+  - 送出時定位可疑 → 同一個底部選單，標題寫原因；「就用目前位置」照那個座標派，選站就直接派。
+  - 錯誤頁（地下）：最近站 chips 一鍵派＋輸入框（範例「新宿駅、台北車站」）。
+  - 站名跟座標一起送（`loc.label`）。
+- `src/geocode.ts`（新）：查詢本體，api/geocode.ts 與量測共用。有假名用 ja 查，其餘 zh-TW（純漢字兩邊都查得到，回來的名稱是中文：「新宿」「東京車站」）。
+- `src/orderHandler.ts`：`loc.label` 去控制字元、截 40 字，不進 log。`src/prompt.ts`：有 label → 「使用者剛在「X」下車，steps 第一步從出站寫起」。
+- `src/probe.ts`／`api/probe.ts`：`mode=geocode`（10 站 vs 參考座標）、地點加 `shinjuku`。
+
+## 閘門（2026-11-02）
+
+- typecheck ✅、單元 586 條 ✅（`TZ=Asia/Taipei`；`fe698f4` 重跑）、build ✅、check:bundle ✅、smoke ✅。
+- e2e（Chromium）：108 過、5 不過（cmd-layout ×4、memory ×1，正式版本一樣不過，既有的 Chromium 差異）。新增 `r6-station.spec.ts` 7 條全過。`manual-location.spec.ts` B17 改成預期 loc 帶 label。
+
+## Preview
+
+| 名稱 | deployment | 內容 |
+|---|---|---|
+| R6 preview-1 | `dpl_2D81dE7dmgPJNpngiEAYA7aThsyS`（general-decision-cu77vqn6m-cc4wang-uis-projects.vercel.app） | `edf8948`。正式站的檔＋6a–6d（src 8 個檔）＋新 api/geocode.ts、api/probe.ts |
+| R6 preview-2 | `dpl_4mZZRHxWPGznKoYnRPQiKupJqnJW`（general-decision-qiw16vmid-cc4wang-uis-projects.vercel.app） | `83a92ba`。preview-1 ＋ 6e–6i（checker 第 1 輪修正：orderHandler、rules、probe、places、types、geocode） |
+| R6 preview-3（= 正式站） | `dpl_BczjRMsGvQNzoE386mdq6GnGGY3D`（general-decision-dp4tfp3kw-cc4wang-uis-projects.vercel.app） | `fe698f4`。preview-2 ＋ 6j（只有 `src/orderHandler.ts`：`withinRadius` 對所有 text 查詢生效）。meta `round6=preview-3`。要上線時用這個 deployment 的檔案清單加 `target: production` 重建 |
+
+直傳做法同 Round 4／5；打包腳本在 scratchpad `tools/pack-r6.mjs`（從上一版 bundle 重建、跟 HEAD 比、差異打成 6*，驗證 bad=0）。
+
+## 實測（2026-11-02 01:14 東京）
+
+- `mode=geocode`：10/10 在 300 m 內。新宿 3、東京 11、渋谷 5、池袋 0、品川 10、上野 8、秋葉原 3、銀座 40、六本木 95、恵比寿 2 m。
+- `mode=scene&loc=shinjuku`（深夜 01:15）：12/12 符合情境規則，鐘點都對（01:17 到店等）。這也是 Round 5 第一次深夜量測。
+- 量測費：10 次 Places（geocode）＋約 15 次 Places＋12 次 Claude（scene）。約 US$1。
+
+## 實測 preview-3（2026-11-02 11:13 東京，`fe698f4`）
+
+`mode=scene&loc=shinjuku`，起點「新宿駅」。原始回應逐字存在 scratchpad `r6check/scene-shinjuku-preview3.json`（旁邊的 `.meta.txt` 記 URL、時間、x-vercel-id）。
+
+| 項目 | 結果 |
+|---|---|
+| 情境規則 | 12/12 pass |
+| 距離 ≤ 查詢半徑 | 12/12 |
+| 距離 ≤ 情境本身的半徑（放大前） | 12/12（最遠 874 m／1000 m，rest 談事情） |
+| 放大 2.5 倍的查詢 | 2 筆（rest 談事情、rest 其他），兩筆派到的店都在原半徑內 |
+| 口令第一步從出站寫起 | 12/12（全部「出站後走 N 分…」） |
+| 最慢一筆 | 3.6 秒 |
+
+- 這次是白天（11:13），店多，幾乎不需要放大。「附近沒有 → 放大 → 收 ≤ 2.5 倍」這條路只有單元測試（`origin.test.ts` withinRadius）＋ preview-2 深夜資料（當時 4 筆靠放大找到，距離 538–1106 m，都在 2.5 倍內）。沒有在 preview-3 深夜重量。
+- 首頁 200，`data-deployment-id` 對得上 preview-3。
+- `mode=geocode`（11:26，checker 第 3 輪要求補量）：10/10 在 300 m 內。新宿 3、東京 11、渋谷 5、池袋 0、品川 10、上野 8、秋葉原 3、銀座 40、六本木 95、恵比寿 2 m。標籤全部回「○○駅」（ja 查法生效）。原始回應存 scratchpad `r6check/geocode-preview3.json`＋`.meta.txt`。
+- 本輪量測費：約 25 次 Places＋12 次 Claude。
+
+## 獨立 checker
+
+1. 第 1 輪（2026-11-02 02:00，preview-1）FAIL，條件 4：
+   - 4a 距離：rest「其他／有插座」派到步行 14 分的麥當勞，直線 1099 m > 情境半徑 1000 m。原因：Text Search 的 locationRestriction 只收方框，角落可到半徑 1.41 倍；量測工具只驗 maxWalk，沒驗距離。
+   - 4b 口令起點：只有單元測試驗 prompt 文字，真模型輸出零筆（probe 的 loc 沒帶站名）→ Rule 6 不算證據。
+   - 其餘條件 1、2、3、5 與既有規則（T5 一屏、只存站名、站名不進 log、改動 ≤ 300 行）PASS。
+   - 已修（`83a92ba`）：候選帶 distM，方框查到、距離 > 半徑的切掉；`stationStart()` 伺服器保證第一步從出站寫起；probe 帶站名、驗距離與出站；查詞含「駅」用 ja（標籤回「新宿駅」不是「新宿」）。單元 583 條、e2e 26 條（r6／manual-location／budget／r5-scene）全過。
+   - preview-2 真資料（新宿駅 02:47）：12/12 距離 ≤ 半徑、12/12 口令從出站寫起。存檔 scratchpad `r6check/scene-shinjuku-label.json`。
+
+2. 第 2 輪（2026-11-02 02:50，preview-2）FAIL，條件 4a；4b PASS；1、2、3、5 PASS：
+   - 4a：12 筆有 4 筆距離 > 情境半徑（快吃 538/500、外帶 939/600、放空 755/600、其他 1106/1000），全是第一次查不到、半徑放大 2.5 倍後找到的；量測工具把放大後的半徑當合格，帳面 12/12。「歇／其他」兩輪都派到同一家 1106 m 的麥當勞。
+   - 修正沒修到的地方：切圓只對 `restrict`（方框）查詢生效；「歇」的關鍵字查詢用 locationBias，沒有 restrict，所以沒被濾到。
+   - 另：Round 6 程式新增 323 行（src＋api，含量測工具 49、app.tsx 129），文件沒寫理由 → Rule 7 FAIL。
+   - 兩輪同一條件 FAIL → checker 規則停下，交 Cross 決定（見下「Cross 決定」）。
+
+3. 第 3 輪（2026-11-02 11:25，preview-3 `fe698f4`）FAIL，只在條件 2；條件 1、3、4a、4b、5、Rule 7、站名不進 log、只存站名、T5 全 PASS：
+   - 條件 0（部署＝程式）：checker 自己用 Vercel API 對了 33 個 bundle 的 sha1，解開後 48 個 src＋4 個 api 檔逐字等於 `fe698f4`。
+   - 條件 2 FAIL 原因：唯一的 geocode 真資料是 preview-1（`edf8948`），之後 `83a92ba` 把含「駅」的查詞改成 ja 查，受驗版本沒有重量。→ 已補量（上面「實測 preview-3」），10/10，最大 95 m。不改程式。
+   - 條件 4a：12 列逐列重算，10 列未放大全部 ≤ 情境半徑；2 列放大的店也在原半徑內（874/1000、130/1000）。`withinRadius` 只看 `kind==='text'` 不看 `restrict`，所以「歇」的 bias 查詢也切；放大查詢的 radius 已 ×2.5，切圓即 ≤ 2.5 倍。
+   - 條件 4 證據限制：preview-3 是白天。「放大後派到 > 原半徑、≤ 2.5 倍」這條路在 `fe698f4` 沒有真資料（只有修正前 preview-2 深夜 4 筆，都 ≤ 2.5 倍）。checker 判條件文字成立 → PASS，但建議上線前補一次深夜新宿量測（約 US$1）。交 Cross 決定。
+   - Rule 7：`git diff --numstat 3c5018d..fe698f4 -- src api` = +333／−66，跟文件的四塊理由對得上。
+   - 範圍外紀錄：救援路徑（3 km 超商）不在 STOP 4 文字內、沒人量過；文件行數表沒列 `styles.css` +5；條件 1、3 的證據是 Chromium e2e，不是東京真手機（前兩輪同樣收法）。
+   - 條件 2 補量後重驗（11:35）：PASS。10/10 ≤ 300 m，label 全部以「駅」結尾（ja 查法生效）。**總判定 PASS**。
+
+## 上線做法（已執行，2026-11-02 13:52）
+
+用 preview-3 的檔案清單（同一組 sha，`deploy/bundle-0a`…`6j`＋4 個 api 檔＋package.json、scripts/unpack.mjs、vercel.json）呼叫 create_deployment 加 `target: "production"`，meta `round6=production`。上線後驗：首頁回新 JS、`/api/probe` 404、`/api/order` GET 405、runtime error 0。回復點：Round 5 `dpl_52gRcv8zFHehsdU9BTYJG6H98Jc2`。
+
+## Cross 決定（2026-11-02 06:00）
+
+「接受放大」：STOP 4 改寫成「≤ 情境半徑；附近沒有時 ≤ 2.5 倍」。放大是 Round 4 就有的機制，深夜不放大幾乎派不出店。
+接著做：距離上限套到所有關鍵字查詢（含「歇」）→ 用原始 probe 回應重量 → 補 300 行理由 → checker 再看一次 → Cross 決定上線 🔒。
+
+## 為什麼改超過 300 行（Cross 規則 2）
+
+src＋api 新增約 330 行（含 checker 兩輪的修正）。拆開看：
+
+| 部分 | 行數 | 為什麼省不掉 |
+|---|---|---|
+| `src/app.tsx` | ~130 | 出發點標籤、底部選單（目前位置／最近 5 站／打字）、錯誤頁最近站、定位可疑先問。這是 Cross 要的「在車上也能用」本體 |
+| `src/probe.ts` | ~60 | 只在 preview 運作的量測：10 站 geocode、情境帶站名、距離與出站判定（STOP 2、4 要真資料） |
+| `src/api.ts`、`src/geocode.ts` | ~60 | 定位原因分類、可疑定位判斷；geocode 查詢搬成共用模組（api 與量測共用一份） |
+| 其餘（prefs、rules、orderHandler、places、prompt、types） | ~80 | 最近 5 站、口令從出站寫起（伺服器保證）、距離切回圓、prompt 一行 |
+
+沒有搬動或重寫既有邏輯；沒選站時行為不變（e2e「定位新鮮又準 → 不問，直接派」驗過）。
+
+## 已知風險／下一輪候選
+
+- 站名：查詞含假名或「駅」用 ja 查（回「新宿駅」）；打中文「新宿站」用 zh-TW（回「新宿」）。改了之後沒再重量 10 站的 geocode（省 10 次 Places；查法只差 languageCode）。
+- 方框切回圓之後，候選會少一些（角落的店不算）；單元測試裡「一個人快吃」的 total 從 6 變 1。
+- 深夜東京「歇」派到水煙吧（hookah_bar）×2、購物中心（新宿サザンテラス）×2、麥當勞 ×1。原因是 Round 4 就有的「東京歇關鍵字是中文咖啡廳」。不是這輪造成；下一輪候選：rest 在日本用日文關鍵字、排除 hookah_bar／shopping_mall。
+- 深夜「約會」派到酒吧（Bar Vier，type=bar）：約會的排除清單沒有酒吧類。下一輪候選。
+- 「去」卡的交通選項（走路／捷運／計程車／開車）仍然沒有作用。
+- 定位可疑的判斷用 60 秒／300 m：沒有實機數據，可能太常問或太少問。要看 Cross 在東京實際用的感覺。
+- 深夜「附近沒有 → 放大 2.5 倍」在 `fe698f4` 沒有真資料（上線時 Cross 接受這個缺口；preview-3 的 probe 仍可補量，正式站 404）。
+- 救援路徑（3 km 超商）不在 STOP 4 的距離規則內，沒量過。
+- 最近 5 站存 localStorage，清網站資料就沒了。

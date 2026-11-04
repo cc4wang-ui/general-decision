@@ -1,6 +1,6 @@
 // Round 3 B17、C2：拒絕定位 → 錯誤畫面有「手動報座標」→ 輸入地名 → /api/geocode → 拿到口令。
 import { expect, test } from '@playwright/test'
-import { FIXED_ORDER, captureOrders, prime } from './fixtures.ts'
+import { FIXED_ORDER, captureOrders, prime, openCard } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => { await prime(page) })
 
@@ -9,7 +9,7 @@ const STATION = { loc: { lat: 25.0478, lng: 121.517 }, label: '台北車站' }
 async function toLocationError(page: import('@playwright/test').Page, context: import('@playwright/test').BrowserContext) {
   await context.clearPermissions() // 不給定位權限
   await page.goto('/')
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="error"]')).toBeVisible({ timeout: 15_000 })
 }
@@ -32,7 +32,7 @@ test('B17 拒絕定位 → 手動報「台北車站」→ 拿到口令；座標�
   await expect(page.getByTestId('meme-big')).toHaveText('阿財魯肉飯')
   expect(geocoded).toEqual([{ q: '台北車站' }])
   expect(sent).toHaveLength(1)
-  expect(sent[0]?.loc).toEqual(STATION.loc)
+  expect(sent[0]?.loc).toEqual({ ...STATION.loc, label: STATION.label }) // Round 6：站名一起送，口令從車站寫起
 
   // 不存本機：localStorage 沒有座標
   const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }))

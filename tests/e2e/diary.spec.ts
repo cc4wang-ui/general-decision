@@ -1,13 +1,13 @@
 // 第 12 節 S7：走 3 道口令後日記出現 3 筆、統計正確。
 import { expect, test } from '@playwright/test'
-import { FIXED_ORDER, SECOND_ORDER, mockOrder, prime } from './fixtures.ts'
+import { FIXED_ORDER, SECOND_ORDER, mockOrder, prime, openCard, refuseOrder } from './fixtures.ts'
 
 test.beforeEach(async ({ page }) => { await prime(page) })
 
 test.use({ geolocation: { latitude: 25.033, longitude: 121.5654 }, permissions: ['geolocation'] })
 
 async function runOrder(page: import('@playwright/test').Page, card: string, action: '完成' | '沒做') {
-  await page.locator(`[data-card="${card}"]`).click()
+  await openCard(page, card)
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   if (action === '完成') {
@@ -15,7 +15,7 @@ async function runOrder(page: import('@playwright/test').Page, card: string, act
     await expect(page.locator('[data-screen="log"]')).toBeVisible()
     await page.getByRole('button', { name: '解散' }).click()
   } else {
-    await page.getByRole('button', { name: '沒做' }).click()
+    await refuseOrder(page, card)
     await expect(page.locator('[data-screen="stand"]')).toBeVisible()
     await expect(page.locator('[data-screen="home"]')).toBeVisible({ timeout: 25_000 })
   }
@@ -43,7 +43,7 @@ test('換口令只留一筆日記（第 10 節）', async ({ page }) => {
   await mockOrder(page, [FIXED_ORDER, SECOND_ORDER])
   await page.goto('/')
 
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await page.getByTestId('reissue').click()
   await page.getByTestId('reason-closed').click()

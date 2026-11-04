@@ -1,7 +1,7 @@
 // Round 3 B16：首次啟動出現同意畫面；同意前 /api/* 一次都不呼叫；同意後正常走。
 // 這支刻意不呼叫 prime()。
 import { expect, test } from '@playwright/test'
-import { FIXED_ORDER } from './fixtures.ts'
+import { FIXED_ORDER, openCard } from './fixtures.ts'
 
 test.use({ geolocation: { latitude: 25.033, longitude: 121.5654 }, permissions: ['geolocation'] })
 
@@ -25,7 +25,7 @@ test('B16 首次啟動 → 同意畫面；同意前 0 次 API；同意後正常�
   expect(await page.evaluate(() => localStorage.getItem('decide.consent'))).toBe('v1')
   expect(calls).toEqual([])
 
-  await page.locator('[data-card="eat"]').click()
+  await openCard(page, 'eat')
   await page.getByRole('button', { name: '是！班長' }).click()
   await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
   expect(calls).toEqual(['/api/order'])
