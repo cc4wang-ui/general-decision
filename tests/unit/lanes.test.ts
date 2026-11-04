@@ -9,13 +9,10 @@ import { priceFit } from '../../src/price.ts'
 const many = (n: number, f: (seed: number) => LanePlan) => Array.from({ length: n }, (_, s) => f(s + 1))
 
 describe('LANES 表', () => {
-  it('2023 Table A 的 type 標 verified；R3§1.3 新增的標 verified:false', () => {
+  it('全部 lane 都已實測為 verified（Round 10：R3§1.3 新增的 10 條在 preview 真 Places 回 200 後翻成 true）', () => {
     const unverified = LANES.filter((l) => !l.verified).map((l) => l.id).sort()
-    expect(unverified).toEqual([
-      'chinese_noodle_restaurant', 'fine_dining_restaurant', 'hot_pot_restaurant', 'japanese_curry_restaurant', 'japanese_izakaya_restaurant',
-      'noodle_shop', 'taiwanese_restaurant', 'tonkatsu_restaurant', 'yakiniku_restaurant', 'yakitori_restaurant',
-    ])
-    for (const l of LANES.filter((x) => x.verified)) expect(l.since).toBe('2023')
+    expect(unverified).toEqual([])
+    for (const l of LANES) expect(['2023', '2024-11', '2026-02']).toContain(l.since)
     expect(new Set(LANES.map((l) => l.id)).size).toBe(LANES.length)
   })
 })

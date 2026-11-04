@@ -3,6 +3,8 @@
 // 輪替「細類 type × rankPreference」才撈得到不同的 20 家，池子擴了，pickPlace 才有得挑。
 // 鐵則：只在 verified 的 lane 裡挑。新 type 沒實測過可能讓整次查詢 400（R2 風險），
 // 只有 Team Lead／Cross 跑完 `npm run probe:lanes` 回 200 才把 verified 翻成 true。
+// Round 10（X5）：preview `/api/probe?mode=lanes` 東京 83／台北信義 92 條全 200、0 條 400（2026-11-04 09:02，
+// state/evidence/r10/final/lanes-*.json）→ 2026-02／2024-11 這 10 條翻成 true。
 import { betaSample, cuisineOf, type Rng } from './discovery.ts'
 import { GO_LANE_PREFIX, goPlan, goTrip, goWiden } from './go.ts'
 import { WIDEN_FACTOR } from './places.ts'
@@ -51,16 +53,16 @@ export const LANES: Lane[] = [
   L('coffee_shop', true, '2023'),
   L('ice_cream_shop', true, '2023'),
   // R3§1.3 標為新增：未實測，pickLane 不挑
-  L('taiwanese_restaurant', false, '2026-02', { only: 'TW' }),
-  L('noodle_shop', false, '2026-02'),
-  L('chinese_noodle_restaurant', false, '2026-02'),
-  L('hot_pot_restaurant', false, '2026-02'),
-  L('japanese_izakaya_restaurant', false, '2026-02'),
-  L('yakiniku_restaurant', false, '2026-02'),
-  L('yakitori_restaurant', false, '2026-02'),
-  L('tonkatsu_restaurant', false, '2026-02'),
-  L('japanese_curry_restaurant', false, '2026-02'),
-  L('fine_dining_restaurant', false, '2024-11'),
+  L('taiwanese_restaurant', true, '2026-02', { only: 'TW' }),
+  L('noodle_shop', true, '2026-02'),
+  L('chinese_noodle_restaurant', true, '2026-02'),
+  L('hot_pot_restaurant', true, '2026-02'),
+  L('japanese_izakaya_restaurant', true, '2026-02'),
+  L('yakiniku_restaurant', true, '2026-02'),
+  L('yakitori_restaurant', true, '2026-02'),
+  L('tonkatsu_restaurant', true, '2026-02'),
+  L('japanese_curry_restaurant', true, '2026-02'),
+  L('fine_dining_restaurant', true, '2024-11'),
 ]
 
 /** 第二次呼叫與 400 退路用的泛用 lane。 */

@@ -13,7 +13,7 @@ curl -sS -m 30 -c "$JAR" -o /dev/null "$SHARE"
 case "$NAME" in
   scene-*) PATHQ="/api/probe?mode=scene&loc=${NAME#scene-}" ;;
   go-*) PATHQ="/api/probe?mode=go&loc=${NAME#go-}" ;;
-  lanes) PATHQ="/api/probe?mode=lanes" ;;
+  lanes-*) PATHQ="/api/probe?mode=lanes&loc=${NAME#lanes-}" ;;
   *) echo "不認得的 name：$NAME" >&2; exit 2 ;;
 esac
 CODE=$(curl -sS -m 180 -b "$JAR" -D "$OUT/$NAME.headers.txt" -o "$OUT/$NAME.json" -w '%{http_code}' "$BASE$PATHQ")

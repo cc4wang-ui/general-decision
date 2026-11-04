@@ -304,8 +304,8 @@ describe('api/probe：mode=lanes／mode=go', () => {
     expect(r.rows.length).toBe(lanePlansFor('TW').length)
     expect(r.summary.bad400).toEqual(['noodle_shop'])
     expect(r.summary.empty).toEqual(['go:art'])
-    expect(r.summary.flip).toContain('taiwanese_restaurant')
-    expect(r.summary.flip).not.toContain('noodle_shop')
+    // Round 10：10 條 2026-02／2024-11 的 lane 已用真 Places 實測（state/evidence/r10/final/lanes-*.json）翻成 verified，沒有可翻的了。
+    expect(r.summary.flip).toEqual([])
     expect(r.rows.find((x) => x.lane === 'q:便當')).toMatchObject({ status: 200, raw: 2 })
     expect([...masks]).toEqual(['places.id'])
     const jp = lanePlansFor('JP').map((p) => p.plan.lane)
