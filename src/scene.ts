@@ -39,6 +39,8 @@ export interface SceneRule {
   avoidTypes?: string[]
   /** 挑店前先排除店名符合的店（不夠就放回）。 */
   avoidNames?: RegExp
+  /** Round 12：整批放回時，avoidTypes／avoidNames 也不放寬（歇：信義深夜「等人」放回後派到水煙吧）。 */
+  hardAvoid?: boolean
   /** 挑店前先排除評分低於這個的店（不夠就放回）。 */
   minRating?: number
   /** 挑店前先排除步行超過這個分鐘的店（不夠就放回）。 */
@@ -72,7 +74,8 @@ export const SHISHA_RE = /シーシャ|shisha|hookah|水煙/i
  * 歇選咖啡也不派的「不是咖啡店」（Round 8，2026-11-03 01:14 東京深夜量測：查「カフェ」放大後派到
  * カラオケパセラ（type=karaoke）、新宿カブキhall（居酒屋美食街，type=restaurant，只有店名看得出來））。
  */
-const NOT_COFFEE = ['karaoke', 'food_court']
+// Round 12：snack_bar（日本的スナック＝陪酒小酒館；台灣是小吃店，也不是坐下喝咖啡的地方）。新宿深夜「一個人放空」派到 Artbar星男。
+const NOT_COFFEE = ['karaoke', 'food_court', 'snack_bar']
 /** 選咖啡時店名擋一層：水煙吧＋美食街、居酒屋、卡拉OK（美食街常標成 restaurant，type 擋不到）。 */
 export const NOT_COFFEE_RE = new RegExp(`${SHISHA_RE.source}|food ?court|フードコート|美食街|美食廣場|居酒屋|izakaya|カラオケ|karaoke|卡拉ok|ktv`, 'i')
 type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'> & Partial<Pick<PlaceCandidate, 'name' | 'opensInMin'>>
@@ -114,7 +117,8 @@ const EAT: SceneRule[] = [
     // Round 10（路線圖 Q1 建議答案：擋）：約會不派酒吧類（Round 6 起派到 Bar Vier）。
     // Round 11（Cross 2026-11-04「全部都處理」）：步行上限 15 分。早上 4.3★ 多半沒開，放寬評分時也不放寬步行（checker 2026-11-04 看到走 32 分）。
     // 半徑跟著收到 1200 m（15 分 × 80 m），第一次查詢的 20 家才會落在走得到的範圍。
-    id: '約會吃好一點', radius: 1200, maxWalk: 15, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH, ...BARISH], minRating: 4.3,
+    // Round 12：也不派外帶店（早上派到 meal_takeaway 的壽司店）、購物中心／百貨（候選裡有新宿サザンテラス）。
+    id: '約會吃好一點', radius: 1200, maxWalk: 15, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH, ...BARISH, ...NOT_A_SEAT, 'meal_takeaway'], minRating: 4.3,
     queries: {
       TW: [q('義大利麵', 'western', 2.5), q('餐酒館', 'western', 3), q('日式料理', 'jp', 3), q('牛排', 'western', 3, BEEF), q('鐵板燒', 'jp', 2.5), q('法式料理', 'western', 3.5)],
       JP: [q('イタリアン', 'western', 2.5), q('フレンチ', 'western', 3.5), q('寿司', 'jp', 2.5), q('天ぷら', 'jp', 2.5), q('和食', 'jp', 3)],
@@ -206,7 +210,7 @@ function withChoices(module: ModuleId, choices: Record<string, string | number>,
   if (module === 'eat' && choices.taste === '甜食' && rule.avoidTypes) return { ...rule, avoidTypes: rule.avoidTypes.filter((t) => !SWEET_OK.has(t)) }
   if (module === 'rest') {
     const coffee = String(choices.drink ?? '咖啡') === '咖啡'
-    return { ...rule, avoidTypes: [...(rule.avoidTypes ?? []), ...NOT_A_SEAT, ...(coffee ? [...BARISH, ...NOT_COFFEE] : [])], ...(coffee ? { avoidNames: NOT_COFFEE_RE } : {}) }
+    return { ...rule, hardAvoid: true, avoidTypes: [...(rule.avoidTypes ?? []), ...NOT_A_SEAT, ...(coffee ? [...BARISH, ...NOT_COFFEE] : [])], ...(coffee ? { avoidNames: NOT_COFFEE_RE } : {}) }
   }
   return rule
 }
@@ -290,10 +294,19 @@ export function sceneFilter<T extends Cand>(cands: T[], scene: Scene | null): { 
     const softer = pool.filter((c) => passes(c, { ...scene.rule, minRating: undefined }))
     if (softer.length) {
       const best = Math.max(...softer.map((c) => c.rating ?? 0))
-      return { kept: softer.filter((c) => (c.rating ?? 0) >= best - 0.2), relaxed: true }
+      return { kept: softer.filter((c) => (c.rating ?? 0) >= best - 0.2 - EPS), relaxed: true }
     }
   }
-  return { kept: pool, relaxed: pool.length > 0 }
+  const back = hardPool(pool, scene.rule)
+  return { kept: back, relaxed: back.length > 0 }
+}
+
+/** 評分比較的浮點容差（4.3 − 0.2 不一定剛好等於 4.1）。 */
+const EPS = 1e-9
+
+/** 整批放回時也不放寬的：hardAvoid 的情境（歇）照樣排除類型／店名。 */
+function hardPool<T extends Cand>(pool: T[], r: SceneRule): T[] {
+  return r.hardAvoid ? pool.filter((c) => typeOk(c, r)) : pool
 }
 
 /**
@@ -304,8 +317,18 @@ export function sceneFilter<T extends Cand>(cands: T[], scene: Scene | null): { 
 export function sceneTiers<T extends Cand>(cands: T[], scene: Scene | null): T[][] {
   const pool = reachablePool(cands, scene)
   const tiers: T[][] = [sceneFilter(cands, scene).kept]
-  if (scene) tiers.push(pool.filter((c) => passes(c, { ...scene.rule, minRating: undefined })))
-  tiers.push(pool)
+  if (scene) {
+    // Round 12（checker R11 第 2 輪：一蘭被擋後 60 次裡 12 次派 3.8★）：第 2 層改成評分階梯——
+    // 「最高分往下 0.2★」一階一階加進來；被記憶擋掉的那一階挑不到，就再往下一階。
+    const soft = pool.filter((c) => passes(c, { ...scene.rule, minRating: undefined }))
+    const ratings = [...new Set(soft.map((c) => c.rating ?? 0))].sort((a, b) => b - a)
+    for (let i = 0; i < ratings.length;) {
+      const floor = ratings[i] - 0.2 - EPS
+      tiers.push(soft.filter((c) => (c.rating ?? 0) >= floor))
+      while (i < ratings.length && ratings[i] >= floor) i++
+    }
+    tiers.push(hardPool(pool, scene.rule))
+  } else tiers.push(pool)
   // 只留比前一層大的（各層是包含關係；同樣大小＝同一批，不用再挑一次）
   let max = 0
   return tiers.filter((t) => (t.length > max ? ((max = t.length), true) : false))
@@ -316,12 +339,15 @@ export function scenePasses(c: Cand, scene: Scene | null): boolean {
   return reachablePool([c], scene).length === 1 && (!scene || passes(c, scene.rule))
 }
 
-function passes(c: Cand, r: SceneRule): boolean {
-  if (r.avoidTypes && [c.primaryType, ...(c.types ?? [])].some((t) => t !== undefined && r.avoidTypes!.includes(t))) {
-    // 主類別是速食才排除；types 裡順帶有 fast_food 的正餐店（例：拉麵店也標 fast_food）不排除。
-    if (c.primaryType && r.avoidTypes.includes(c.primaryType)) return false
-  }
+/** 類型與店名的排除（主類別是速食才排除；types 裡順帶有 fast_food 的正餐店，例：拉麵店也標 fast_food，不排除）。 */
+function typeOk(c: Cand, r: SceneRule): boolean {
+  if (r.avoidTypes && c.primaryType && r.avoidTypes.includes(c.primaryType)) return false
   if (r.avoidNames && c.name && r.avoidNames.test(c.name)) return false
+  return true
+}
+
+function passes(c: Cand, r: SceneRule): boolean {
+  if (!typeOk(c, r)) return false
   if (r.minRating !== undefined && typeof c.rating === 'number' && c.rating < r.minRating) return false
   if (r.maxWalk !== undefined && typeof c.walkMin === 'number' && c.walkMin > r.maxWalk) return false
   // 宵夜：還沒開門的店（「HH:MM 開」）不算。Nearby 的查法沒有 openNow，這裡補上（checker 2026-11-01）。

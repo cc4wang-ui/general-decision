@@ -602,9 +602,13 @@ describe('Round 7：東京的歇', () => {
     // 選酒吧：水煙吧、購物中心仍不派；酒吧類與店名不擋
     const bar = sceneOf('rest', { scene: '朋友聊天', drink: '酒吧' })
     expect(sceneFilter([...cands, c('Bar Vier', { primaryType: 'bar' })], bar).kept.map((x) => x.id)).toEqual(['shisha cafe and bar NAROZ 歌舞伎町店', '新宿シーシャ Shisha Cafe 紅洛煙', 'コメダ珈琲店', 'マクドナルド', 'Bar Vier'])
-    // 附近真的只剩水煙吧 → 整批放回，relaxed
+    // Round 12（Cross 2026-11-05「全部處理完之後一次上線」：已知未修「歇整批放回派到水煙吧」）：
+    // 附近只剩水煙吧、購物中心 → 不再整批放回，交給超商救援（原本 Round 7 是整批放回）
     const only = cands.slice(0, 2)
-    expect(sceneFilter(only, coffee)).toEqual({ kept: only, relaxed: true })
+    expect(sceneFilter(only, coffee)).toEqual({ kept: [], relaxed: false })
+    // 只剩的那批裡有一家類型對、只是評分／步行／營業時間不夠 → 放回的只有那家
+    const slow = c('ドトール', { walkMin: 30 })
+    expect(sceneFilter([...only, slow], sceneOf('rest', { scene: '等人', drink: '咖啡' }))).toEqual({ kept: [slow], relaxed: true })
     expect(SHISHA_RE.test('Hookah Lounge')).toBe(true)
     expect(SHISHA_RE.test('猿田彦珈琲')).toBe(false)
     // 吃的情境不受影響
@@ -641,9 +645,9 @@ describe('Round 8：派錯店', () => {
     expect(sceneFilter(night, sceneOf('rest', { scene: '朋友聊天', drink: '居酒屋' })).kept).toHaveLength(5)
     expect(sceneFilter(night, sceneOf('rest', { scene: '朋友聊天', drink: '酒吧' })).kept).toHaveLength(5)
   })
-  it('附近真的只剩卡拉OK、美食街 → 整批放回（寧可派得到），relaxed=true', () => {
+  it('Round 12：附近只剩卡拉OK、美食街 → 不再整批放回（類型不對的不放寬），交給超商救援', () => {
     const only = night.slice(0, 3)
-    expect(sceneFilter(only, sceneOf('rest', { scene: '等人', drink: '咖啡' }))).toEqual({ kept: only, relaxed: true })
+    expect(sceneFilter(only, sceneOf('rest', { scene: '等人', drink: '咖啡' }))).toEqual({ kept: [], relaxed: false })
   })
   it('外帶：主類別是酒吧類（bar、pub、居酒屋…）不派；便當、超商、速食照派', () => {
     const takeout = sceneOf('eat', { scene: '外帶' })
@@ -835,6 +839,73 @@ describe('Round 11 checker 第 1 輪：被記憶擋掉時一層一層退', () =>
         expect(body.place?.id, `seed ${seed} ${block}`).toBe('B')
         expect(body.place!.walkMin).toBeLessThanOrEqual(15)
       }
+    }
+  })
+})
+
+// Round 12（Cross 2026-11-05「全部處理完之後一次上線 不要一直分段」）：Round 11 的已知未修全處理。
+describe('Round 12：評分階梯、約會不派外帶店與購物中心、歇整批放回也不放寬類型', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+  const date = sceneOf('eat', { scene: '約會吃好一點' })
+  const r43 = c('4.3', { rating: 4.3 }), r42 = c('4.2', { rating: 4.2 }), r40 = c('4.0', { rating: 4.0 }), r38 = c('3.8', { rating: 3.8 }), r30 = c('3.0', { rating: 3.0 })
+  const bar = c('bar', { rating: 4.7, primaryType: 'japanese_izakaya_restaurant' }), far = c('far', { rating: 4.6, walkMin: 29 })
+
+  it('sceneTiers 評分階梯：4.3 → 4.1 以上 → 3.8 以上 → 15 分內全部 → 整批（每階都比上一階大）', () => {
+    expect(sceneTiers([r43, r42, r40, r38, r30, bar, far], date)).toEqual([
+      [r43], [r43, r42], [r43, r42, r40, r38], [r43, r42, r40, r38, r30], [r43, r42, r40, r38, r30, bar, far],
+    ])
+  })
+  it('浮點：4.3 − 0.2 的門檻包含 4.1', () => {
+    const r41 = c('4.1', { rating: 4.1 })
+    expect(sceneTiers([r43, r41, r30], date)[1]).toEqual([r43, r41])
+    expect(sceneFilter([c('4.2', { rating: 4.2 }), c('4.0', { rating: 4.0 }), c('3.9', { rating: 3.9 })], date).kept.map((x) => x.id)).toEqual(['4.2', '4.0'])
+  })
+  it('約會不派外帶店、購物中心、百貨（只看主類別）', () => {
+    for (const t of ['meal_takeaway', 'shopping_mall', 'department_store']) expect(scenePasses(c(t, { primaryType: t }), date), t).toBe(false)
+    expect(scenePasses(c('壽司', { primaryType: 'sushi_restaurant', types: ['sushi_restaurant', 'meal_takeaway'] }), date)).toBe(true)
+  })
+  it('歇選咖啡不派 snack_bar；整批放回時水煙吧（type=pub、店名 Hookah）也不放回 → 空的，交給超商救援', () => {
+    const wait = sceneOf('rest', { scene: '等人', drink: '咖啡' })
+    const solo = sceneOf('rest', { scene: '一個人放空', drink: '咖啡' })
+    expect(scenePasses(c('Artbar星男', { primaryType: 'snack_bar', walkMin: 5, rating: 4.3 }), solo)).toBe(false)
+    const hookah = c('PLAYING Hookah Lounge', { primaryType: 'pub', walkMin: 7, rating: 4.4 })
+    expect(sceneFilter([hookah], wait)).toEqual({ kept: [], relaxed: false })
+    expect(sceneTiers([hookah], wait)).toEqual([])
+    // 類型對、只是走太遠的咖啡店 → 放回的只有它
+    const cafe = c('Remember Me café', { primaryType: 'cafe', walkMin: 21 })
+    expect(sceneFilter([hookah, cafe], wait)).toEqual({ kept: [cafe], relaxed: true })
+    expect(sceneTiers([hookah, cafe], wait)).toEqual([[cafe]])
+  })
+  it('吃的情境沒有 hardAvoid：約會只剩酒吧時照舊整批放回（Round 10 Q1）', () => {
+    expect(sceneFilter([bar], date)).toEqual({ kept: [bar], relaxed: true })
+  })
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    process.env.GOOGLE_PLACES_KEY = 'test-places-key'
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+  it('handler：唯一的 4.3★ 被擋 → 派 4.2★（不派 3.8／3.0）；4.3、4.2 都被擋 → 派 3.8★ 以上；20 種子', async () => {
+    const raw = [
+      at('A43', 300, { rating: 4.3, userRatingCount: 800, primaryType: 'ramen_restaurant' }),
+      at('B42', 500, { rating: 4.2, userRatingCount: 800, primaryType: 'japanese_restaurant' }),
+      at('C38', 200, { rating: 3.8, userRatingCount: 800, primaryType: 'family_restaurant' }),
+      at('D30', 250, { rating: 3.0, userRatingCount: 800, primaryType: 'restaurant' }),
+      at('M', 150, { rating: 4.4, userRatingCount: 800, primaryType: 'shopping_mall' }),
+      at('T', 180, { rating: 4.5, userRatingCount: 800, primaryType: 'meal_takeaway' }),
+      at('BAR', 400, { rating: 4.7, userRatingCount: 800, primaryType: 'japanese_izakaya_restaurant' }),
+    ]
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) =>
+      String(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
+    const until = Date.parse('2026-11-15')
+    for (let seed = 1; seed <= 20; seed++) {
+      const one = (await (await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed, mem: [{ id: 'A43', sh: [], dn: [], x: until }] }))).json()) as Body
+      expect(one.place?.id, `seed ${seed}`).toBe('B42')
+      const two = (await (await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed, mem: [{ id: 'A43', sh: [], dn: [], x: 'forever' }, { id: 'B42', sh: [], dn: [], x: until }] }))).json()) as Body
+      expect(two.place?.id, `seed ${seed} both blocked`).toBe('C38')
     }
   })
 })
