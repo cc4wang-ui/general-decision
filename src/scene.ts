@@ -41,6 +41,8 @@ export interface SceneRule {
   avoidNames?: RegExp
   /** Round 12：整批放回時，avoidTypes／avoidNames 也不放寬（歇：信義深夜「等人」放回後派到水煙吧）。 */
   hardAvoid?: boolean
+  /** Round 12：整批放回時也不放回的主類別（約會：外帶店、購物中心、百貨；酒吧照 Q1 放回）。 */
+  hardTypes?: string[]
   /** 挑店前先排除評分低於這個的店（不夠就放回）。 */
   minRating?: number
   /** 挑店前先排除步行超過這個分鐘的店（不夠就放回）。 */
@@ -118,7 +120,8 @@ const EAT: SceneRule[] = [
     // Round 11（Cross 2026-11-04「全部都處理」）：步行上限 15 分。早上 4.3★ 多半沒開，放寬評分時也不放寬步行（checker 2026-11-04 看到走 32 分）。
     // 半徑跟著收到 1200 m（15 分 × 80 m），第一次查詢的 20 家才會落在走得到的範圍。
     // Round 12：也不派外帶店（早上派到 meal_takeaway 的壽司店）、購物中心／百貨（候選裡有新宿サザンテラス）。
-    id: '約會吃好一點', radius: 1200, maxWalk: 15, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH, ...BARISH, ...NOT_A_SEAT, 'meal_takeaway'], minRating: 4.3,
+    // checker R12 第 1 輪：整批放回時這三類也不放回（Q1 只同意「只剩酒吧時放回」）。
+    id: '約會吃好一點', radius: 1200, maxWalk: 15, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH, ...BARISH, ...NOT_A_SEAT, 'meal_takeaway'], hardTypes: [...NOT_A_SEAT, 'meal_takeaway'], minRating: 4.3,
     queries: {
       TW: [q('義大利麵', 'western', 2.5), q('餐酒館', 'western', 3), q('日式料理', 'jp', 3), q('牛排', 'western', 3, BEEF), q('鐵板燒', 'jp', 2.5), q('法式料理', 'western', 3.5)],
       JP: [q('イタリアン', 'western', 2.5), q('フレンチ', 'western', 3.5), q('寿司', 'jp', 2.5), q('天ぷら', 'jp', 2.5), q('和食', 'jp', 3)],
@@ -304,9 +307,11 @@ export function sceneFilter<T extends Cand>(cands: T[], scene: Scene | null): { 
 /** 評分比較的浮點容差（4.3 − 0.2 不一定剛好等於 4.1）。 */
 const EPS = 1e-9
 
-/** 整批放回時也不放寬的：hardAvoid 的情境（歇）照樣排除類型／店名。 */
+/** 整批放回時也不放寬的：hardAvoid 的情境（歇）照樣排除類型／店名；hardTypes（約會）照樣排除那幾種主類別。 */
 function hardPool<T extends Cand>(pool: T[], r: SceneRule): T[] {
-  return r.hardAvoid ? pool.filter((c) => typeOk(c, r)) : pool
+  if (r.hardAvoid) return pool.filter((c) => typeOk(c, r))
+  if (r.hardTypes) return pool.filter((c) => !(c.primaryType && r.hardTypes!.includes(c.primaryType)))
+  return pool
 }
 
 /**
@@ -329,9 +334,16 @@ export function sceneTiers<T extends Cand>(cands: T[], scene: Scene | null): T[]
     }
     tiers.push(hardPool(pool, scene.rule))
   } else tiers.push(pool)
-  // 只留比前一層大的（各層是包含關係；同樣大小＝同一批，不用再挑一次）
-  let max = 0
-  return tiers.filter((t) => (t.length > max ? ((max = t.length), true) : false))
+  // 每層＝前面所有層的聯集＋這層（checker R12 第 1 輪：沒評分的店在第 1 層、不在評分階梯，只比店數會漏掉）。
+  // 沒有加進新店的層不用再挑一次。店的順序照候選原本的順序。
+  const acc = new Set<T>()
+  const out: T[][] = []
+  for (const t of tiers) {
+    const before = acc.size
+    for (const c of t) acc.add(c)
+    if (acc.size > before) out.push(pool.filter((c) => acc.has(c)))
+  }
+  return out
 }
 
 /** 單一店家是否符合情境偏好（handler 算「夠不夠 5 家」用）。 */

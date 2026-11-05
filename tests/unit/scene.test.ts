@@ -909,3 +909,61 @@ describe('Round 12：評分階梯、約會不派外帶店與購物中心、歇�
     }
   })
 })
+
+// Round 12 checker 第 1 輪（2026-11-05）：(1) 沒評分的店在第 1 層、不在評分階梯，只比店數的去重會漏掉一階；
+// (2) 約會整批放回時，外帶店／購物中心／百貨又被放回來（Q1 只同意放回酒吧）。
+describe('Round 12 checker 第 1 輪：沒評分的店、約會整批放回的類型', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+  const date = sceneOf('eat', { scene: '約會吃好一點' })
+  it('sceneTiers：每層都包含前面所有層；沒評分的店不會讓 4.2／4.1 那一階被跳過', () => {
+    const A = c('A43', { rating: 4.3 }), U1 = c('U1', { rating: undefined }), U2 = c('U2', { rating: undefined })
+    const B = c('B42', { rating: 4.2 }), C = c('C41', { rating: 4.1 }), D = c('D38', { rating: 3.8 })
+    expect(sceneTiers([A, U1, U2, B, C, D], date)).toEqual([[A, U1, U2], [A, U1, U2, B, C], [A, U1, U2, B, C, D]])
+  })
+  it('約會整批放回：外帶店、購物中心、百貨不放回；酒吧照 Q1 放回', () => {
+    const mall = c('mall', { primaryType: 'shopping_mall' }), take = c('take', { primaryType: 'meal_takeaway' }), dept = c('dept', { primaryType: 'department_store' })
+    const far = c('far', { walkMin: 26 }), bar = c('bar', { primaryType: 'bar' })
+    expect(sceneFilter([mall, take, dept, far], date)).toEqual({ kept: [far], relaxed: true })
+    expect(sceneFilter([mall, take, dept], date)).toEqual({ kept: [], relaxed: false })
+    expect(sceneFilter([mall, bar], date)).toEqual({ kept: [bar], relaxed: true })
+    expect(sceneTiers([mall, take, dept, far], date)).toEqual([[far]])
+  })
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    process.env.GOOGLE_PLACES_KEY = 'test-places-key'
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+  const stubPlaces = (raw: RawPlace[]) => vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) =>
+    String(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
+  it('handler：4.3★ 和 2 家沒評分的店都被擋 → 派 4.2／4.1，0 筆 3.8；20 種子', async () => {
+    stubPlaces([
+      at('A43', 300, { rating: 4.3, userRatingCount: 800, primaryType: 'japanese_restaurant' }),
+      at('U1', 250, { rating: undefined, userRatingCount: undefined, primaryType: 'japanese_restaurant' }),
+      at('U2', 350, { rating: undefined, userRatingCount: undefined, primaryType: 'japanese_restaurant' }),
+      at('B42', 500, { rating: 4.2, userRatingCount: 800, primaryType: 'japanese_restaurant' }),
+      at('C41', 400, { rating: 4.1, userRatingCount: 800, primaryType: 'japanese_restaurant' }),
+      at('D38', 200, { rating: 3.8, userRatingCount: 800, primaryType: 'japanese_restaurant' }),
+    ])
+    const until = Date.parse('2026-11-15')
+    for (let seed = 1; seed <= 20; seed++) {
+      const body = (await (await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed, mem: ['A43', 'U1', 'U2'].map((id) => ({ id, sh: [], dn: [], x: until })) }))).json()) as Body
+      expect(['B42', 'C41'], `seed ${seed}`).toContain(body.place?.id)
+    }
+  })
+  it('handler：15 分內只剩外帶店／購物中心／百貨＋遠處餐廳 → 0 筆這三種；20 種子', async () => {
+    stubPlaces([
+      at('TAKE', 200, { rating: 4.6, userRatingCount: 800, primaryType: 'meal_takeaway' }),
+      at('MALL', 300, { rating: 4.4, userRatingCount: 800, primaryType: 'shopping_mall' }),
+      at('DEPT', 400, { rating: 4.3, userRatingCount: 800, primaryType: 'department_store' }),
+      at('FAR', 2050, { rating: 4.4, userRatingCount: 800, primaryType: 'italian_restaurant' }),
+    ])
+    for (let seed = 1; seed <= 20; seed++) {
+      const body = (await (await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed }))).json()) as Body
+      expect(body.place?.id, `seed ${seed}`).toBe('FAR')
+    }
+  })
+})
