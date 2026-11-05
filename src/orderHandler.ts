@@ -14,7 +14,7 @@ import { cuisineOf, mulberry32, pickPlace, type PickOutcome } from './discovery.
 import { bandOf, countryOf, currencyCountry, effectiveBand, estText, priceFit, priceText } from './price.ts'
 import { brandKeyOf, clusterKeys } from './chains.ts'
 import { templateOrder } from './template.ts'
-import { SCENE_TEXT_KEY, reachablePool, sanitizeSceneText, sceneFilter, sceneOf, scenePasses, sceneWiden } from './scene.ts'
+import { SCENE_TEXT_KEY, sanitizeSceneText, sceneFilter, sceneOf, scenePasses, sceneTiers, sceneWiden } from './scene.ts'
 import { goKeep, goPick, goTrip } from './go.ts'
 import { hourIn, tzOf } from './tz.ts'
 import type { Band, Country, CuisineStats, Order, OrderDebug, OrderRequest, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
@@ -246,11 +246,12 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
         rng,
       })
       : null
-    // 情境的偏好（排除速食、評分、步行）先篩；篩完沒店、或篩過的店都被記憶擋掉 → 用整批候選（寧可派得到）。
-    const sf = sceneFilter(cands, scene)
+    // 情境的偏好（排除速食、評分、步行）先篩；篩完沒店、或篩過的店都被記憶擋掉 → 一層一層往下退（sceneTiers），最後才用整批候選（寧可派得到）。
     // Round 10：退路也不派到店時已關門的店（viable）；連這都沒有 → 下面的超商救援。
-    const reachable = reachablePool(cands, scene)
-    pick = choose(req.budget, sf.kept) ?? (sf.kept.length < reachable.length ? choose(req.budget, reachable) : null)
+    // Round 11：被記憶擋掉時先只放寬評分（步行上限、不派酒吧照舊），不要一步退到整批。
+    const sf = sceneFilter(cands, scene)
+    pick = null
+    for (const tier of sceneTiers(cands, scene)) if ((pick = choose(req.budget, tier))) break
     if (scene) dbg.scene = { id: scene.id, ...(scene.text ? { text: scene.text } : {}), kept: sf.kept.length, total: cands.length, relaxed: sf.relaxed || (!!pick && !sf.kept.some((k) => k.id === pick!.place.id)) }
     // Round 10：「去」不派超商——超商不是去處，而且固定 3 km 會超過使用者選的單程時間。找不到就說實話（下面 no_places）。
     if (!pick && !allFailed() && !goT) {

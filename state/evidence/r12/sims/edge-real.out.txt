@@ -1,0 +1,6 @@
+{
+ "そば処かめや 新宿店 4.2★ 走6 restaurant": 21,
+ "eggslut 新宿サザンテラス店 4.1★ 走2 hamburger_restaurant": 22,
+ "赤坂うまや新宿 4.1★ 走4 japanese_restaurant": 17
+}
+低於「剩下的 15 分內最高 4.2★ − 0.2 = 4.0★」：0/60

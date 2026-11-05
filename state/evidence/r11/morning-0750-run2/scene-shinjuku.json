@@ -1,0 +1,398 @@
+{
+ "loc": "東京新宿駅",
+ "localHour": 7,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "しんぱち食堂 西武新宿店",
+   "type": "japanese_restaurant",
+   "rating": 4,
+   "walkMin": 8,
+   "distM": 588,
+   "radiusM": 1250,
+   "closeIn": 1120,
+   "how": "text=\"ラーメン\" rank=DISTANCE → text=\"食堂\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 5,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走8分鐘抵達",
+    "點一碗丼飯，18:00前吃完"
+   ],
+   "bot": "一個口令一個動作，20分鐘內解決",
+   "ms": 2557
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "清林堂",
+   "type": "sandwich_shop",
+   "rating": 4.4,
+   "walkMin": 12,
+   "distM": 884,
+   "radiusM": 1500,
+   "closeIn": 700,
+   "how": "text=\"惣菜\" rank=RELEVANCE → text=\"弁当\" rank=DISTANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 8,
+    "total": 18,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 12 分鐘抵達",
+    "點一份",
+    "外帶回去吃"
+   ],
+   "bot": "別猶豫，出站走 12 分",
+   "ms": 2311
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "eggslut 新宿サザンテラス店",
+   "type": "hamburger_restaurant",
+   "rating": 4.1,
+   "walkMin": 2,
+   "distM": 122,
+   "radiusM": 3000,
+   "closeIn": 790,
+   "how": "text=\"中華料理\" rank=RELEVANCE → text=\"レストラン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 18,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘到店",
+    "點3〜4道招牌餐點一起分享",
+    "09:30前吃完離開"
+   ],
+   "bot": "一群人，點到飽，90分鐘內搞定",
+   "ms": 2722
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "サイゼリヤ 新宿西口エルタワー店",
+   "type": "family_restaurant",
+   "rating": 3.7,
+   "walkMin": 6,
+   "distM": 402,
+   "radiusM": 3000,
+   "closeIn": 910,
+   "how": "text=\"和食\" rank=DISTANCE → text=\"イタリアン\" rank=DISTANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 2,
+    "total": 5,
+    "relaxed": true
+   },
+   "ratingRelaxed": true,
+   "cands": [
+    {
+     "name": "Rossi",
+     "type": "italian_restaurant",
+     "rating": 4.6,
+     "walkMin": 33,
+     "closeIn": 160
+    },
+    {
+     "name": "L’OMBELICO／TRUNK(HOTEL) YOYOGI PARK",
+     "type": "italian_restaurant",
+     "rating": 4.1,
+     "walkMin": 34,
+     "closeIn": 910
+    },
+    {
+     "name": "ガスト 新宿ＮＯＷＡビル店",
+     "type": "family_restaurant",
+     "rating": 3.8,
+     "walkMin": 2,
+     "closeIn": 910
+    },
+    {
+     "name": "サイゼリヤ 新宿西口エルタワー店",
+     "type": "family_restaurant",
+     "rating": 3.7,
+     "walkMin": 6,
+     "closeIn": 910
+    },
+    {
+     "name": "マイアミガーデン新宿東口店",
+     "type": "italian_restaurant",
+     "rating": 2.8,
+     "walkMin": 7,
+     "closeIn": 10
+    }
+   ],
+   "steps": [
+    "出站後走 6 分到達",
+    "點招牌紅酒燉牛肉、青菜沙拉、手工披薩，90 分鐘內享受"
+   ],
+   "bot": "招牌菜慢慢點，約會就是要有fu",
+   "ms": 2922
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "そば処かめや 新宿店",
+   "type": "restaurant",
+   "rating": 4.2,
+   "walkMin": 6,
+   "distM": 404,
+   "radiusM": 1000,
+   "closeIn": 910,
+   "how": "text=\"そば\" rank=DISTANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 18,
+    "total": 18,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走6分鐘抵達",
+    "點一碗蕎麥麵，咬緊牙關吃",
+    "07:56到08:26內吃完回宿舍"
+   ],
+   "bot": "宵夜輕食，30分內解決",
+   "ms": 2626
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "オールデイダイニング 樹林",
+   "type": "restaurant",
+   "rating": 4.2,
+   "walkMin": 8,
+   "distM": 568,
+   "radiusM": 2500,
+   "closeIn": 790,
+   "how": "text=\"食べ放題 レストラン\" rank=DISTANCE → text=\"食べ放題 レストラン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 6,
+    "total": 6,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走8分鐘抵達",
+    "入店點套餐，確認有無時間限制",
+    "專心吃，20分鐘內決定夠飽沒"
+   ],
+   "bot": "你各位啊，現在去最省力",
+   "ms": 2788
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "ベーカリー＆レストラン 沢村 新宿",
+   "type": "restaurant",
+   "rating": 4,
+   "walkMin": 2,
+   "distM": 144,
+   "radiusM": 600,
+   "closeIn": 910,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 6,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘到店",
+    "點一杯咖啡，坐著放空",
+    "07:52到08:22，坐滿30分鐘才起來"
+   ],
+   "bot": "坐下、點咖啡、手機收起",
+   "ms": 2495
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "DEAN & DELUCA カフェ NEWoMan新宿",
+   "type": "cafe",
+   "rating": 3.8,
+   "walkMin": 2,
+   "distM": 142,
+   "radiusM": 1000,
+   "closeIn": 850,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘到店",
+    "進去問店員插座位置，點一杯咖啡",
+    "從08:00起專心工作讀書90分鐘，10:30後再休息"
+   ],
+   "bot": "一個口令一個動作，坐滿去",
+   "ms": 2847
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Shinjuku CROSSING cafe&dining",
+   "type": "cafe",
+   "rating": 4.4,
+   "walkMin": 5,
+   "distM": 327,
+   "radiusM": 1000,
+   "closeIn": 880,
+   "how": "text=\"カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 13,
+    "total": 15,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 5 分鐘到店",
+    "點兩杯咖啡，找靠窗或角落能舒服聊天的座位",
+    "坐滿 60 分鐘再動"
+   ],
+   "bot": "找個能並肩坐的位子，聊到自然散",
+   "ms": 2890
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "VERVE COFFEE ROASTERS NEWoMan SHINJUKU",
+   "type": "coffee_shop",
+   "rating": 4.3,
+   "walkMin": 2,
+   "distM": 146,
+   "radiusM": 2500,
+   "closeIn": 850,
+   "how": "text=\"静か カフェ\" rank=RELEVANCE → text=\"静か カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 4,
+    "total": 22,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘抵達",
+    "進店找角落位子坐下",
+    "點一杯咖啡，07:52前點好，談事情到08:52以後再離開"
+   ],
+   "bot": "找角落位子，先點再談",
+   "ms": 2639
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Shinjuku CROSSING cafe&dining",
+   "type": "cafe",
+   "rating": 4.4,
+   "walkMin": 5,
+   "distM": 327,
+   "radiusM": 400,
+   "closeIn": 880,
+   "how": "text=\"カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 6,
+    "total": 7,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 5 分鐘到店",
+    "點一杯咖啡，坐 20 分鐘",
+    "時間到就起身，不要拖"
+   ],
+   "bot": "你各位啊，猶豫不會讓咖啡變溫",
+   "ms": 2312
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "珈琲貴族エジンバラ",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 7,
+   "distM": 523,
+   "radiusM": 1000,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走7分鐘抵達",
+    "到店先問店員有沒有插座座位",
+    "點一杯咖啡，坐60分鐘，手機面朝下"
+   ],
+   "bot": "先確認插座位置，坐下就插上",
+   "ms": 2600
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 2922
+ }
+}
