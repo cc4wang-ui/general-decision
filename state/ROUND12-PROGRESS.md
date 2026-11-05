@@ -1,5 +1,6 @@
 # Round 12 進度：已知未修全處理，一次上線（接手用）
 
+> **2026-11-05 22:46 東京上線**：PR #35 → `main` `0d88cdb`，`dpl_2CiHdd6cAuS4HE7c1JBDk1WsYjPS`。回復點 `dpl_8XSAAmNtPTS9bmfbNaiJqc51Vx9f`。
 > 開始：2026-11-05 21:54 東京。分支 `claude/vigilant-clarke-dsrqfi`（PR #35），基底 `main` `945088a`（正式站 `dpl_8XSAAmNtPTS9bmfbNaiJqc51Vx9f`＝回復點）。
 > Round 11 的 checker 第 1 輪修正（`sceneTiers`）也在這個 PR，一起上線。
 
@@ -107,3 +108,18 @@ Routes：`routeVerified:true`（`preview-2210/daily.json`）。
 ## 上線（Cross 2026-11-05 21:54「全部處理完之後一次上線」）
 
 checker PASS → 合併 PR #35 進 `main`。上線前正式站 `dpl_8XSAAmNtPTS9bmfbNaiJqc51Vx9f`（`945088a`）＝ **回復點**。
+
+### 上線驗證（2026-11-05 22:46 東京）✅
+
+| 檢查 | 結果 |
+|---|---|
+| `general-decision.vercel.app` 指向 | `dpl_2CiHdd6cAuS4HE7c1JBDk1WsYjPS`（`main` `0d88cdb`，PR #35） |
+| 首頁 JS | `index-CQ4Wvz1u.js`（= 本機 build） |
+| `/api/probe` | 404 |
+| `/api/order`、`/api/weekly`、`/api/daily-route`、`/api/geocode` GET | 405 |
+| POST `/api/order` 新宿・約會吃好一點 | 200，東京寿司 ITAMAE SUSHI，走 9 分 |
+| POST `/api/order` 新宿・歇・等人（咖啡） | 200，FLOWER WALL MONE，走 6 分 |
+| POST `/api/daily-route`（目前位置＝新宿） | 200，`routeVerified:true`，步行 3／5 分 |
+| runtime error（1 小時） | 0 |
+
+證據 `state/evidence/r12/production/`。正式站只更新這一次（Cross「不要一直分段」）。
