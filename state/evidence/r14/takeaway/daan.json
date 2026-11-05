@@ -1,0 +1,156 @@
+{
+ "loc": "台北大安住宅區",
+ "country": "TW",
+ "queries": [
+  {
+   "q": "義大利麵",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "餐酒館",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "日式料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "牛排",
+   "status": 200,
+   "raw": 16
+  },
+  {
+   "q": "鐵板燒",
+   "status": 200,
+   "raw": 11
+  },
+  {
+   "q": "法式料理",
+   "status": 200,
+   "raw": 17
+  },
+  {
+   "q": "餐廳",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "熱炒",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "火鍋",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "燒肉",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "韓式料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "泰式料理",
+   "status": 200,
+   "raw": 19
+  }
+ ],
+ "rows": [
+  {
+   "name": "すき家信義安和",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_curry_restaurant",
+    "breakfast_restaurant",
+    "fast_food_restaurant",
+    "coffee_shop",
+    "cafe",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "food_store",
+    "family_restaurant",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "餐廳"
+   ]
+  },
+  {
+   "name": "成家小館 仁愛店｜酸菜白肉鍋・熱炒料理",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "snack_bar",
+    "chinese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "熱炒"
+   ]
+  },
+  {
+   "name": "韓國時間",
+   "primaryType": "korean_restaurant",
+   "types": [
+    "korean_restaurant",
+    "korean_barbecue_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "韓式料理"
+   ]
+  },
+  {
+   "name": "起家雞韓式炸雞 六張犁店",
+   "primaryType": "korean_restaurant",
+   "types": [
+    "korean_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "韓式料理"
+   ]
+  },
+  {
+   "name": "新泰村 泰式小吃",
+   "primaryType": "snack_bar",
+   "types": [
+    "snack_bar",
+    "thai_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "泰式料理"
+   ]
+  }
+ ]
+}
