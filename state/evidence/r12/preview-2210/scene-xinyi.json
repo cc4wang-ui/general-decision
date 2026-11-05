@@ -1,0 +1,600 @@
+{
+ "loc": "台北信義（市府）",
+ "localHour": 21,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "鴨肉謝",
+   "type": "taiwanese_restaurant",
+   "rating": 4.4,
+   "walkMin": 5,
+   "distM": 383,
+   "radiusM": 1250,
+   "closeIn": 259,
+   "how": "text=\"麵店\" rank=DISTANCE → text=\"小吃\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 4,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "21:15 到店，點一份鴨肉飯",
+    "坐下立刻吃，不要滑手機",
+    "21:35 前吃完，起身走人"
+   ],
+   "bot": "一個人、趕時間，20分鐘內解決",
+   "ms": 2882
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "SKRABUR 黑膠漢堡",
+   "type": "hamburger_restaurant",
+   "rating": 4.5,
+   "walkMin": 3,
+   "distM": 230,
+   "radiusM": 1500,
+   "closeIn": 79,
+   "how": "text=\"水餃 鍋貼\" rank=DISTANCE → text=\"外帶\" rank=DISTANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 13,
+    "total": 23,
+    "relaxed": false
+   },
+   "steps": [
+    "21:13 前抵達，點一份漢堡套餐",
+    "確認外帶袋子密封",
+    "22:29 前吃完"
+   ],
+   "bot": "21:13 到店，點餐外帶，22:29 前吃完",
+   "ms": 2726
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "小滿苑燒肉",
+   "type": "yakiniku_restaurant",
+   "rating": 4.7,
+   "walkMin": 13,
+   "distM": 1018,
+   "radiusM": 1200,
+   "closeIn": 169,
+   "how": "text=\"燒肉\" rank=RELEVANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 13,
+    "total": 16,
+    "relaxed": false
+   },
+   "steps": [
+    "21:23 到店，點燒肉拼盤、海鮮、青菜各一份，飲料自選",
+    "各位輪流燒，慢慢吃，90分鐘內吃爽為止"
+   ],
+   "bot": "一個口令一個動作，點起來",
+   "ms": 2970
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "rén bistronomy",
+   "type": "bistro",
+   "rating": 4.7,
+   "walkMin": 9,
+   "distM": 701,
+   "radiusM": 3000,
+   "closeIn": 199,
+   "how": "text=\"鐵板燒\" rank=RELEVANCE → text=\"餐酒館\" rank=DISTANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 14,
+    "total": 34,
+    "relaxed": false
+   },
+   "cands": [
+    {
+     "name": "夜色Talking Bar",
+     "type": "bistro",
+     "rating": 5,
+     "walkMin": 13,
+     "closeIn": 469
+    },
+    {
+     "name": "一杯起 鐵板x串燒｜寵物友善 ｜深夜食堂",
+     "type": "japanese_restaurant",
+     "rating": 5,
+     "walkMin": 14,
+     "closeIn": 229
+    },
+    {
+     "name": "來吧台北日式暢飲餐酒館",
+     "type": "pub",
+     "rating": 4.9,
+     "walkMin": 11,
+     "closeIn": 289
+    },
+    {
+     "name": "ComingBistro｜台北餐酒館",
+     "type": "restaurant",
+     "rating": 4.9,
+     "walkMin": 12,
+     "closeIn": 289
+    },
+    {
+     "name": "Savor Moon • Shisha Bistro 水煙餐酒館｜大安區宵夜小酒館｜大小獨立聚會約會包廂｜暖心雞湯烏龍麵",
+     "type": "bistro",
+     "rating": 4.9,
+     "walkMin": 12,
+     "closeIn": 469
+    },
+    {
+     "name": "Range Bistrokaya",
+     "type": "restaurant",
+     "rating": 4.8,
+     "walkMin": 4,
+     "closeIn": 199
+    },
+    {
+     "name": "ape' 阿配",
+     "type": "bistro",
+     "rating": 4.9,
+     "walkMin": 9,
+     "closeIn": 79
+    },
+    {
+     "name": "Hoda Bistro餐酒館(加油站跟萊爾富中間)",
+     "type": "bistro",
+     "rating": 4.8,
+     "walkMin": 3,
+     "closeIn": 229
+    },
+    {
+     "name": "明水然・樂-信義松菸店(台北松菸店)",
+     "type": "japanese_restaurant",
+     "rating": 4.7,
+     "walkMin": 3,
+     "closeIn": 29
+    },
+    {
+     "name": "rén bistronomy",
+     "type": "bistro",
+     "rating": 4.7,
+     "walkMin": 9,
+     "closeIn": 199
+    },
+    {
+     "name": "KameKona 夏威夷鐵板燒 （逸仙店）",
+     "type": "japanese_restaurant",
+     "rating": 4.7,
+     "walkMin": 4,
+     "closeIn": 49
+    },
+    {
+     "name": "Commons",
+     "type": "restaurant",
+     "rating": 4.7,
+     "walkMin": 12,
+     "closeIn": 289
+    },
+    {
+     "name": "地中海餐酒館 ABV Bar & Kitchen 台北光復店",
+     "type": "mediterranean_restaurant",
+     "rating": 4.6,
+     "walkMin": 12,
+     "closeIn": 259
+    },
+    {
+     "name": "Flare Taipei",
+     "type": "lounge_bar",
+     "rating": 4.6,
+     "walkMin": 8,
+     "closeIn": 289
+    },
+    {
+     "name": "想食鐵板燒",
+     "type": "japanese_restaurant",
+     "rating": 4.6,
+     "walkMin": 15,
+     "closeIn": 19
+    },
+    {
+     "name": "那邊 THERE",
+     "type": "bistro",
+     "rating": 4.6,
+     "walkMin": 9,
+     "closeIn": 169
+    },
+    {
+     "name": "KISCO Taipei",
+     "type": "bistro",
+     "rating": 4.6,
+     "walkMin": 9,
+     "closeIn": 289
+    },
+    {
+     "name": "隱世餐酒館(台北永春店)",
+     "type": "restaurant",
+     "rating": 4.5,
+     "walkMin": 11,
+     "closeIn": 289
+    },
+    {
+     "name": "年三十鐵板串燒居酒屋 | 光復店",
+     "type": "japanese_izakaya_restaurant",
+     "rating": 4.5,
+     "walkMin": 12,
+     "closeIn": 139
+    },
+    {
+     "name": "Justin's Wine & Bistro 小玖館",
+     "type": "bistro",
+     "rating": 4.6,
+     "walkMin": 4,
+     "closeIn": 169
+    },
+    {
+     "name": "IMAGE INHOUSE",
+     "type": "bar",
+     "rating": 4.4,
+     "walkMin": 9,
+     "closeIn": 349
+    },
+    {
+     "name": "旨醞鐵板料理 微風店",
+     "type": "japanese_restaurant",
+     "rating": 4.4,
+     "walkMin": 3,
+     "closeIn": 34
+    },
+    {
+     "name": "初魚 鉄板料亭-台北信義A9",
+     "type": "japanese_restaurant",
+     "rating": 4.3,
+     "walkMin": 7,
+     "closeIn": 19
+    },
+    {
+     "name": "Bouillon 布雍家",
+     "type": "bistro",
+     "rating": 4.3,
+     "walkMin": 4,
+     "closeIn": 109
+    },
+    {
+     "name": "天吉鐵板燒 延吉店",
+     "type": "japanese_restaurant",
+     "rating": 4.3,
+     "walkMin": 14,
+     "closeIn": 19
+    },
+    {
+     "name": "小後苑Backyard Jr.｜信義店Xinyi",
+     "type": "bar",
+     "rating": 4.2,
+     "walkMin": 7,
+     "closeIn": 289
+    },
+    {
+     "name": "凱林鐵板燒 遠東Garden City台北大巨蛋",
+     "type": "japanese_restaurant",
+     "rating": 4.3,
+     "walkMin": 10,
+     "closeIn": 19
+    },
+    {
+     "name": "凱林鐵板燒 台北101店",
+     "type": "japanese_restaurant",
+     "rating": 4.1,
+     "walkMin": 11,
+     "closeIn": 19
+    },
+    {
+     "name": "Beau",
+     "type": "bistro",
+     "rating": 4.1,
+     "walkMin": 12,
+     "closeIn": 289
+    },
+    {
+     "name": "瑪黑餐酒 信義店 TRANSIT Taipei",
+     "type": "bistro",
+     "rating": 3.9,
+     "walkMin": 2,
+     "closeIn": 49
+    },
+    {
+     "name": "凱林鐵板燒 信義威秀店",
+     "type": "japanese_restaurant",
+     "rating": 3.9,
+     "walkMin": 9,
+     "closeIn": 49
+    },
+    {
+     "name": "藝燒 鐵板燒料理 統一Dream Plaza店",
+     "type": "japanese_restaurant",
+     "rating": 3,
+     "walkMin": 2,
+     "closeIn": 19
+    },
+    {
+     "name": "舞紅花鐵板燒 新光三越A8店",
+     "type": "japanese_restaurant",
+     "rating": 2.8,
+     "walkMin": 4,
+     "closeIn": 19
+    },
+    {
+     "name": "漾紅花鐵板燒 新光三越信義新天地A11店",
+     "type": "japanese_restaurant",
+     "rating": 2.7,
+     "walkMin": 6,
+     "closeIn": 19
+    }
+   ],
+   "steps": [
+    "21:19 到店，點招牌菜",
+    "細細品嚐，90 分鐘內吃完"
+   ],
+   "bot": "點招牌菜，約會慢慢享受",
+   "ms": 2176
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "雞湯桑 Torisan 市府店",
+   "type": "japanese_restaurant",
+   "rating": 4.6,
+   "walkMin": 5,
+   "distM": 328,
+   "radiusM": 1000,
+   "closeIn": 49,
+   "how": "text=\"拉麵\" rank=RELEVANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 8,
+    "total": 16,
+    "relaxed": false
+   },
+   "steps": [
+    "點一碗雞湯麵或單點雞肉丼飯",
+    "21:45 前吃完，不要賴著"
+   ],
+   "bot": "21:15 到，輕鬆吃，30 分鐘內回",
+   "ms": 2712
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "老燒肉台北八德店",
+   "type": "yakiniku_restaurant",
+   "rating": 4.2,
+   "walkMin": 12,
+   "distM": 929,
+   "radiusM": 1000,
+   "closeIn": 169,
+   "how": "text=\"吃到飽 餐廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 6,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "點肉類、蔬菜、配菜各一輪起跳",
+    "烤熟就吃，不要等",
+    "23:50 前結帳離開"
+   ],
+   "bot": "一個口令一個動作，21:22 到店",
+   "ms": 2722
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "永心鳳茶｜微風信義店 YONSHIN FENGCHA",
+   "type": "restaurant",
+   "rating": 4.2,
+   "walkMin": 3,
+   "distM": 195,
+   "radiusM": 600,
+   "closeIn": 49,
+   "how": "text=\"咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 7,
+    "total": 13,
+    "relaxed": false
+   },
+   "steps": [
+    "21:13 到門口，點一杯招牌茶飲",
+    "關掉手機螢幕，坐滿 30 分鐘",
+    "21:43 起身，喝完就走"
+   ],
+   "bot": "一個人坐著，放空就是工作",
+   "ms": 2598
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "佐吧(深夜咖啡廳)",
+   "type": "cafe",
+   "rating": 5,
+   "walkMin": 8,
+   "distM": 579,
+   "radiusM": 2500,
+   "closeIn": 139,
+   "how": "text=\"不限時 咖啡廳\" rank=DISTANCE → text=\"不限時 咖啡廳\" rank=RELEVANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 7,
+    "total": 23,
+    "relaxed": false
+   },
+   "steps": [
+    "進門先問店員哪裡有插座",
+    "點一杯咖啡，21:25 前坐下",
+    "22:45 前不准離開，專心工作"
+   ],
+   "bot": "一個口令一個動作，坐滿再走",
+   "ms": 2692
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "那邊 THERE",
+   "type": "bistro",
+   "rating": 4.6,
+   "walkMin": 9,
+   "distM": 666,
+   "radiusM": 2500,
+   "closeIn": 169,
+   "how": "text=\"咖啡廳\" rank=RELEVANCE → text=\"咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 3,
+    "total": 22,
+    "relaxed": false
+   },
+   "steps": [
+    "找能容納你們全部的位子坐下",
+    "各點一杯咖啡，一起喝",
+    "坐到 22:20 以後再動"
+   ],
+   "bot": "朋友聊天就是要坐滿，別急著走",
+   "ms": 2889
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "FeelGood Inc. Fog / 迷霧啡爾",
+   "type": "coffee_shop",
+   "rating": 4.7,
+   "walkMin": 12,
+   "distM": 936,
+   "radiusM": 2500,
+   "closeIn": 199,
+   "how": "text=\"安靜 咖啡廳\" rank=RELEVANCE → text=\"安靜 咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 2,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "21:22 到店，點一杯咖啡",
+    "坐角落位子，手機面朝下",
+    "22:22 前講完，閉嘴滾"
+   ],
+   "bot": "你各位啊，找角落坐好再開始",
+   "ms": 2962
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "北緯二十五",
+   "type": "coffee_shop",
+   "rating": 4.1,
+   "walkMin": 6,
+   "distM": 425,
+   "radiusM": 1000,
+   "closeIn": 49,
+   "how": "text=\"咖啡廳\" rank=RELEVANCE → text=\"咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 6,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "點一杯咖啡，不要加太多東西",
+    "坐下喝，20分鐘到就起來",
+    "手機面朝下，眼睛看人"
+   ],
+   "bot": "一杯咖啡，20分鐘內喝完就閃",
+   "ms": 2757
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "告乃翁 CallingBar 自家烘焙咖啡店",
+   "type": "coffee_shop",
+   "rating": 4.9,
+   "walkMin": 15,
+   "distM": 1144,
+   "radiusM": 2500,
+   "closeIn": 109,
+   "how": "text=\"有插座 咖啡廳\" rank=RELEVANCE → text=\"有插座 咖啡廳\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 15,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "到店先問吧檯有沒有插座能用",
+    "點一杯咖啡，坐下插電",
+    "22:30 前喝完走人"
+   ],
+   "bot": "先確認插座，一杯咖啡坐到 22:30",
+   "ms": 2954
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 2970
+ }
+}

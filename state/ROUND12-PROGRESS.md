@@ -28,4 +28,33 @@
 
 ## 進度
 
-（進行中）
+### 程式（`2bfc78c`）
+
+| STOP | 改了什麼 | 測試 |
+|---|---|---|
+| 1 評分階梯 | `src/scene.ts` `sceneTiers` 第 2 層改成「最高分往下 0.2★」一階一階往下（每階都比上一階大）；評分比較加浮點容差 `EPS` | `scene.test.ts`「Round 12」：階梯分層、4.3−0.2 含 4.1、handler 20 種子（唯一 4.3 被擋 → 派 4.2；4.3、4.2 都被擋 → 派 3.8）。突變：拿掉階梯 → 3 條失敗 |
+| 2 約會類型 | 約會 `avoidTypes` 加 `meal_takeaway`、`shopping_mall`、`department_store`（只看主類別） | 同上「約會不派外帶店、購物中心、百貨」 |
+| 3 歇整批放回 | `SceneRule.hardAvoid`：歇的類型／店名排除在整批放回時也不放寬（`hardPool`）；沒有 → 超商救援 | 同上＋改 2 條舊測試（Round 7／8 的「只剩水煙吧／卡拉OK → 整批放回」改成「交給超商救援」）。突變：拿掉 hardPool → 3 條失敗 |
+| 4 snack_bar | `NOT_COFFEE` 加 `snack_bar`（歇選咖啡） | 同上 |
+| 5 streak e2e | 兩個原因：`.screen` 0.18 秒進場動畫中途量到；重新載入後頁面被捲動 1–2 px。改成等版面停住、用整頁座標，容許值 2 px 不變 | 修前重跑 15 次 1 次失敗；修後 50/50。突變：有連勝章時導覽列變高 → 量到 22 px、失敗 |
+
+### 閘門（`2bfc78c`，2026-11-05 22:1x 東京）
+
+typecheck ✅、單元 723/723 ✅、build ✅（`index-CXakj8TD.js`；`scene.ts` 前端也用，hash 變了）、check:bundle ✅、smoke ✅、e2e 全套 127/127 ✅。
+
+### 模擬（checker R11 的腳本，對 `2bfc78c` 重跑；證據 `state/evidence/r12/sims/`）
+
+| 腳本 | 結果 |
+|---|---|
+| `edge-mem-loop` | A 被擋 → B（15 分內）40/40、40/40 |
+| `edge-band` | S2：B3.8 40/40；S3：F4.2 40/40；S4：F4.2 40/40 |
+| `edge-real`（07:50 新宿真候選，一蘭被擋） | 4.2★ そば処かめや 21、4.1★ eggslut 22、4.1★ 赤坂うまや 17；**低於 4.0★：0/60**；購物中心 0 |
+
+### 測試版實測（`dpl_8msxWngLu4SLpDGGCtah64kDGVF4`，`2bfc78c`）
+
+| 時間 | 地點 | 情境 | 派錯／還沒開／到店已關／約會酒吧／約會走超過 15 分 | 約會 | 證據 |
+|---|---|---|---|---|---|
+| 11-05 22:10 東京 | 新宿 | 12/12 | 全 0 | 東京寿司 ITAMAE SUSHI 4.5★ 走 9 分 | `state/evidence/r12/preview-2210/scene-shinjuku.*` |
+| 11-05 21:10 台北 | 信義 | 12/12 | 全 0 | rén bistronomy 4.7★ 走 9 分 | `state/evidence/r12/preview-2210/scene-xinyi.*` |
+
+Routes：`routeVerified:true`（`preview-2210/daily.json`）。
