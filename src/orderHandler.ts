@@ -228,10 +228,12 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
     if (budget && cands.length === 0 && !allFailed()) await call(widenPlan(first, { forceRestaurant: firstStatus === 400, country, rng, dropPrice: true, words }))
     placesMs = Date.now() - t0
     country = cands.map((c) => currencyCountry(c.priceRange?.currency)).find(Boolean) ?? country
+    // Round 14：主類別是外帶店的，debug 多帶完整 types（判斷「其實能坐下吃」用；只限外帶店，不放大回應）。
+    const dbgCand = (p: PlaceCandidate) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, ...(p.opensInMin !== undefined ? { opensIn: p.opensInMin } : {}), band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}), ...(p.primaryType === 'meal_takeaway' && p.types ? { types: p.types } : {}) })
     dbg.places = {
       how: hows.join(' → '),
       tries,
-      candidates: cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, ...(p.opensInMin !== undefined ? { opensIn: p.opensInMin } : {}), band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })),
+      candidates: cands.map(dbgCand),
     }
     dbg.price = { country, known: cands.filter((c) => bandOf(c, country) !== null).length, total: cands.length }
     const choose = (budget: OrderRequest['budget'], pool: PlaceCandidate[] = cands) => pool.length
@@ -261,7 +263,7 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
       await call(rescuePlan(country))
       placesMs = Date.now() - t0
       dbg.places.how = hows.join(' → ')
-      dbg.places.candidates.push(...cands.map((p) => ({ name: p.name, rating: p.rating, count: p.ratingCount, walkMin: p.walkMin, ...(p.distM !== undefined ? { distM: p.distM } : {}), openUntil: p.openUntil, opensAt: p.opensAt, ...(p.opensInMin !== undefined ? { opensIn: p.opensInMin } : {}), band: bandOf(p, country), ...(p.primaryType ? { type: p.primaryType } : {}), ...(p.closeInMin !== undefined ? { closeIn: p.closeInMin } : {}) })))
+      dbg.places.candidates.push(...cands.map(dbgCand))
       pick = choose(undefined)
       if (pick) console.warn(`[rescue] module=${req.module}：前兩次派不出店，改派超商`)
     }

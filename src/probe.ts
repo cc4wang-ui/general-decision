@@ -170,7 +170,9 @@ export interface SceneRow {
   /** Round 11：附近沒有一家過評分，派的是走得到的店裡最高分的（規則本身的放寬）。 */
   ratingRelaxed?: boolean
   /** Round 11：約會的全部候選（量測腳本重算用）。 */
-  cands?: Array<{ name: string; type?: string; rating?: number; walkMin?: number; closeIn?: number; opensAt?: string }>
+  cands?: Array<{ name: string; type?: string; rating?: number; walkMin?: number; closeIn?: number; opensAt?: string; types?: string[] }>
+  /** Round 14：主類別是外帶店的候選與完整 types。 */
+  takeaways?: Array<{ name: string; types: string[] }>
   steps?: string[]
   bot?: string
   ms?: number
@@ -226,7 +228,9 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
       ...(d?.scene ? { dbg: d.scene } : {}),
       ...(ratingRelaxed ? { ratingRelaxed: true } : {}),
       // Round 11：約會附上全部候選，給量測整理腳本自己重算「15 分內最高分」（不靠 scene.ts）。
-      ...(scene === '約會吃好一點' && d?.places ? { cands: d.places.candidates.map((x) => ({ name: x.name, type: x.type, rating: x.rating, walkMin: x.walkMin, ...(x.closeIn !== undefined ? { closeIn: x.closeIn } : {}), ...(x.opensAt ? { opensAt: x.opensAt } : {}) })) } : {}),
+      ...(scene === '約會吃好一點' && d?.places ? { cands: d.places.candidates.map((x) => ({ name: x.name, type: x.type, rating: x.rating, walkMin: x.walkMin, ...(x.closeIn !== undefined ? { closeIn: x.closeIn } : {}), ...(x.opensAt ? { opensAt: x.opensAt } : {}), ...(x.types ? { types: x.types } : {}) })) } : {}),
+      // Round 14：每一格都列出主類別是外帶店的候選與完整 types（量「其實能坐下吃」的判斷規則用）。
+      ...(d?.places?.candidates.some((x) => x.types) ? { takeaways: d.places.candidates.filter((x) => x.types).map((x) => ({ name: x.name, types: x.types! })) } : {}),
       ...(b.steps ? { steps: b.steps, bot: b.meme?.bot } : {}),
       ms: Date.now() - t,
     }
