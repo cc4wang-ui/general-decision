@@ -612,3 +612,51 @@ export async function runGoProbe(
     },
   }
 }
+
+// ── Round 14：mode=takeaway（被標成外帶店、其實能坐下吃的店）────────────────
+// 用約會、朋友聚餐會查的關鍵字（含放大時的通用關鍵字）各打一次 Text Search，只拿店名與類型
+// （fieldMask 不含評分、營業時間＝較便宜的計價），列出主類別或 types 裡有 meal_takeaway 的店與完整 types。
+
+export interface TakeawayProbeRow { name: string; primaryType?: string; types: string[]; queries: string[] }
+export interface TakeawayProbeResult { loc: string; country: Country; queries: { q: string; status: number; raw: number }[]; rows: TakeawayProbeRow[] }
+
+export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof fetch; key?: string } = {}): Promise<TakeawayProbeResult> {
+  const loc = PROBE_LOCS[locKey]
+  if (!loc) throw new Error(`未知地點 ${locKey}`)
+  const key = opts.key ?? process.env.GOOGLE_PLACES_KEY
+  if (!key) throw new Error('GOOGLE_PLACES_KEY 未設定')
+  const fetchFn = opts.fetchFn ?? fetch
+  const country = countryOf(loc)
+  const local = country === 'TW' || country === 'JP' ? country : null
+  const lang = placesLanguage(country)
+  const words = new Set<string>()
+  for (const id of ['約會吃好一點', '朋友聚餐']) {
+    const rule = sceneOf('eat', { scene: id })?.rule
+    if (!rule || !local) continue
+    for (const q of rule.queries?.[local] ?? []) words.add(q.q)
+    for (const w of rule.widen?.[local] ?? []) words.add(w)
+  }
+  const queries: TakeawayProbeResult['queries'] = []
+  const byName = new Map<string, TakeawayProbeRow>()
+  for (const q of words) {
+    const { url, body } = placesRequest(loc, { kind: 'text', lane: `takeaway:${q}`, textQuery: q, radius: 1200, rank: 'RELEVANCE', restrict: true } as LanePlan, lang)
+    let status = 0
+    let raw = 0
+    try {
+      const res = await fetchFn(url, { method: 'POST', headers: { 'content-type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.displayName,places.primaryType,places.types' }, body, signal: AbortSignal.timeout(10_000) })
+      status = res.status
+      const places = res.ok ? (((await res.json()) as { places?: { displayName?: { text?: string }; primaryType?: string; types?: string[] }[] }).places ?? []) : []
+      raw = places.length
+      for (const p of places) {
+        const types = p.types ?? []
+        if (p.primaryType !== 'meal_takeaway' && !types.includes('meal_takeaway')) continue
+        const name = p.displayName?.text ?? '?'
+        const row = byName.get(name) ?? { name, ...(p.primaryType ? { primaryType: p.primaryType } : {}), types, queries: [] }
+        row.queries.push(q)
+        byName.set(name, row)
+      }
+    } catch { /* status 0 */ }
+    queries.push({ q, status, raw })
+  }
+  return { loc: loc.label, country, queries, rows: [...byName.values()] }
+}

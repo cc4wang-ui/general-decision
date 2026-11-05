@@ -128,3 +128,28 @@ describe('runGeocodeProbe（Round 6）', () => {
     if (saved) process.env.GOOGLE_PLACES_KEY = saved
   })
 })
+
+// Round 14：mode=takeaway——約會／聚餐的關鍵字各打一次，只列外帶店（主類別或 types 有 meal_takeaway），fieldMask 只拿名稱與類型。
+import { runTakeawayProbe } from '../../src/probe.ts'
+describe('runTakeawayProbe（Round 14）', () => {
+  it('只列外帶店、帶完整 types 與查到它的關鍵字；fieldMask 不含評分與營業時間', async () => {
+    const masks: string[] = []
+    const queries: string[] = []
+    const fetchFn = (async (_u: string | URL | Request, init?: RequestInit) => {
+      masks.push(String((init?.headers as Record<string, string>)['X-Goog-FieldMask']))
+      queries.push(JSON.parse(String(init?.body)).textQuery)
+      return new Response(JSON.stringify({ places: [
+        { displayName: { text: 'すし屋のはなれ、' }, primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'] },
+        { displayName: { text: '普通の寿司' }, primaryType: 'sushi_restaurant', types: ['sushi_restaurant', 'restaurant'] },
+      ] }), { status: 200 })
+    }) as typeof fetch
+    const r = await runTakeawayProbe('shinjuku', { fetchFn, key: 'k' })
+    expect(r.country).toBe('JP')
+    expect(queries).toContain('寿司')
+    expect(queries).toContain('焼肉')
+    expect(new Set(masks)).toEqual(new Set(['places.displayName,places.primaryType,places.types']))
+    expect(r.rows).toHaveLength(1)
+    expect(r.rows[0]).toMatchObject({ name: 'すし屋のはなれ、', primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'] })
+    expect(r.rows[0]!.queries.length).toBe(queries.length)
+  })
+})
