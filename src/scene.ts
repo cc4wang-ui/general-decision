@@ -107,7 +107,8 @@ const EAT: SceneRule[] = [
     hint: '情境：外帶。steps 寫點什麼、外帶回去吃，不要寫內用、不要寫幾分鐘內在店裡吃完。',
   },
   {
-    id: '朋友聚餐', radius: 1200, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH],
+    // Round 13：不派購物中心、百貨、水煙吧、外帶店（新宿 22:32 派到新宿サザンテラス）；整批放回時也不放回（同約會）。
+    id: '朋友聚餐', radius: 1200, minOpen: 90, stay: 90, avoidTypes: [...FASTISH, ...DESSERTISH, ...NOT_A_SEAT, 'meal_takeaway'], hardTypes: [...NOT_A_SEAT, 'meal_takeaway'],
     queries: {
       TW: [q('熱炒', 'tw', 2.5), q('火鍋', 'hotpot', 2.5), q('燒肉', 'jp', 3, BEEF), q('餐酒館', 'western', 3), q('韓式料理', 'kr', 2, HOT), q('泰式料理', 'other', 2, HOT)],
       JP: [q('居酒屋', 'jp', 2.5), q('焼肉', 'jp', 3, BEEF), q('焼き鳥', 'jp', 2.5), q('お好み焼き', 'jp', 2), q('中華料理', 'cn', 1.5), q('韓国料理', 'kr', 2, HOT)],
@@ -360,7 +361,8 @@ function typeOk(c: Cand, r: SceneRule): boolean {
 
 function passes(c: Cand, r: SceneRule): boolean {
   if (!typeOk(c, r)) return false
-  if (r.minRating !== undefined && typeof c.rating === 'number' && c.rating < r.minRating) return false
+  // Round 13（Cross 2026-11-05「沒評分擋掉」）：沒評分的店不過評分門檻（以前是「沒資料不擋」）。放寬評分時排在最底層（rating 當 0）。
+  if (r.minRating !== undefined && (typeof c.rating !== 'number' || c.rating < r.minRating)) return false
   if (r.maxWalk !== undefined && typeof c.walkMin === 'number' && c.walkMin > r.maxWalk) return false
   // 宵夜：還沒開門的店（「HH:MM 開」）不算。Nearby 的查法沒有 openNow，這裡補上（checker 2026-11-01）。
   if (r.openNow && c.opensAt) return false
