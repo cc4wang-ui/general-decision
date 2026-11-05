@@ -1,0 +1,5 @@
+const { sceneTiers, sceneOf } = await import('/home/user/general-decision/src/scene.ts')
+const date = sceneOf('eat', { scene: '約會吃好一點' })
+const c = (id: string, x: any = {}) => ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...x })
+const show = (t: any[][]) => t.map((l) => l.map((x) => x.id).join(',')).join(' | ')
+console.log(show(sceneTiers([c('4.3', { rating: 4.3 }), c('U1', { rating: undefined }), c('U2', { rating: undefined }), c('4.2', { rating: 4.2 }), c('4.1', { rating: 4.1 }), c('3.0', { rating: 3.0 })], date)))

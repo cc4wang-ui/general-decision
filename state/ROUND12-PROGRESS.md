@@ -58,3 +58,24 @@ typecheck ✅、單元 723/723 ✅、build ✅（`index-CXakj8TD.js`；`scene.ts
 | 11-05 21:10 台北 | 信義 | 12/12 | 全 0 | rén bistronomy 4.7★ 走 9 分 | `state/evidence/r12/preview-2210/scene-xinyi.*` |
 
 Routes：`routeVerified:true`（`preview-2210/daily.json`）。
+
+## Checker 第 1 輪（2026-11-05 22:15–22:30 東京）：FAIL（只有「其他」類）
+
+| STOP | 判定 | 摘要 |
+|---|---|---|
+| 1 評分階梯 | **FAIL** | 主要路徑對（edge-real 低於 4.0★ 0/60），反例：4.3★＋2 家沒評分的店都被擋，剩 4.2／4.1／3.8 → 40 次有 8 次派 3.8★。原因：分層去重只比店數；沒評分的店在第 1 層、不在評分階梯，「每層包含上一層」不成立 |
+| 2 約會類型 | **FAIL** | 正常路徑擋得住；整批放回時外帶店／購物中心／百貨又被放回（40 次 37 次）。Q1 只同意放回酒吧 |
+| 3、4、5、6 | PASS | 歇整批放回 5 種情境 20/20 走救援；snack_bar 擋住；streak 30/30、容許值沒放寬；閘門全過、測試版 12/12×2 |
+| 7 | FAIL | 因為 1、2 |
+
+- 舊測試改動：checker 判「合理」（契約要求的行為改變，且補了正向案例）。
+- 「probe 放寬評分不改」：理由站得住，但回報時要寫成「判定不是問題、不改」，不能算已修。
+
+### 第 2 輪前的修正（`a83743b`）
+
+- `sceneTiers`：每層＝前面所有層的聯集＋這層，有加進新店才留（不再只比店數）。
+- `SceneRule.hardTypes`：約會整批放回時也排除 `meal_takeaway`、`shopping_mall`、`department_store`；酒吧照 Q1 放回。
+- 單元 4 條（沒評分的分層、約會放回類型、handler × 2）。突變：換回只比店數 → 2 條失敗；拿掉 hardTypes → 2 條失敗。
+- checker 的反例腳本重跑：`unrated-handler2` 擋 A43／U1／U2 → B42 22、C41 18（0 筆 3.8）；`date-putback` B → 40/40 派遠處餐廳（0 筆三種類型）；`prop-date` 400 例：違規 0（2 筆 no_places 是假資料的救援查詢回同一批店）。
+- 閘門：typecheck ✅、單元 727/727 ✅、build ✅（`index-CQ4Wvz1u.js`）、check:bundle ✅、smoke ✅、e2e 127/127 ✅。
+- 測試版 `dpl_Gy3tpz777yj9vJiMRFJjzdHPncsU`（22:32 東京）：新宿 12/12、信義 12/12，各項 0；Routes `routeVerified:true`。證據 `state/evidence/r12/preview2-2232/`。
