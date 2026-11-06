@@ -1,0 +1,526 @@
+{
+ "loc": "東京八重洲",
+ "localHour": 8,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "蕎麦一心たすけ 日本橋店",
+   "type": "restaurant",
+   "rating": 3.8,
+   "walkMin": 5,
+   "distM": 400,
+   "radiusM": 500,
+   "closeIn": 396,
+   "how": "text=\"牛丼\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 6,
+    "total": 7,
+    "relaxed": false
+   },
+   "steps": [
+    "08:28到店點一碗蕎麥麵",
+    "坐下就吃，不要滑手機",
+    "08:48前吃完，滾出來"
+   ],
+   "bot": "一碗蕎麥麵，20分鐘內掃完",
+   "ms": 2778
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "ほんのり屋 ×marukomeグランスタ東京",
+   "type": "japanese_restaurant",
+   "rating": 4,
+   "walkMin": 6,
+   "distM": 401,
+   "radiusM": 1500,
+   "closeIn": 756,
+   "how": "text=\"テイクアウト\" rank=DISTANCE → text=\"惣菜\" rank=RELEVANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 10,
+    "total": 15,
+    "relaxed": false
+   },
+   "takeaways": [
+    {
+     "name": "sakana baccaグランスタ東京店（京葉ストリートエリア）",
+     "types": [
+      "deli",
+      "japanese_restaurant",
+      "meal_takeaway",
+      "food_store",
+      "restaurant",
+      "food",
+      "store",
+      "point_of_interest",
+      "establishment"
+     ]
+    },
+    {
+     "name": "おむすび権米衛 丸の内マイプラザ店",
+     "types": [
+      "meal_takeaway",
+      "restaurant",
+      "food",
+      "point_of_interest",
+      "establishment"
+     ]
+    },
+    {
+     "name": "築地カイセンノドン",
+     "types": [
+      "meal_takeaway",
+      "restaurant",
+      "food",
+      "point_of_interest",
+      "establishment"
+     ]
+    }
+   ],
+   "steps": [
+    "08:29 到店，點一樣東西",
+    "拿了就走，別站在那邊"
+   ],
+   "bot": "菜鳥就是要先踩點，外帶回去吃",
+   "ms": 2584
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "焼肉 番手十番",
+   "type": "yakiniku_restaurant",
+   "rating": 4.7,
+   "walkMin": 20,
+   "distM": 1540,
+   "radiusM": 3000,
+   "closeIn": 336,
+   "how": "text=\"中華料理\" rank=DISTANCE → text=\"焼肉\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 2,
+    "total": 2,
+    "relaxed": false
+   },
+   "steps": [
+    "08:43 到店，點雙人或三人套餐各一份，加點蔬菜盤",
+    "輪流烤，別搶火，慢慢來",
+    "10:13 前吃完結帳走人"
+   ],
+   "bot": "一起點烤肉拼盤，120 分鐘內吃完",
+   "ms": 3211
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "PIGNETO ピニェート",
+   "type": "italian_restaurant",
+   "rating": 4.4,
+   "walkMin": 14,
+   "distM": 1098,
+   "radiusM": 3000,
+   "closeIn": 816,
+   "how": "text=\"寿司\" rank=RELEVANCE → text=\"イタリアン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 2,
+    "total": 18,
+    "relaxed": false
+   },
+   "cands": [
+    {
+     "name": "Bistro COCONE",
+     "type": "restaurant",
+     "rating": 4.5,
+     "walkMin": 22,
+     "closeIn": 96
+    },
+    {
+     "name": "PIGNETO ピニェート",
+     "type": "italian_restaurant",
+     "rating": 4.4,
+     "walkMin": 14,
+     "closeIn": 816
+    },
+    {
+     "name": "寿司 藤右衛門",
+     "type": "sushi_restaurant",
+     "rating": 4.4,
+     "walkMin": 15,
+     "closeIn": 96
+    },
+    {
+     "name": "Sophie at EDITION",
+     "type": "italian_restaurant",
+     "rating": 4.3,
+     "walkMin": 10,
+     "closeIn": 816
+    },
+    {
+     "name": "PANNINI Ginza イタリア料理パンとドルチェ",
+     "type": "bakery",
+     "rating": 4.3,
+     "walkMin": 11,
+     "closeIn": 636
+    },
+    {
+     "name": "Grill&Bar Porco Piatto",
+     "type": "italian_restaurant",
+     "rating": 4.3,
+     "walkMin": 33,
+     "closeIn": 96
+    },
+    {
+     "name": "イタリアン ケシキ 東京",
+     "type": "italian_restaurant",
+     "rating": 4.1,
+     "walkMin": 11,
+     "closeIn": 126
+    },
+    {
+     "name": "VILLAZZAdue",
+     "type": "italian_restaurant",
+     "rating": 4.1,
+     "walkMin": 9,
+     "closeIn": 771
+    },
+    {
+     "name": "イル カルディナーレ 銀座コリドー店",
+     "type": "italian_restaurant",
+     "rating": 4.1,
+     "walkMin": 16,
+     "closeIn": 96
+    },
+    {
+     "name": "Wande Shiba",
+     "type": "italian_restaurant",
+     "rating": 4.1,
+     "walkMin": 36,
+     "closeIn": 96
+    },
+    {
+     "name": "ITALIAN BBQ LaBettola イタリアンBBQ ラ ベットラ",
+     "type": "italian_restaurant",
+     "rating": 4.1,
+     "walkMin": 22,
+     "closeIn": 96
+    },
+    {
+     "name": "The Kitchen Salvatore Cuomo GINZA",
+     "type": "italian_restaurant",
+     "rating": 4,
+     "walkMin": 9,
+     "closeIn": 126
+    },
+    {
+     "name": "キャンティ・デュエ",
+     "type": "italian_restaurant",
+     "rating": 4,
+     "walkMin": 25,
+     "closeIn": 96
+    },
+    {
+     "name": "カフェカルディーノ／HAGARE ヤエチカ店",
+     "type": "cafe",
+     "rating": 3.9,
+     "walkMin": 2,
+     "closeIn": 846
+    },
+    {
+     "name": "RISTORANTE E’volta il cielo 銀座プレミア店",
+     "type": "italian_restaurant",
+     "rating": 3.7,
+     "walkMin": 19,
+     "closeIn": 816
+    },
+    {
+     "name": "Italian&Bar ALBERGO新橋店",
+     "type": "italian_restaurant",
+     "rating": 3.7,
+     "walkMin": 27,
+     "closeIn": 96
+    },
+    {
+     "name": "cafe イタリアントマト ヤエチカ店",
+     "type": "cafe",
+     "rating": 3.5,
+     "walkMin": 3,
+     "closeIn": 816
+    },
+    {
+     "name": "東京パニーノ アロマフレスカ 東京駅店",
+     "type": "bar",
+     "rating": 3.4,
+     "walkMin": 5,
+     "closeIn": 846
+    }
+   ],
+   "steps": [
+    "08:37 到店，點招牌餐點",
+    "細嚼慢嚥，90分鐘內享受",
+    "10:07 以後再離開"
+   ],
+   "bot": "點招牌、慢慢吃，90分鐘以上",
+   "ms": 2770
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "蕎麦一心たすけ 日本橋店",
+   "type": "restaurant",
+   "rating": 3.8,
+   "walkMin": 5,
+   "distM": 400,
+   "radiusM": 1000,
+   "closeIn": 396,
+   "how": "text=\"牛丼\" rank=DISTANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 18,
+    "total": 18,
+    "relaxed": false
+   },
+   "steps": [
+    "08:28 到店，點一碗蕎麥麵",
+    "輕輕鬆鬆吃，別拖延",
+    "08:58 前走人回家"
+   ],
+   "bot": "進去點碗蕎麥麵，30分鐘內吃完",
+   "ms": 2730
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "LAVAROCK",
+   "type": "bistro",
+   "rating": 4.1,
+   "walkMin": 3,
+   "distM": 214,
+   "radiusM": 2500,
+   "closeIn": 126,
+   "how": "text=\"食べ放題 レストラン\" rank=DISTANCE → text=\"食べ放題 レストラン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 10,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "08:26 到店，先問有沒有插座跟 Wi-Fi",
+    "點飽為止，120 分內解決",
+    "起身前確認沒漏的"
+   ],
+   "bot": "一個口令一個動作，別磨蹭",
+   "ms": 2992
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "DEPOT",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 5,
+   "distM": 383,
+   "radiusM": 600,
+   "closeIn": 846,
+   "how": "text=\"カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 8,
+    "total": 8,
+    "relaxed": false
+   },
+   "steps": [
+    "08:28 到店點一杯咖啡",
+    "坐下，手機面朝下放桌邊",
+    "30分鐘內不動，08:58 以後才起來"
+   ],
+   "bot": "一杯咖啡、30分鐘放空、手機收起來",
+   "ms": 2700
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "GOOD COFFEE FARMS Cafe & Bar",
+   "type": "cafe",
+   "rating": 4.6,
+   "walkMin": 3,
+   "distM": 233,
+   "radiusM": 1000,
+   "closeIn": 576,
+   "how": "text=\"電源 カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "進門先問店員插座在哪",
+    "點一杯咖啡，09:56前喝完",
+    "專心工作到11:33再休息"
+   ],
+   "bot": "一個口令一個動作，坐滿去",
+   "ms": 2540
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "神乃珈琲 ヤエチカ店",
+   "type": "cafe",
+   "rating": 3.8,
+   "walkMin": 2,
+   "distM": 148,
+   "radiusM": 1000,
+   "closeIn": 816,
+   "how": "text=\"カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 15,
+    "total": 16,
+    "relaxed": false
+   },
+   "steps": [
+    "進去找能坐兩個人以上的位子",
+    "點兩杯咖啡",
+    "坐滿 60 分鐘再動"
+   ],
+   "bot": "找個能坐的位子，別催人走",
+   "ms": 2334
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "imperfect MARUNOUCHI ROASTERY",
+   "type": "coffee_stand",
+   "rating": 4.2,
+   "walkMin": 9,
+   "distM": 654,
+   "radiusM": 2500,
+   "closeIn": 636,
+   "how": "text=\"静か カフェ\" rank=DISTANCE → text=\"静か カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 6,
+    "total": 27,
+    "relaxed": false
+   },
+   "steps": [
+    "08:32 到店點咖啡，¥1,000〜2,000 內",
+    "找角落位子坐穩，手機面朝下",
+    "09:32 前談完，準時離開"
+   ],
+   "bot": "角落坐定，先點再談",
+   "ms": 2964
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "Cafe THE LOUNGE",
+   "type": "breakfast_restaurant",
+   "rating": 3.9,
+   "walkMin": 2,
+   "distM": 146,
+   "radiusM": 400,
+   "closeIn": 96,
+   "how": "text=\"カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 7,
+    "total": 7,
+    "relaxed": false
+   },
+   "steps": [
+    "點一杯咖啡",
+    "坐 20 分鐘滑手機",
+    "08:45 準時起身"
+   ],
+   "bot": "點一杯、坐 20 分、時間到就走",
+   "ms": 2411
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "GOOD COFFEE FARMS Cafe & Bar",
+   "type": "cafe",
+   "rating": 4.6,
+   "walkMin": 3,
+   "distM": 233,
+   "radiusM": 1000,
+   "closeIn": 576,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "08:26到店，點一杯咖啡",
+    "先確認有插座位置再坐",
+    "喝完30分鐘內離開"
+   ],
+   "bot": "到店先問插座，別傻站",
+   "ms": 2398
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 3211
+ }
+}

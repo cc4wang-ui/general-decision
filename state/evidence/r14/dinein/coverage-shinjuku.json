@@ -1,0 +1,520 @@
+{
+ "loc": "東京新宿駅",
+ "country": "JP",
+ "queries": [
+  {
+   "q": "イタリアン",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "フレンチ",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "寿司",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "天ぷら",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "和食",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "レストラン",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "居酒屋",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "焼肉",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "焼き鳥",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "お好み焼き",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "中華料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "韓国料理",
+   "status": 200,
+   "raw": 20
+  }
+ ],
+ "rows": [
+  {
+   "name": "イル・ソーレガット",
+   "id": "ChIJh5MdSCrzGGARVzmzBlDR_N8",
+   "primaryType": "italian_restaurant",
+   "types": [
+    "italian_restaurant",
+    "western_restaurant",
+    "meal_takeaway",
+    "european_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "イタリアン",
+    "レストラン"
+   ]
+  },
+  {
+   "name": "PIZZA SALVATORE CUOMO ＆ BAR 新宿",
+   "id": "ChIJE6uvw9WMGGAR6L4Fw4g9J_o",
+   "primaryType": "italian_restaurant",
+   "types": [
+    "italian_restaurant",
+    "bar_and_grill",
+    "pizza_restaurant",
+    "meal_takeaway",
+    "european_restaurant",
+    "bar",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "イタリアン"
+   ]
+  },
+  {
+   "name": "新宿 誠",
+   "id": "ChIJv3LyhtWMGGAR6a4klzW2pdA",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "seafood_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ]
+  },
+  {
+   "name": "東京寿司 ITAMAE SUSHI 新宿東宝ビル店",
+   "id": "ChIJncp6wCuNGGAR4B7ARaTRLBw",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ]
+  },
+  {
+   "name": "幸せ新宿 サカナウマイ",
+   "id": "ChIJ0QZrcWeNGGARZdvDhbkzvQE",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "banquet_hall",
+    "seafood_restaurant",
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "event_venue",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ]
+  },
+  {
+   "name": "すし土風炉 西新宿七丁目店",
+   "id": "ChIJa3xk9NWMGGARcCqsJldhWjs",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "banquet_hall",
+    "seafood_restaurant",
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "event_venue",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ]
+  },
+  {
+   "name": "串天ぷら 段々屋",
+   "id": "ChIJPzERaNGMGGARHVN8Y4CsW1s",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天ぷら"
+   ]
+  },
+  {
+   "name": "天麩羅 しゅん",
+   "id": "ChIJE2tqZtSMGGARvhxngr8JMhM",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "snack_bar",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天ぷら"
+   ]
+  },
+  {
+   "name": "天丼てんや 新宿イーストサイドスクエア店",
+   "id": "ChIJbQb8ud2MGGARaorrS_RsG9k",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天ぷら"
+   ]
+  },
+  {
+   "name": "オッティモ・シーフード・ガーデン 新宿店",
+   "id": "ChIJAQAsttqMGGARl4QV9BMebIA",
+   "primaryType": "italian_restaurant",
+   "types": [
+    "italian_restaurant",
+    "western_restaurant",
+    "mediterranean_restaurant",
+    "seafood_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "wine_bar",
+    "european_restaurant",
+    "bar",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "レストラン"
+   ]
+  },
+  {
+   "name": "むさしの森Ｄｉｎｅｒ 新宿中央公園店",
+   "id": "ChIJ0zbr5v7zGGAR-PzrYw6YsK4",
+   "primaryType": "cafe",
+   "types": [
+    "cafe",
+    "breakfast_restaurant",
+    "coffee_shop",
+    "sandwich_shop",
+    "meal_takeaway",
+    "food_store",
+    "family_restaurant",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "レストラン"
+   ]
+  },
+  {
+   "name": "いまがわ食堂 西新宿店",
+   "id": "ChIJ835OpsaNGGAR2LljEdMNauU",
+   "primaryType": "seafood_restaurant",
+   "types": [
+    "seafood_restaurant",
+    "brunch_restaurant",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "レストラン"
+   ]
+  },
+  {
+   "name": "オールデイダイニング 樹林",
+   "id": "ChIJE2tqZtSMGGARt24OI2Lv-MA",
+   "primaryType": "restaurant",
+   "types": [
+    "restaurant",
+    "breakfast_restaurant",
+    "dessert_restaurant",
+    "western_restaurant",
+    "buffet_restaurant",
+    "snack_bar",
+    "cafe",
+    "meal_takeaway",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "レストラン"
+   ]
+  },
+  {
+   "name": "新宿っ子居酒屋 とととりとん",
+   "id": "ChIJKSv0ctGMGGAR3BUFRgTvEtE",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "yakitori_restaurant",
+    "banquet_hall",
+    "snack_bar",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "event_venue",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "居酒屋"
+   ]
+  },
+  {
+   "name": "新宿っ子居酒屋 とととりとんはなれ",
+   "id": "ChIJgZjMitWMGGARRcfIh870a_w",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "yakitori_restaurant",
+    "banquet_hall",
+    "snack_bar",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "event_venue",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "居酒屋"
+   ]
+  },
+  {
+   "name": "焼肉トラジ 新宿西口店",
+   "id": "ChIJLcz6LNaMGGARv3WBZR1z7xo",
+   "primaryType": "yakiniku_restaurant",
+   "types": [
+    "yakiniku_restaurant",
+    "korean_barbecue_restaurant",
+    "snack_bar",
+    "wine_bar",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "liquor_store",
+    "meal_delivery",
+    "food_delivery",
+    "korean_restaurant",
+    "japanese_restaurant",
+    "bar",
+    "restaurant",
+    "point_of_interest",
+    "store",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "焼肉"
+   ]
+  },
+  {
+   "name": "とりよし 西新宿店",
+   "id": "ChIJRXvrQ9GMGGARfyt2QaLWgOc",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "yakitori_restaurant",
+    "snack_bar",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "焼き鳥"
+   ]
+  },
+  {
+   "name": "中国料理 礼華 新宿店",
+   "id": "ChIJId7U5OmMGGARaM-7p1hCtyQ",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "dim_sum_restaurant",
+    "asian_restaurant",
+    "cantonese_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "wine_bar",
+    "bar",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "中華料理"
+   ]
+  },
+  {
+   "name": "叙楽苑",
+   "id": "ChIJWQoRhK2NGGARt7sIxDDgQIQ",
+   "primaryType": "taiwanese_restaurant",
+   "types": [
+    "taiwanese_restaurant",
+    "chinese_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "中華料理"
+   ]
+  },
+  {
+   "name": "香港園（ホンコンエン）新宿初台",
+   "id": "ChIJX5A_FC3zGGARLJskl1b8XzM",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "taiwanese_restaurant",
+    "japanese_izakaya_restaurant",
+    "snack_bar",
+    "ramen_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "中華料理"
+   ]
+  }
+ ],
+ "samples": [
+  {
+   "name": "Italian Restaurant AUREOLE (オリオール)",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "Italianbar ATTACHMENT 新宿西口店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "オービカ モッツァレラバー 西新宿店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "イル・ソーレガット",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "ビストロ リタ 新宿店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "Italian Bar Primal",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "ビラビアンキ 新宿店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "イタリアンバル チャルーダ ITALIAN-BAR-CHARUDA",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  }
+ ]
+}

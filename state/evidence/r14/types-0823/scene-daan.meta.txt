@@ -1,0 +1,5 @@
+URL: https://general-decision-l92nxa9rt-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=daan
+fetched: curl（分享連結 cookie）
+date: 2026-11-05 23:23:57 UTC（東京 08:23）
+status: 200
+x-vercel-id: iad1::iad1::qff4w-1793921034258-53b370c33ea0

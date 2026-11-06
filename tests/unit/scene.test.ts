@@ -1033,3 +1033,112 @@ describe('Round 13：沒評分擋掉、朋友聚餐不派購物中心', () => {
     }
   })
 })
+
+// Round 14（Cross 2026-11-06「修。有些能坐下吃的店，被 Google 標成外帶店，因此被誤擋」→ 選 A）：
+// 約會、聚餐碰到主類別是外帶店的候選 → 查 Place Details 的 dineIn；可內用就不擋。
+import { DINE_IN_CHECK_MAX, dineInChecks } from '../../src/scene.ts'
+import { fetchDineIn } from '../../src/orderHandler.ts'
+describe('Round 14：被標成外帶店、其實能坐下吃（dineIn）', () => {
+  const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+  const date = sceneOf('eat', { scene: '約會吃好一點' })
+  const party = sceneOf('eat', { scene: '朋友聚餐' })
+  const take = (id: string, extra: Partial<PlaceCandidate> = {}) => c(id, { primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'], ...extra })
+  it('約會、聚餐：外帶店 dineIn=true 不擋；false 或沒查到照樣擋（正常篩選與整批放回都一樣）', () => {
+    for (const s of [date, party]) {
+      expect(scenePasses(take('yes', { dineIn: true }), s)).toBe(true)
+      expect(scenePasses(take('no', { dineIn: false }), s)).toBe(false)
+      expect(scenePasses(take('unknown'), s)).toBe(false)
+    }
+    const far = c('far', { walkMin: 26 })
+    expect(sceneFilter([take('no', { dineIn: false }), far], date)).toEqual({ kept: [far], relaxed: true })
+    const yes = take('yes', { dineIn: true, rating: 4.0 })
+    expect(sceneFilter([yes, far], date).kept).toEqual([yes])
+  })
+  it('只有外帶店的主類別會被 dineIn 放行；購物中心可內用也照擋', () => {
+    expect(scenePasses(c('mall', { primaryType: 'shopping_mall', dineIn: true }), date)).toBe(false)
+  })
+  it('dineInChecks：只在約會／聚餐；只查外帶店、走得到、還沒查過的；評分高的先，最多 2 家', () => {
+    expect(DINE_IN_CHECK_MAX).toBe(2)
+    const cands = [take('t40', { rating: 4.0 }), take('t46', { rating: 4.6 }), take('t44', { rating: 4.4 }), take('far', { rating: 4.9, walkMin: 20 }), take('done', { rating: 4.8, dineIn: false }), c('rest')]
+    expect(dineInChecks(cands, date).map((x) => x.id)).toEqual(['t46', 't44'])
+    expect(dineInChecks(cands, party).map((x) => x.id)).toEqual(['far', 't46'])
+    expect(dineInChecks(cands, sceneOf('eat', { scene: '外帶' }))).toEqual([])
+    expect(dineInChecks(cands, sceneOf('eat', { scene: '一個人快吃' }))).toEqual([])
+    expect(dineInChecks(cands, null)).toEqual([])
+    expect(dineInChecks([take('closed', { closeInMin: 3 })], date)).toEqual([])
+  })
+  it('dineInChecks（checker R14 第 1 輪）：會被營業時間擋掉的外帶店不佔名額；評分不夠的照查（評分會放寬）', () => {
+    const short1 = take('s49', { rating: 4.9, closeInMin: 40 }), short2 = take('s48', { rating: 4.8, closeInMin: 40 })
+    const ok = take('ok46', { rating: 4.6 }), low = take('low40', { rating: 4.0 })
+    expect(dineInChecks([short1, short2, ok, low], date).map((x) => x.id)).toEqual(['ok46', 'low40'])
+  })
+  it('fetchDineIn：GET、fieldMask 只有 dineIn；不是 true／false、錯誤、例外 → undefined', async () => {
+    process.env.GOOGLE_PLACES_KEY = 'k'
+    const seen: { url: string; init?: RequestInit }[] = []
+    const io = (body: unknown, status = 200) => ({ fetch: (async (u: string | URL | Request, init?: RequestInit) => { seen.push({ url: String(u), init }); return new Response(JSON.stringify(body), { status }) }) as typeof fetch })
+    expect(await fetchDineIn(io({ dineIn: true }), 'ChIJ/a b')).toBe(true)
+    expect(seen[0]!.url).toBe('https://places.googleapis.com/v1/places/ChIJ%2Fa%20b')
+    expect(seen[0]!.init?.method).toBe('GET')
+    expect((seen[0]!.init?.headers as Record<string, string>)['X-Goog-FieldMask']).toBe('dineIn')
+    expect(await fetchDineIn(io({ dineIn: false }), 'x')).toBe(false)
+    expect(await fetchDineIn(io({}), 'x')).toBeUndefined()
+    expect(await fetchDineIn(io({ dineIn: 'yes' }), 'x')).toBeUndefined()
+    expect(await fetchDineIn(io({ dineIn: true }, 500), 'x')).toBeUndefined()
+    expect(await fetchDineIn({ fetch: (async () => { throw new Error('timeout') }) as typeof fetch }, 'x')).toBeUndefined()
+  })
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    process.env.GOOGLE_PLACES_KEY = 'test-places-key'
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+  /** Text Search 回 raw；Place Details（/v1/places/{id}）照 dine 回 dineIn（'err' → 500）。回傳 details 呼叫的 id。 */
+  const stubDine = (raw: RawPlace[], dine: Record<string, boolean | 'err'>) => {
+    const detailIds: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
+      const u = String(url)
+      if (u.includes('anthropic')) return claudeOk()
+      const m = u.match(/\/v1\/places\/([^:?]+)$/)
+      if (m) {
+        const id = decodeURIComponent(m[1]!)
+        detailIds.push(id)
+        return dine[id] === 'err' ? new Response('{}', { status: 500 }) : new Response(JSON.stringify(id in dine ? { dineIn: dine[id] } : {}), { status: 200 })
+      }
+      return new Response(JSON.stringify({ places: raw }), { status: 200 })
+    }))
+    return detailIds
+  }
+  const RAW = () => [
+    at('TAKE', 300, { rating: 4.6, userRatingCount: 800, primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'] }),
+    at('REG', 500, { rating: 4.0, userRatingCount: 800, primaryType: 'japanese_restaurant' }),
+  ]
+  it('handler：約會碰到外帶店 → 查 1 次 dineIn；可內用 → 派它，不可／查不到 → 不派；x-places-calls 算進去', async () => {
+    for (const [v, want] of [[true, 'TAKE'], [false, 'REG'], ['err', 'REG']] as const) {
+      const ids = stubDine(RAW(), { TAKE: v })
+      const res = await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed: 3 }))
+      const body = (await res.json()) as Body
+      expect(body.place?.id, String(v)).toBe(want)
+      expect(ids).toEqual(['TAKE'])
+      expect(body.debug.dineIn).toEqual([{ name: '店TAKE', dineIn: v === 'err' ? null : v }])
+      const searches = body.debug.places!.how.split('→').length
+      expect(Number(res.headers.get('x-places-calls'))).toBe(searches + 1)
+      vi.unstubAllGlobals()
+    }
+  })
+  it('handler：朋友聚餐同樣查；外帶情境不查；一單最多查 2 家', async () => {
+    const ids = stubDine(RAW(), { TAKE: true })
+    expect(((await (await handler(post({ choices: { scene: '朋友聚餐', diet: '都可以' }, seed: 1 }))).json()) as Body).place?.id).toBe('TAKE')
+    expect(ids).toEqual(['TAKE'])
+    vi.unstubAllGlobals()
+    const none = stubDine(RAW(), { TAKE: true })
+    await handler(post({ choices: { scene: '外帶', diet: '都可以' }, seed: 1 }))
+    expect(none).toEqual([])
+    vi.unstubAllGlobals()
+    const many = stubDine([1, 2, 3, 4].map((n) => at(`T${n}`, 200 + n * 50, { rating: 4 + n / 10, userRatingCount: 800, primaryType: 'meal_takeaway' })), {})
+    await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed: 1 }))
+    expect(many).toEqual(['T4', 'T3'])
+  })
+})

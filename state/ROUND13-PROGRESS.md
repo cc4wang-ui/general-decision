@@ -1,5 +1,6 @@
 # Round 13 進度：沒評分擋掉＋下一輪候選（接手用）
 
+> **2026-11-05 23:35 東京上線**：PR #36 → `main` `acfd4d2`，`dpl_53GLUwu4BmfAfRsai2yyzUzL6Kzs`。回復點 `dpl_2CiHdd6cAuS4HE7c1JBDk1WsYjPS`。
 > 開始：2026-11-05 23:18 東京。分支 `claude/vigilant-clarke-dsrqfi`（PR #36），基底 `main` `0d88cdb`（正式站 `dpl_2CiHdd6cAuS4HE7c1JBDk1WsYjPS`＝回復點）。
 
 ## 目標契約｜R13 沒評分擋掉＋聚餐不派購物中心
@@ -76,3 +77,18 @@ typecheck ✅、單元 732/732 ✅、build ✅（`index-BxpohqeD.js`）、check:
 ## 上線（沿用 Cross 2026-11-05 21:54「全部處理完之後一次上線 不要一直分段」）
 
 checker PASS → 合併 PR #36。上線前正式站 `dpl_2CiHdd6cAuS4HE7c1JBDk1WsYjPS`（`0d88cdb`）＝ **回復點**。
+
+### 上線驗證（2026-11-05 23:35 東京）✅
+
+| 檢查 | 結果 |
+|---|---|
+| `general-decision.vercel.app` 指向 | `dpl_53GLUwu4BmfAfRsai2yyzUzL6Kzs`（`main` `acfd4d2`，PR #36） |
+| 首頁 JS | `index-BxpohqeD.js`（= 本機 build） |
+| `/api/probe` | 404 |
+| `/api/order`、`/api/weekly`、`/api/daily-route`、`/api/geocode` GET | 405 |
+| POST `/api/order` 新宿・約會吃好一點 | 200，イタリアンバル チャルーダ，走 10 分 |
+| POST `/api/order` 新宿・朋友聚餐 | 200，火ノ丸，走 7 分 |
+| POST `/api/daily-route`（目前位置＝新宿） | 200，`routeVerified:true`，步行 3／5 分 |
+| runtime error（1 小時） | 0 |
+
+證據 `state/evidence/r13/production/`。

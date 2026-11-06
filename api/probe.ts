@@ -5,9 +5,10 @@
 //   GET /api/probe?mode=scene&loc=xinyi（Round 5：吃、歇每一種情境各一次）
 //   GET /api/probe?mode=geocode（Round 6：10 個日文站名 → 座標，對參考座標量誤差）
 //   GET /api/probe?mode=lanes&loc=xinyi（Round 10 X5：每條 lane 打一次真 Places，回 HTTP 狀態與筆數）
+//   GET /api/probe?mode=takeaway&loc=shinjuku（Round 14：約會／聚餐關鍵字查到的外帶店與完整 types）
 //   GET /api/probe?mode=go&loc=xinyi[&minutes=15|30|60][&seed=1]（Round 10 X2：四種交通各派一次）
 // 實作在 src/probe.ts。
-import { PROBE_LOCS, runGeocodeProbe, runGoProbe, runLaneProbe, runMatrix, runSceneMatrix, runSim } from '../src/probe.ts'
+import { PROBE_LOCS, runGeocodeProbe, runGoProbe, runLaneProbe, runMatrix, runSceneMatrix, runSim, runTakeawayProbe } from '../src/probe.ts'
 import { MINUTES, type Minutes } from '../src/go.ts'
 import type { Band } from '../src/types.ts'
 
@@ -35,6 +36,10 @@ async function handler(request: Request): Promise<Response> {
     }
     if (q.get('mode') === 'scene') return json(await runSceneMatrix(loc))
     if (q.get('mode') === 'lanes') return json(await runLaneProbe(loc))
+    if (q.get('mode') === 'takeaway') {
+      const words = (q.get('q') ?? '').split(',').map((w) => w.trim()).filter(Boolean).slice(0, 12)
+      return json(await runTakeawayProbe(loc, { sample: Math.min(20, Math.max(0, Number(q.get('sample') ?? 0) || 0)), ...(words.length ? { queries: words } : {}) }))
+    }
     if (q.get('mode') === 'go') {
       const m = Number(q.get('minutes') ?? 30)
       const seed = Number(q.get('seed'))

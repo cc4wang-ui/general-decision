@@ -1,0 +1,5 @@
+probe GET: 404
+order GET: 405
+weekly GET: 405
+daily-route GET: 405
+geocode GET: 405

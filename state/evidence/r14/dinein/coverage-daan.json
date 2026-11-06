@@ -1,0 +1,227 @@
+{
+ "loc": "台北大安住宅區",
+ "country": "TW",
+ "queries": [
+  {
+   "q": "義大利麵",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "餐酒館",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "日式料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "牛排",
+   "status": 200,
+   "raw": 16
+  },
+  {
+   "q": "鐵板燒",
+   "status": 200,
+   "raw": 11
+  },
+  {
+   "q": "法式料理",
+   "status": 200,
+   "raw": 17
+  },
+  {
+   "q": "餐廳",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "熱炒",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "火鍋",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "燒肉",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "韓式料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "泰式料理",
+   "status": 200,
+   "raw": 19
+  }
+ ],
+ "rows": [
+  {
+   "name": "すき家信義安和",
+   "id": "ChIJ_3WWEcyrQjQR-tvya11aBt8",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "coffee_shop",
+    "breakfast_restaurant",
+    "japanese_curry_restaurant",
+    "fast_food_restaurant",
+    "cafe",
+    "family_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "food_store",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "store",
+    "establishment"
+   ],
+   "queries": [
+    "餐廳"
+   ]
+  },
+  {
+   "name": "成家小館 仁愛店｜酸菜白肉鍋・熱炒料理",
+   "id": "ChIJ6xFUKsmrQjQRMT_M9ptOb6M",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "snack_bar",
+    "chinese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "熱炒"
+   ]
+  },
+  {
+   "name": "鑫吉野烤肉飯-大安和平店",
+   "id": "ChIJAyLT7cCrQjQR9bZzHGPG0qI",
+   "primaryType": "restaurant",
+   "types": [
+    "restaurant",
+    "meal_takeaway",
+    "chinese_restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "燒肉"
+   ]
+  },
+  {
+   "name": "韓國時間",
+   "id": "ChIJVQNOISqqQjQR25HpUboNbGs",
+   "primaryType": "korean_restaurant",
+   "types": [
+    "korean_restaurant",
+    "korean_barbecue_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "韓式料理"
+   ]
+  },
+  {
+   "name": "起家雞韓式炸雞 六張犁店",
+   "id": "ChIJtx3Hv-urQjQRn7wBL_uX41g",
+   "primaryType": "korean_restaurant",
+   "types": [
+    "korean_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "韓式料理"
+   ]
+  },
+  {
+   "name": "新泰村 泰式小吃",
+   "id": "ChIJdxvEfZerQjQRyLytXBLKt2Y",
+   "primaryType": "snack_bar",
+   "types": [
+    "snack_bar",
+    "thai_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "泰式料理"
+   ]
+  }
+ ],
+ "samples": [
+  {
+   "name": "光司DATE 義大利麵 大安店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "11PASTA Trattoria 食義_大安店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "Jn'F 義大利麵 比薩 安居店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "堤香義大利麵",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "發現義大利麵",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "29號館 義大利麵",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "班杰諾義大利餐廳",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "Rico義式廚房 大安六張店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  }
+ ]
+}

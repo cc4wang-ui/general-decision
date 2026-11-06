@@ -1,0 +1,419 @@
+{
+ "loc": "東京新宿駅",
+ "localHour": 8,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "しんぱち食堂 西武新宿店",
+   "type": "japanese_restaurant",
+   "rating": 4,
+   "walkMin": 8,
+   "distM": 588,
+   "radiusM": 1250,
+   "closeIn": 1086,
+   "how": "text=\"ラーメン\" rank=DISTANCE → text=\"食堂\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 6,
+    "total": 11,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走8分鐘抵達",
+    "點一碗丼飯，不要猶豫",
+    "08:51前吃完，別拖"
+   ],
+   "bot": "一個人快吃，20分鐘內解決",
+   "ms": 2722
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "だし茶漬け えん ルミネ新宿店",
+   "type": "japanese_restaurant",
+   "rating": 4.1,
+   "walkMin": 2,
+   "distM": 130,
+   "radiusM": 600,
+   "closeIn": 816,
+   "how": "text=\"おにぎり\" rank=RELEVANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 12,
+    "total": 12,
+    "relaxed": false
+   },
+   "takeaways": [
+    {
+     "name": "おむすび 米屋の太郎 新宿センタービル店",
+     "types": [
+      "meal_takeaway",
+      "restaurant",
+      "food",
+      "point_of_interest",
+      "establishment"
+     ]
+    },
+    {
+     "name": "おだむすび 小田急エース南館店",
+     "types": [
+      "meal_takeaway",
+      "fast_food_restaurant",
+      "snack_bar",
+      "japanese_restaurant",
+      "restaurant",
+      "food",
+      "point_of_interest",
+      "establishment"
+     ]
+    },
+    {
+     "name": "米屋のおにぎり屋 菊太屋米穀店 ニュウマン新宿店",
+     "types": [
+      "meal_takeaway",
+      "restaurant",
+      "food",
+      "point_of_interest",
+      "establishment"
+     ]
+    }
+   ],
+   "steps": [
+    "出站後走2分鐘抵達",
+    "點一碗茶漬飯",
+    "外帶回去邊走邊吃"
+   ],
+   "bot": "出站快走，點茶漬飯外帶，回營",
+   "ms": 2475
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "よいもど YOIMODO",
+   "type": "japanese_restaurant",
+   "rating": 4.6,
+   "walkMin": 8,
+   "distM": 572,
+   "radiusM": 3000,
+   "how": "text=\"韓国料理\" rank=RELEVANCE → text=\"居酒屋\" rank=RELEVANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 20,
+    "total": 21,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 8 分鐘抵達",
+    "點 3〜4 道菜一起分，別問別人意見",
+    "坐下來吃 90 分鐘"
+   ],
+   "bot": "一群人就是要點一堆，別磨蹭",
+   "ms": 2952
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "サイゼリヤ 新宿西口エルタワー店",
+   "type": "family_restaurant",
+   "rating": 3.7,
+   "walkMin": 6,
+   "distM": 402,
+   "radiusM": 3000,
+   "closeIn": 876,
+   "how": "text=\"イタリアン\" rank=DISTANCE → text=\"イタリアン\" rank=DISTANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 1,
+    "total": 3,
+    "relaxed": true
+   },
+   "ratingRelaxed": true,
+   "cands": [
+    {
+     "name": "Rossi",
+     "type": "italian_restaurant",
+     "rating": 4.6,
+     "walkMin": 33,
+     "closeIn": 126
+    },
+    {
+     "name": "L’OMBELICO／TRUNK(HOTEL) YOYOGI PARK",
+     "type": "italian_restaurant",
+     "rating": 4.1,
+     "walkMin": 34,
+     "closeIn": 876
+    },
+    {
+     "name": "サイゼリヤ 新宿西口エルタワー店",
+     "type": "family_restaurant",
+     "rating": 3.7,
+     "walkMin": 6,
+     "closeIn": 876
+    }
+   ],
+   "steps": [
+    "出站後走6分鐘抵達",
+    "點一份招牌義大利麵、一份主菜、飲料各一杯，慢慢享受",
+    "09:59前吃完離開"
+   ],
+   "bot": "點招牌慢慢吃，約會就是這樣",
+   "ms": 3022
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "らーめん 鴨to葱 イイトルミネ新宿店",
+   "type": "ramen_restaurant",
+   "rating": 4.2,
+   "walkMin": 2,
+   "distM": 131,
+   "radiusM": 1000,
+   "closeIn": 876,
+   "how": "text=\"ラーメン\" rank=RELEVANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 8,
+    "total": 9,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘抵達",
+    "點一碗拉麵，喝湯不要全喝",
+    "08:55以前吃完出門"
+   ],
+   "bot": "輕一點，30分鐘內解決，回家睡覺",
+   "ms": 2593
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "マーブルラウンジ",
+   "type": "buffet_restaurant",
+   "rating": 3.8,
+   "walkMin": 12,
+   "distM": 926,
+   "radiusM": 2500,
+   "closeIn": 756,
+   "how": "text=\"食べ放題 レストラン\" rank=RELEVANCE → text=\"食べ放題 レストラン\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 6,
+    "total": 6,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走12分抵達",
+    "進門跟店員說吃到飽方案，選擇品項",
+    "60分內吃完，不拖延"
+   ],
+   "bot": "一個口令一個動作，點餐",
+   "ms": 2685
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "セガフレード・ザネッティ・エスプレッソ 新宿３丁目店",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 4,
+   "distM": 285,
+   "radiusM": 600,
+   "closeIn": 816,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 8,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走 4 分鐘抵達",
+    "點一杯咖啡，坐下不碰手機",
+    "08:57 前離開"
+   ],
+   "bot": "咖啡館裡坐 30 分，手機收起來",
+   "ms": 2571
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "珈琲貴族エジンバラ",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 7,
+   "distM": 523,
+   "radiusM": 1000,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走7分鐘到店",
+    "進門先問店員插座位置",
+    "點一杯咖啡，10:00前都別動"
+   ],
+   "bot": "一個口令一個動作，坐滿",
+   "ms": 2641
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "DEAN & DELUCA 新宿",
+   "type": "deli",
+   "rating": 3.8,
+   "walkMin": 1,
+   "distM": 61,
+   "radiusM": 1000,
+   "closeIn": 816,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 8,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走1分鐘抵達",
+    "找個能坐2個人的位子，各點一杯咖啡",
+    "坐滿60分鐘再走"
+   ],
+   "bot": "找位子坐，一起喝咖啡聊天",
+   "ms": 2333
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "VERVE COFFEE ROASTERS NEWoMan SHINJUKU",
+   "type": "coffee_shop",
+   "rating": 4.3,
+   "walkMin": 2,
+   "distM": 146,
+   "radiusM": 2500,
+   "closeIn": 816,
+   "how": "text=\"静か カフェ\" rank=RELEVANCE → text=\"静か カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 5,
+    "total": 22,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走2分鐘抵達",
+    "進去找最角落的位子坐下",
+    "點一杯咖啡，09:25前喝完"
+   ],
+   "bot": "找角落位子，先點再開談",
+   "ms": 2505
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "セガフレード・ザネッティ・エスプレッソ 新宿３丁目店",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 4,
+   "distM": 285,
+   "radiusM": 400,
+   "closeIn": 816,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 8,
+    "total": 10,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走4分鐘抵達",
+    "點一杯咖啡，08:27 坐下",
+    "08:47 準時起身離開"
+   ],
+   "bot": "咖啡一杯，20分鐘內喝完，時間到就撤",
+   "ms": 2593
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "珈琲貴族エジンバラ",
+   "type": "cafe",
+   "rating": 4.1,
+   "walkMin": 7,
+   "distM": 523,
+   "radiusM": 1000,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "出站後走7分鐘抵達",
+    "點一杯咖啡，坐滿60分鐘",
+    "確認插座能用，手機充上去"
+   ],
+   "bot": "到店先問插座位置，選靠近的位子坐",
+   "ms": 2605
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 3022
+ }
+}

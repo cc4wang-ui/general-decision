@@ -80,7 +80,7 @@ export const SHISHA_RE = /シーシャ|shisha|hookah|水煙/i
 const NOT_COFFEE = ['karaoke', 'food_court', 'snack_bar']
 /** 選咖啡時店名擋一層：水煙吧＋美食街、居酒屋、卡拉OK（美食街常標成 restaurant，type 擋不到）。 */
 export const NOT_COFFEE_RE = new RegExp(`${SHISHA_RE.source}|food ?court|フードコート|美食街|美食廣場|居酒屋|izakaya|カラオケ|karaoke|卡拉ok|ktv`, 'i')
-type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'> & Partial<Pick<PlaceCandidate, 'name' | 'opensInMin'>>
+type Cand = Pick<PlaceCandidate, 'primaryType' | 'types' | 'rating' | 'walkMin' | 'opensAt' | 'closeInMin'> & Partial<Pick<PlaceCandidate, 'name' | 'opensInMin' | 'dineIn' | 'id'>>
 /** 一個人快吃不派要久坐、要多人的店（checker 2026-11-01：東京查「牛丼」派到燒肉店）。 */
 const SLOW_MEAL = ['yakiniku_restaurant', 'korean_barbecue_restaurant', 'barbecue_restaurant', 'hot_pot_restaurant', 'fine_dining_restaurant', 'buffet_restaurant', 'steak_house', 'japanese_izakaya_restaurant', 'bar', 'pub', 'wine_bar', 'bar_and_grill']
 
@@ -311,7 +311,7 @@ const EPS = 1e-9
 /** 整批放回時也不放寬的：hardAvoid 的情境（歇）照樣排除類型／店名；hardTypes（約會）照樣排除那幾種主類別。 */
 function hardPool<T extends Cand>(pool: T[], r: SceneRule): T[] {
   if (r.hardAvoid) return pool.filter((c) => typeOk(c, r))
-  if (r.hardTypes) return pool.filter((c) => !(c.primaryType && r.hardTypes!.includes(c.primaryType)))
+  if (r.hardTypes) return pool.filter((c) => !blockedType(c, r.hardTypes!))
   return pool
 }
 
@@ -347,14 +347,38 @@ export function sceneTiers<T extends Cand>(cands: T[], scene: Scene | null): T[]
   return out
 }
 
+/** Round 14：每一單最多查幾家「可內用」（Place Details Enterprise + Atmosphere，每月前 1,000 次免費）。 */
+export const DINE_IN_CHECK_MAX = 2
+/**
+ * Round 14：要查「可內用」的候選——只有擋外帶店的情境（約會、朋友聚餐），主類別是外帶店、還沒查過，
+ * 而且除了外帶標籤和評分之外都合格（到店時開著、步行上限內、營業夠久…）；評分高的先查，最多 DINE_IN_CHECK_MAX 家。
+ */
+export function dineInChecks<T extends Cand>(cands: T[], scene: Scene | null): T[] {
+  if (!scene?.rule.avoidTypes?.includes('meal_takeaway')) return []
+  // checker R14 第 1 輪：名額只給「除了外帶標籤和評分之外都合格」的店（營業時間、步行、店名…），
+  // 不讓會被營業時間擋掉的店佔掉名額。評分不算，因為評分不夠時會放寬。
+  const rest = { ...scene.rule, minRating: undefined }
+  return reachablePool(cands, scene)
+    .filter((c) => c.primaryType === 'meal_takeaway' && c.dineIn === undefined && passes({ ...c, primaryType: undefined }, rest))
+    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+    .slice(0, DINE_IN_CHECK_MAX)
+}
+
 /** 單一店家是否符合情境偏好（handler 算「夠不夠 5 家」用）。 */
 export function scenePasses(c: Cand, scene: Scene | null): boolean {
   return reachablePool([c], scene).length === 1 && (!scene || passes(c, scene.rule))
 }
 
+/**
+ * Round 14（Cross 2026-11-06「A」）：主類別是外帶店、但 Google 說可內用（dineIn=true）＝能坐下吃，不當外帶店擋。
+ * 沒查到（undefined）或 false → 照樣當外帶店。只有 Place Details 查過的才有 dineIn（dineInChecks）。
+ */
+const blockedType = (c: Cand, types: string[]): boolean =>
+  !!c.primaryType && types.includes(c.primaryType) && !(c.primaryType === 'meal_takeaway' && c.dineIn === true)
+
 /** 類型與店名的排除（主類別是速食才排除；types 裡順帶有 fast_food 的正餐店，例：拉麵店也標 fast_food，不排除）。 */
 function typeOk(c: Cand, r: SceneRule): boolean {
-  if (r.avoidTypes && c.primaryType && r.avoidTypes.includes(c.primaryType)) return false
+  if (r.avoidTypes && blockedType(c, r.avoidTypes)) return false
   if (r.avoidNames && c.name && r.avoidNames.test(c.name)) return false
   return true
 }

@@ -170,7 +170,11 @@ export interface SceneRow {
   /** Round 11：附近沒有一家過評分，派的是走得到的店裡最高分的（規則本身的放寬）。 */
   ratingRelaxed?: boolean
   /** Round 11：約會的全部候選（量測腳本重算用）。 */
-  cands?: Array<{ name: string; type?: string; rating?: number; walkMin?: number; closeIn?: number; opensAt?: string }>
+  cands?: Array<{ name: string; type?: string; rating?: number; walkMin?: number; closeIn?: number; opensAt?: string; types?: string[] }>
+  /** Round 14：這一單查了「可內用」的外帶店。 */
+  dineIn?: OrderDebug['dineIn']
+  /** Round 14：主類別是外帶店的候選與完整 types。 */
+  takeaways?: Array<{ name: string; types: string[] }>
   steps?: string[]
   bot?: string
   ms?: number
@@ -225,8 +229,11 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
       ...(d?.places ? { how: d.places.how } : {}),
       ...(d?.scene ? { dbg: d.scene } : {}),
       ...(ratingRelaxed ? { ratingRelaxed: true } : {}),
+      ...(d?.dineIn ? { dineIn: d.dineIn } : {}),
       // Round 11：約會附上全部候選，給量測整理腳本自己重算「15 分內最高分」（不靠 scene.ts）。
-      ...(scene === '約會吃好一點' && d?.places ? { cands: d.places.candidates.map((x) => ({ name: x.name, type: x.type, rating: x.rating, walkMin: x.walkMin, ...(x.closeIn !== undefined ? { closeIn: x.closeIn } : {}), ...(x.opensAt ? { opensAt: x.opensAt } : {}) })) } : {}),
+      ...(scene === '約會吃好一點' && d?.places ? { cands: d.places.candidates.map((x) => ({ name: x.name, type: x.type, rating: x.rating, walkMin: x.walkMin, ...(x.closeIn !== undefined ? { closeIn: x.closeIn } : {}), ...(x.opensAt ? { opensAt: x.opensAt } : {}), ...(x.types ? { types: x.types } : {}) })) } : {}),
+      // Round 14：每一格都列出主類別是外帶店的候選與完整 types（量「其實能坐下吃」的判斷規則用）。
+      ...(d?.places?.candidates.some((x) => x.types) ? { takeaways: d.places.candidates.filter((x) => x.types).map((x) => ({ name: x.name, types: x.types! })) } : {}),
       ...(b.steps ? { steps: b.steps, bot: b.meme?.bot } : {}),
       ms: Date.now() - t,
     }
@@ -607,4 +614,71 @@ export async function runGoProbe(
       maxMs: Math.max(...rows.map((r) => r.ms)),
     },
   }
+}
+
+// ── Round 14：mode=takeaway（被標成外帶店、其實能坐下吃的店）────────────────
+// 用約會、朋友聚餐會查的關鍵字（含放大時的通用關鍵字）各打一次 Text Search，只拿店名與類型
+// （fieldMask 不含評分、營業時間＝較便宜的計價），列出主類別或 types 裡有 meal_takeaway 的店與完整 types。
+
+export interface TakeawayProbeRow { name: string; primaryType?: string; types: string[]; queries: string[]; id?: string; dineIn?: boolean | null; detailStatus?: number }
+export interface TakeawaySample { name: string; primaryType?: string; status: number; dineIn: boolean | null }
+export interface TakeawayProbeResult { loc: string; country: Country; queries: { q: string; status: number; raw: number }[]; rows: TakeawayProbeRow[]; samples: TakeawaySample[] }
+
+export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof fetch; key?: string; sample?: number; queries?: string[] } = {}): Promise<TakeawayProbeResult> {
+  const loc = PROBE_LOCS[locKey]
+  if (!loc) throw new Error(`未知地點 ${locKey}`)
+  const key = opts.key ?? process.env.GOOGLE_PLACES_KEY
+  if (!key) throw new Error('GOOGLE_PLACES_KEY 未設定')
+  const fetchFn = opts.fetchFn ?? fetch
+  const country = countryOf(loc)
+  const local = country === 'TW' || country === 'JP' ? country : null
+  const lang = placesLanguage(country)
+  const words = new Set<string>(opts.queries ?? [])
+  // 有指定關鍵字（checker R14 第 1 輪：找「被標成外帶店、其實能坐」的店）→ 只查指定的；沒有 → 約會、聚餐的關鍵字。
+  if (!opts.queries?.length) for (const id of ['約會吃好一點', '朋友聚餐']) {
+    const rule = sceneOf('eat', { scene: id })?.rule
+    if (!rule || !local) continue
+    for (const q of rule.queries?.[local] ?? []) words.add(q.q)
+    for (const w of rule.widen?.[local] ?? []) words.add(w)
+  }
+  const queries: TakeawayProbeResult['queries'] = []
+  const byName = new Map<string, TakeawayProbeRow>()
+  const others = new Map<string, { name: string; primaryType?: string }>()
+  for (const q of words) {
+    const { url, body } = placesRequest(loc, { kind: 'text', lane: `takeaway:${q}`, textQuery: q, radius: 1200, rank: 'RELEVANCE', restrict: true } as LanePlan, lang)
+    let status = 0
+    let raw = 0
+    try {
+      const res = await fetchFn(url, { method: 'POST', headers: { 'content-type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.types' }, body, signal: AbortSignal.timeout(10_000) })
+      status = res.status
+      const places = res.ok ? (((await res.json()) as { places?: { id?: string; displayName?: { text?: string }; primaryType?: string; types?: string[] }[] }).places ?? []) : []
+      raw = places.length
+      for (const p of places) {
+        const types = p.types ?? []
+        // 一般餐廳（主類別是 *_restaurant）記下來給涵蓋率抽樣
+        if (p.id && p.primaryType?.endsWith('_restaurant') && p.primaryType !== 'fast_food_restaurant' && !others.has(p.id)) others.set(p.id, { name: p.displayName?.text ?? '?', primaryType: p.primaryType })
+        if (p.primaryType !== 'meal_takeaway' && !types.includes('meal_takeaway')) continue
+        const name = p.displayName?.text ?? '?'
+        const row = byName.get(name) ?? { name, ...(p.id ? { id: p.id } : {}), ...(p.primaryType ? { primaryType: p.primaryType } : {}), types, queries: [] }
+        row.queries.push(q)
+        byName.set(name, row)
+      }
+    } catch { /* status 0 */ }
+    queries.push({ q, status, raw })
+  }
+  // Round 14（Cross 選 A）：主類別是外帶店的，再查一次「可內用」（跟正式查法同一個 URL 與 fieldMask），驗 Google 的 dineIn 分得出來。
+  // 另外抽 sample 家一般餐廳查同一個欄位，量 Google 在這裡有沒有 dineIn 的資料（涵蓋率）。記下 HTTP 狀態，分得出「沒資料」和「查失敗」。
+  const rows = [...byName.values()]
+  const base = process.env.PLACES_BASE_URL ?? 'https://places.googleapis.com'
+  const detail = async (id: string): Promise<{ status: number; dineIn: boolean | null }> => {
+    try {
+      const res = await fetchFn(`${base}/v1/places/${encodeURIComponent(id)}`, { method: 'GET', headers: { 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'dineIn' }, signal: AbortSignal.timeout(5000) })
+      const v = res.ok ? ((await res.json()) as { dineIn?: unknown }).dineIn : undefined
+      return { status: res.status, dineIn: typeof v === 'boolean' ? v : null }
+    } catch { return { status: 0, dineIn: null } }
+  }
+  await Promise.all(rows.filter((r) => r.primaryType === 'meal_takeaway' && r.id).map(async (r) => { const d = await detail(r.id!); r.dineIn = d.dineIn; r.detailStatus = d.status }))
+  const samples: TakeawaySample[] = []
+  for (const [id, v] of others) { if (samples.length >= (opts.sample ?? 0)) break; samples.push({ name: v.name, primaryType: v.primaryType, ...(await detail(id)) }) }
+  return { loc: loc.label, country, queries, rows, samples }
 }
