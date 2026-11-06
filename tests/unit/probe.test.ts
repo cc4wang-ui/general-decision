@@ -135,11 +135,12 @@ describe('runTakeawayProbe（Round 14）', () => {
   it('只列外帶店、帶完整 types 與查到它的關鍵字；fieldMask 不含評分與營業時間', async () => {
     const masks: string[] = []
     const queries: string[] = []
-    const fetchFn = (async (_u: string | URL | Request, init?: RequestInit) => {
+    const fetchFn = (async (u: string | URL | Request, init?: RequestInit) => {
+      if (String(u).endsWith('/v1/places/p1')) return new Response(JSON.stringify({ dineIn: true }), { status: 200 })
       masks.push(String((init?.headers as Record<string, string>)['X-Goog-FieldMask']))
       queries.push(JSON.parse(String(init?.body)).textQuery)
       return new Response(JSON.stringify({ places: [
-        { displayName: { text: 'すし屋のはなれ、' }, primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'] },
+        { id: 'p1', displayName: { text: 'すし屋のはなれ、' }, primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'] },
         { displayName: { text: '普通の寿司' }, primaryType: 'sushi_restaurant', types: ['sushi_restaurant', 'restaurant'] },
       ] }), { status: 200 })
     }) as typeof fetch
@@ -147,9 +148,9 @@ describe('runTakeawayProbe（Round 14）', () => {
     expect(r.country).toBe('JP')
     expect(queries).toContain('寿司')
     expect(queries).toContain('焼肉')
-    expect(new Set(masks)).toEqual(new Set(['places.displayName,places.primaryType,places.types']))
+    expect(new Set(masks)).toEqual(new Set(['places.id,places.displayName,places.primaryType,places.types']))
     expect(r.rows).toHaveLength(1)
-    expect(r.rows[0]).toMatchObject({ name: 'すし屋のはなれ、', primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'] })
+    expect(r.rows[0]).toMatchObject({ name: 'すし屋のはなれ、', primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'], dineIn: true })
     expect(r.rows[0]!.queries.length).toBe(queries.length)
   })
 })

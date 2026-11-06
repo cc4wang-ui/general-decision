@@ -15,7 +15,7 @@ import {
 import { TRANSPORTS, daypartOf, goLanePlans, goRadius, isGoDestination, mentionsTransport, type Daypart, type Minutes, type Transport } from './go.ts'
 import { countryOf } from './price.ts'
 import { hourIn, tzOf } from './tz.ts'
-import { handleOrder, placesLanguage, placesRequest, type OrderIo } from './orderHandler.ts'
+import { fetchDineIn, handleOrder, placesLanguage, placesRequest, type OrderIo } from './orderHandler.ts'
 import { SCENE_OTHER, localizeNeed, sceneOf, sceneOptions, scenePasses } from './scene.ts'
 import { STATION_RE } from './rules.ts'
 import { CARD_BY_ID } from './cards.ts'
@@ -171,6 +171,8 @@ export interface SceneRow {
   ratingRelaxed?: boolean
   /** Round 11：約會的全部候選（量測腳本重算用）。 */
   cands?: Array<{ name: string; type?: string; rating?: number; walkMin?: number; closeIn?: number; opensAt?: string; types?: string[] }>
+  /** Round 14：這一單查了「可內用」的外帶店。 */
+  dineIn?: OrderDebug['dineIn']
   /** Round 14：主類別是外帶店的候選與完整 types。 */
   takeaways?: Array<{ name: string; types: string[] }>
   steps?: string[]
@@ -227,6 +229,7 @@ export async function runSceneMatrix(locKey: string, now = new Date(), io?: Orde
       ...(d?.places ? { how: d.places.how } : {}),
       ...(d?.scene ? { dbg: d.scene } : {}),
       ...(ratingRelaxed ? { ratingRelaxed: true } : {}),
+      ...(d?.dineIn ? { dineIn: d.dineIn } : {}),
       // Round 11：約會附上全部候選，給量測整理腳本自己重算「15 分內最高分」（不靠 scene.ts）。
       ...(scene === '約會吃好一點' && d?.places ? { cands: d.places.candidates.map((x) => ({ name: x.name, type: x.type, rating: x.rating, walkMin: x.walkMin, ...(x.closeIn !== undefined ? { closeIn: x.closeIn } : {}), ...(x.opensAt ? { opensAt: x.opensAt } : {}), ...(x.types ? { types: x.types } : {}) })) } : {}),
       // Round 14：每一格都列出主類別是外帶店的候選與完整 types（量「其實能坐下吃」的判斷規則用）。
@@ -617,7 +620,7 @@ export async function runGoProbe(
 // 用約會、朋友聚餐會查的關鍵字（含放大時的通用關鍵字）各打一次 Text Search，只拿店名與類型
 // （fieldMask 不含評分、營業時間＝較便宜的計價），列出主類別或 types 裡有 meal_takeaway 的店與完整 types。
 
-export interface TakeawayProbeRow { name: string; primaryType?: string; types: string[]; queries: string[] }
+export interface TakeawayProbeRow { name: string; primaryType?: string; types: string[]; queries: string[]; id?: string; dineIn?: boolean | null }
 export interface TakeawayProbeResult { loc: string; country: Country; queries: { q: string; status: number; raw: number }[]; rows: TakeawayProbeRow[] }
 
 export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof fetch; key?: string } = {}): Promise<TakeawayProbeResult> {
@@ -643,20 +646,24 @@ export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof 
     let status = 0
     let raw = 0
     try {
-      const res = await fetchFn(url, { method: 'POST', headers: { 'content-type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.displayName,places.primaryType,places.types' }, body, signal: AbortSignal.timeout(10_000) })
+      const res = await fetchFn(url, { method: 'POST', headers: { 'content-type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.types' }, body, signal: AbortSignal.timeout(10_000) })
       status = res.status
-      const places = res.ok ? (((await res.json()) as { places?: { displayName?: { text?: string }; primaryType?: string; types?: string[] }[] }).places ?? []) : []
+      const places = res.ok ? (((await res.json()) as { places?: { id?: string; displayName?: { text?: string }; primaryType?: string; types?: string[] }[] }).places ?? []) : []
       raw = places.length
       for (const p of places) {
         const types = p.types ?? []
         if (p.primaryType !== 'meal_takeaway' && !types.includes('meal_takeaway')) continue
         const name = p.displayName?.text ?? '?'
-        const row = byName.get(name) ?? { name, ...(p.primaryType ? { primaryType: p.primaryType } : {}), types, queries: [] }
+        const row = byName.get(name) ?? { name, ...(p.id ? { id: p.id } : {}), ...(p.primaryType ? { primaryType: p.primaryType } : {}), types, queries: [] }
         row.queries.push(q)
         byName.set(name, row)
       }
     } catch { /* status 0 */ }
     queries.push({ q, status, raw })
   }
-  return { loc: loc.label, country, queries, rows: [...byName.values()] }
+  // Round 14（Cross 選 A）：主類別是外帶店的，再查一次「可內用」（跟正式查法同一個 fetchDineIn），驗 Google 的 dineIn 分得出來。
+  const rows = [...byName.values()]
+  const io = { fetch: fetchFn }
+  await Promise.all(rows.filter((r) => r.primaryType === 'meal_takeaway' && r.id).map(async (r) => { r.dineIn = (await fetchDineIn(io, r.id!)) ?? null }))
+  return { loc: loc.label, country, queries, rows }
 }

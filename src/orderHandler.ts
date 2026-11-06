@@ -14,7 +14,7 @@ import { cuisineOf, mulberry32, pickPlace, type PickOutcome } from './discovery.
 import { bandOf, countryOf, currencyCountry, effectiveBand, estText, priceFit, priceText } from './price.ts'
 import { brandKeyOf, clusterKeys } from './chains.ts'
 import { templateOrder } from './template.ts'
-import { SCENE_TEXT_KEY, sanitizeSceneText, sceneFilter, sceneOf, scenePasses, sceneTiers, sceneWiden } from './scene.ts'
+import { SCENE_TEXT_KEY, dineInChecks, sanitizeSceneText, sceneFilter, sceneOf, scenePasses, sceneTiers, sceneWiden } from './scene.ts'
 import { goKeep, goPick, goTrip } from './go.ts'
 import { hourIn, tzOf } from './tz.ts'
 import type { Band, Country, CuisineStats, Order, OrderDebug, OrderRequest, PickResult, PlaceCandidate, PlaceMemSummary } from './types.ts'
@@ -248,6 +248,17 @@ export async function handleOrder(request: Request, io: OrderIo = defaultIo): Pr
         rng,
       })
       : null
+    // Round 14（Cross 2026-11-06「A」）：約會、聚餐碰到主類別是外帶店的候選 → 查 Place Details 的 dineIn（每單最多 2 家、並行）。
+    // 可內用 → 不當外帶店擋；查不到 → 照樣擋（安全的預設）。算進 x-places-calls（前端的每日上限）。
+    const checks = dineInChecks(cands, scene)
+    if (checks.length) {
+      placesCalled += checks.length
+      const got = await Promise.all(checks.map((c) => fetchDineIn(io, c.id)))
+      const byId = new Map(checks.map((c, i) => [c.id, got[i]]))
+      cands = cands.map((c) => (byId.get(c.id) !== undefined ? { ...c, dineIn: byId.get(c.id) } : c))
+      dbg.dineIn = checks.map((c, i) => ({ name: c.name, dineIn: got[i] ?? null }))
+      console.info(`[dinein] checked=${checks.length} yes=${got.filter((x) => x === true).length} no=${got.filter((x) => x === false).length} unknown=${got.filter((x) => x === undefined).length}`)
+    }
     // 情境的偏好（排除速食、評分、步行）先篩；篩完沒店、或篩過的店都被記憶擋掉 → 一層一層往下退（sceneTiers），最後才用整批候選（寧可派得到）。
     // Round 10：退路也不派到店時已關門的店（viable）；連這都沒有 → 下面的超商救援。
     // Round 11：被記憶擋掉時先只放寬評分（步行上限、不派酒吧照舊），不要一步退到整批。
@@ -492,6 +503,27 @@ export function placesRequest(loc: { lat: number; lng: number }, plan: LanePlan,
  * 兩者同一組 fieldMask、同一個 SKU。languageCode 台灣用 zh-TW、日本用 ja（placesLanguage）；
  * 日本的店名要不要改 ja 待實測（H6），先記在 debug 的 country。
  */
+/**
+ * Round 14：一家店的「可內用」（Place Details，fieldMask 只有 dineIn）。失敗、逾時、沒有這個欄位 → undefined（呼叫端照樣當外帶店擋）。
+ * 費用：Place Details Enterprise + Atmosphere，每月前 1,000 次免費，之後 US$25／千次（Google 價目表，2026-11）。
+ */
+export async function fetchDineIn(io: OrderIo, id: string): Promise<boolean | undefined> {
+  const key = process.env.GOOGLE_PLACES_KEY
+  if (!key || !id) return undefined
+  try {
+    const res = await io.fetch(`${PLACES_BASE}/v1/places/${encodeURIComponent(id)}`, {
+      method: 'GET',
+      headers: { 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'dineIn' },
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!res.ok) return undefined
+    const v = ((await res.json()) as { dineIn?: unknown }).dineIn
+    return typeof v === 'boolean' ? v : undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function fetchPlaces(io: OrderIo, loc: { lat: number; lng: number }, plan: LanePlan, languageCode = 'zh-TW'): Promise<RawPlace[]> {
   const key = process.env.GOOGLE_PLACES_KEY
   if (!key) throw new Error('GOOGLE_PLACES_KEY 未設定')

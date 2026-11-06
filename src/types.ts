@@ -44,6 +44,8 @@ export interface PlaceCandidate {
   lane?: string
   /** Round 4：撈到它的關鍵字 lane 推估的價位檔（src/lanes.ts QUERY_LANES est）。Google 有價位資料時不用。 */
   estBand?: number
+  /** Round 14：Place Details 的 dineIn（可內用）。只有約會／聚餐碰到主類別是外帶店的候選才查；沒查／查不到 → 沒有。 */
+  dineIn?: boolean
 }
 
 /** 送到伺服器的記憶摘要：只有 place_id、我方事件時間戳、我方品牌鍵。沒有店名、評分、座標（R3§3.3）。 */
@@ -180,6 +182,8 @@ export interface EnforceCtx {
 }
 
 export interface OrderDebug {
+  /** Round 14：查了「可內用」的外帶店（店名、結果；null＝查不到）。 */
+  dineIn?: { name: string; dineIn: boolean | null }[]
   module: ModuleId
   level: Level
   model?: string
