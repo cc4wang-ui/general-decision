@@ -15,7 +15,7 @@ import {
 import { TRANSPORTS, daypartOf, goLanePlans, goRadius, isGoDestination, mentionsTransport, type Daypart, type Minutes, type Transport } from './go.ts'
 import { countryOf } from './price.ts'
 import { hourIn, tzOf } from './tz.ts'
-import { fetchDineIn, handleOrder, placesLanguage, placesRequest, type OrderIo } from './orderHandler.ts'
+import { handleOrder, placesLanguage, placesRequest, type OrderIo } from './orderHandler.ts'
 import { SCENE_OTHER, localizeNeed, sceneOf, sceneOptions, scenePasses } from './scene.ts'
 import { STATION_RE } from './rules.ts'
 import { CARD_BY_ID } from './cards.ts'
@@ -620,10 +620,11 @@ export async function runGoProbe(
 // 用約會、朋友聚餐會查的關鍵字（含放大時的通用關鍵字）各打一次 Text Search，只拿店名與類型
 // （fieldMask 不含評分、營業時間＝較便宜的計價），列出主類別或 types 裡有 meal_takeaway 的店與完整 types。
 
-export interface TakeawayProbeRow { name: string; primaryType?: string; types: string[]; queries: string[]; id?: string; dineIn?: boolean | null }
-export interface TakeawayProbeResult { loc: string; country: Country; queries: { q: string; status: number; raw: number }[]; rows: TakeawayProbeRow[] }
+export interface TakeawayProbeRow { name: string; primaryType?: string; types: string[]; queries: string[]; id?: string; dineIn?: boolean | null; detailStatus?: number }
+export interface TakeawaySample { name: string; primaryType?: string; status: number; dineIn: boolean | null }
+export interface TakeawayProbeResult { loc: string; country: Country; queries: { q: string; status: number; raw: number }[]; rows: TakeawayProbeRow[]; samples: TakeawaySample[] }
 
-export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof fetch; key?: string } = {}): Promise<TakeawayProbeResult> {
+export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof fetch; key?: string; sample?: number } = {}): Promise<TakeawayProbeResult> {
   const loc = PROBE_LOCS[locKey]
   if (!loc) throw new Error(`未知地點 ${locKey}`)
   const key = opts.key ?? process.env.GOOGLE_PLACES_KEY
@@ -641,6 +642,7 @@ export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof 
   }
   const queries: TakeawayProbeResult['queries'] = []
   const byName = new Map<string, TakeawayProbeRow>()
+  const others = new Map<string, { name: string; primaryType?: string }>()
   for (const q of words) {
     const { url, body } = placesRequest(loc, { kind: 'text', lane: `takeaway:${q}`, textQuery: q, radius: 1200, rank: 'RELEVANCE', restrict: true } as LanePlan, lang)
     let status = 0
@@ -652,6 +654,8 @@ export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof 
       raw = places.length
       for (const p of places) {
         const types = p.types ?? []
+        // 一般餐廳（主類別是 *_restaurant）記下來給涵蓋率抽樣
+        if (p.id && p.primaryType?.endsWith('_restaurant') && p.primaryType !== 'fast_food_restaurant' && !others.has(p.id)) others.set(p.id, { name: p.displayName?.text ?? '?', primaryType: p.primaryType })
         if (p.primaryType !== 'meal_takeaway' && !types.includes('meal_takeaway')) continue
         const name = p.displayName?.text ?? '?'
         const row = byName.get(name) ?? { name, ...(p.id ? { id: p.id } : {}), ...(p.primaryType ? { primaryType: p.primaryType } : {}), types, queries: [] }
@@ -661,9 +665,19 @@ export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof 
     } catch { /* status 0 */ }
     queries.push({ q, status, raw })
   }
-  // Round 14（Cross 選 A）：主類別是外帶店的，再查一次「可內用」（跟正式查法同一個 fetchDineIn），驗 Google 的 dineIn 分得出來。
+  // Round 14（Cross 選 A）：主類別是外帶店的，再查一次「可內用」（跟正式查法同一個 URL 與 fieldMask），驗 Google 的 dineIn 分得出來。
+  // 另外抽 sample 家一般餐廳查同一個欄位，量 Google 在這裡有沒有 dineIn 的資料（涵蓋率）。記下 HTTP 狀態，分得出「沒資料」和「查失敗」。
   const rows = [...byName.values()]
-  const io = { fetch: fetchFn }
-  await Promise.all(rows.filter((r) => r.primaryType === 'meal_takeaway' && r.id).map(async (r) => { r.dineIn = (await fetchDineIn(io, r.id!)) ?? null }))
-  return { loc: loc.label, country, queries, rows }
+  const base = process.env.PLACES_BASE_URL ?? 'https://places.googleapis.com'
+  const detail = async (id: string): Promise<{ status: number; dineIn: boolean | null }> => {
+    try {
+      const res = await fetchFn(`${base}/v1/places/${encodeURIComponent(id)}`, { method: 'GET', headers: { 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'dineIn' }, signal: AbortSignal.timeout(5000) })
+      const v = res.ok ? ((await res.json()) as { dineIn?: unknown }).dineIn : undefined
+      return { status: res.status, dineIn: typeof v === 'boolean' ? v : null }
+    } catch { return { status: 0, dineIn: null } }
+  }
+  await Promise.all(rows.filter((r) => r.primaryType === 'meal_takeaway' && r.id).map(async (r) => { const d = await detail(r.id!); r.dineIn = d.dineIn; r.detailStatus = d.status }))
+  const samples: TakeawaySample[] = []
+  for (const [id, v] of others) { if (samples.length >= (opts.sample ?? 0)) break; samples.push({ name: v.name, primaryType: v.primaryType, ...(await detail(id)) }) }
+  return { loc: loc.label, country, queries, rows, samples }
 }

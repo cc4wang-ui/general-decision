@@ -141,7 +141,7 @@ describe('runTakeawayProbe（Round 14）', () => {
       queries.push(JSON.parse(String(init?.body)).textQuery)
       return new Response(JSON.stringify({ places: [
         { id: 'p1', displayName: { text: 'すし屋のはなれ、' }, primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'] },
-        { displayName: { text: '普通の寿司' }, primaryType: 'sushi_restaurant', types: ['sushi_restaurant', 'restaurant'] },
+        { id: 'p2', displayName: { text: '普通の寿司' }, primaryType: 'sushi_restaurant', types: ['sushi_restaurant', 'restaurant'] },
       ] }), { status: 200 })
     }) as typeof fetch
     const r = await runTakeawayProbe('shinjuku', { fetchFn, key: 'k' })
@@ -151,6 +151,13 @@ describe('runTakeawayProbe（Round 14）', () => {
     expect(new Set(masks)).toEqual(new Set(['places.id,places.displayName,places.primaryType,places.types']))
     expect(r.rows).toHaveLength(1)
     expect(r.rows[0]).toMatchObject({ name: 'すし屋のはなれ、', primaryType: 'meal_takeaway', types: ['meal_takeaway', 'sushi_restaurant', 'restaurant'], dineIn: true })
+    expect(r.rows[0]!.detailStatus).toBe(200)
     expect(r.rows[0]!.queries.length).toBe(queries.length)
+    expect(r.samples).toEqual([])
+    const s2 = await runTakeawayProbe('shinjuku', { fetchFn: (async (u: string | URL | Request, init?: RequestInit) => {
+      if (/\/v1\/places\/[^:/]+$/.test(String(u))) return new Response(JSON.stringify({}), { status: 200 })
+      return fetchFn(u, init)
+    }) as typeof fetch, key: 'k', sample: 3 })
+    expect(s2.samples).toEqual([{ name: '普通の寿司', primaryType: 'sushi_restaurant', status: 200, dineIn: null }])
   })
 })

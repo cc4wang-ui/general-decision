@@ -1,0 +1,321 @@
+{
+ "loc": "東京八重洲",
+ "country": "JP",
+ "queries": [
+  {
+   "q": "イタリアン",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "フレンチ",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "寿司",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "天ぷら",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "和食",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "レストラン",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "居酒屋",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "焼肉",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "焼き鳥",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "お好み焼き",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "中華料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "韓国料理",
+   "status": 200,
+   "raw": 20
+  }
+ ],
+ "rows": [
+  {
+   "name": "angelo",
+   "id": "ChIJ9frbIO-LGGAROB4y7ep1wMw",
+   "primaryType": "italian_restaurant",
+   "types": [
+    "italian_restaurant",
+    "japanese_izakaya_restaurant",
+    "snack_bar",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "european_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "イタリアン"
+   ]
+  },
+  {
+   "name": "窯焼きピッツァ&イタリアン居酒屋 ハチョボリーノ 本店",
+   "id": "ChIJJVu7I1-JGGAR2D48Ry6v-mY",
+   "primaryType": "italian_restaurant",
+   "types": [
+    "italian_restaurant",
+    "pizza_delivery",
+    "deli",
+    "pizza_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "wine_bar",
+    "food_store",
+    "european_restaurant",
+    "bar",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "イタリアン"
+   ]
+  },
+  {
+   "name": "東京寿司 ITAMAE SUSHI 銀座コリドー店",
+   "id": "ChIJh0c-ze6LGGARYol64XwKjCo",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ]
+  },
+  {
+   "name": "升寿司 八重洲本店",
+   "id": "ChIJBd__uzGLGGARR8NFu6_NzaA",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ]
+  },
+  {
+   "name": "天丼てんや 銀座店",
+   "id": "ChIJbWIRNuGLGGARJMb-vHaiWmo",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天ぷら"
+   ]
+  },
+  {
+   "name": "和もと",
+   "id": "ChIJF-Khw-aLGGARnKCqBZ8AdtU",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "snack_bar",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "和食"
+   ]
+  },
+  {
+   "name": "大衆居酒屋 とりいちず 人形町店",
+   "id": "ChIJm83wv1GJGGARS0FV5GuhLEE",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "chicken_restaurant",
+    "yakitori_restaurant",
+    "hot_pot_restaurant",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "居酒屋"
+   ]
+  },
+  {
+   "name": "創作和食居酒屋 いわ瀬（美酒味肴） 人形町",
+   "id": "ChIJJ6O_M1CJGGARMfN33Nnrb-M",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "居酒屋"
+   ]
+  },
+  {
+   "name": "東京一頭やコレド室町テラス店",
+   "id": "ChIJZwsk_9iLGGAR8QKh8OWZISQ",
+   "primaryType": "yakiniku_restaurant",
+   "types": [
+    "yakiniku_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "焼肉"
+   ]
+  },
+  {
+   "name": "焼肉とワイン 醍醐銀座店",
+   "id": "ChIJk4z8B-aLGGARRKEbEaSHJcw",
+   "primaryType": "restaurant",
+   "types": [
+    "restaurant",
+    "steak_house",
+    "japanese_izakaya_restaurant",
+    "yakiniku_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "wine_bar",
+    "korean_restaurant",
+    "bar",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "焼肉"
+   ]
+  },
+  {
+   "name": "南天玉 銀座一丁目店 （Chinese Dining ナンテンユー）",
+   "id": "ChIJZePASuOLGGARBtQJRp3zQc4",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "dim_sum_restaurant",
+    "chinese_noodle_restaurant",
+    "cantonese_restaurant",
+    "banquet_hall",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "event_venue",
+    "japanese_restaurant",
+    "chinese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華料理"
+   ]
+  },
+  {
+   "name": "土火土火 東京・八重洲本店",
+   "id": "ChIJk-lqlf2LGGAR_fA7NTQEeG0",
+   "primaryType": "korean_restaurant",
+   "types": [
+    "korean_restaurant",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "韓国料理"
+   ]
+  },
+  {
+   "name": "韓豚屋 有楽町店",
+   "id": "ChIJaww8rO-LGGAR7CymGop9AVw",
+   "primaryType": "korean_restaurant",
+   "types": [
+    "korean_restaurant",
+    "yakiniku_restaurant",
+    "korean_barbecue_restaurant",
+    "buffet_restaurant",
+    "hot_pot_restaurant",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "韓国料理"
+   ]
+  }
+ ]
+}
