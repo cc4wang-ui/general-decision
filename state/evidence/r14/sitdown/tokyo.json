@@ -1,0 +1,977 @@
+{
+ "loc": "東京八重洲",
+ "country": "JP",
+ "queries": [
+  {
+   "q": "すし屋のはなれ",
+   "status": 200,
+   "raw": 17
+  },
+  {
+   "q": "寿司 テイクアウト",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "海鮮丼",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "天丼",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "定食",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "とんかつ",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "カレー",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "餃子",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "弁当",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "中華 テイクアウト",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "ラーメン",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "うどん",
+   "status": 200,
+   "raw": 20
+  }
+ ],
+ "rows": [
+  {
+   "name": "板前 鮨 はなれ ‐ H A N A R E - 銀座",
+   "id": "ChIJ7yon5uiLGGARa61IP4f5IC0",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "すし屋のはなれ"
+   ]
+  },
+  {
+   "name": "銀座すし嘉 はなれ",
+   "id": "ChIJC2cnBNmLGGARnyPwN5OYGbg",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "すし屋のはなれ"
+   ]
+  },
+  {
+   "name": "近畿大学水産研究所 はなれ グランスタ東京店",
+   "id": "ChIJeUDSM7-LGGARjdgZ-MacvWk",
+   "primaryType": "seafood_restaurant",
+   "types": [
+    "seafood_restaurant",
+    "japanese_izakaya_restaurant",
+    "snack_bar",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "すし屋のはなれ",
+    "海鮮丼"
+   ]
+  },
+  {
+   "name": "ちよだ鮨 人形町店",
+   "id": "ChIJWVRx1FGJGGARu-tClW9_aV8",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ],
+   "dineIn": false,
+   "detailStatus": 200
+  },
+  {
+   "name": "スシロー 有楽町店",
+   "id": "ChIJP2b3JG6LGGARRAGykP6quuQ",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "ramen_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "family_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ]
+  },
+  {
+   "name": "すしざんまい 有楽町店",
+   "id": "ChIJK38Xq--LGGARrcixA9X-3kQ",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_izakaya_restaurant",
+    "seafood_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "food_store",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト",
+    "海鮮丼"
+   ]
+  },
+  {
+   "name": "寿司処古市庵 日本橋高島屋店",
+   "id": "ChIJrTLa7leJGGAR7ll4Dpl20FI",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ],
+   "dineIn": false,
+   "detailStatus": 200
+  },
+  {
+   "name": "すしざんまい 匠銀座6丁目店",
+   "id": "ChIJq6pWQe-LGGARJ199D_hXWnI",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_izakaya_restaurant",
+    "snack_bar",
+    "seafood_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "food_store",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ]
+  },
+  {
+   "name": "創作鮨処 タキモト 大丸東京店",
+   "id": "ChIJMSKVFPyLGGARjb7Wu3JwVVI",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ],
+   "dineIn": null,
+   "detailStatus": 200
+  },
+  {
+   "name": "うまい鮨勘 銀座本店",
+   "id": "ChIJva8_-NaLGGARmc9rGw0pFPA",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ]
+  },
+  {
+   "name": "スシロー aune有楽町店",
+   "id": "ChIJXQhVG_qLGGARdtQBPU1NKrs",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "family_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ]
+  },
+  {
+   "name": "知床鮨 大丸東京店",
+   "id": "ChIJGeYlX_mLGGAROLmVEYEl8ZI",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ],
+   "dineIn": null,
+   "detailStatus": 200
+  },
+  {
+   "name": "金沢まいもん寿司 珠姫 大手町店",
+   "id": "ChIJ1WlifwiMGGAR6JeSKWTwPnU",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "seafood_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司 テイクアウト"
+   ]
+  },
+  {
+   "name": "海鮮丼 銀はち 銀座店",
+   "id": "ChIJh6AiUuGLGGARKuwNvN3OCK8",
+   "primaryType": "seafood_restaurant",
+   "types": [
+    "seafood_restaurant",
+    "fast_food_restaurant",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "海鮮丼"
+   ]
+  },
+  {
+   "name": "杉水産",
+   "id": "ChIJVVR1sPaJGGAR2TcEHeedz1o",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "meal_takeaway",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food_store",
+    "store",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "海鮮丼"
+   ],
+   "dineIn": false,
+   "detailStatus": 200
+  },
+  {
+   "name": "天丼てんや 銀座店",
+   "id": "ChIJbWIRNuGLGGARJMb-vHaiWmo",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天丼"
+   ]
+  },
+  {
+   "name": "天丼てんや 八重洲店",
+   "id": "ChIJzQEVm_yLGGAR1QSl3jr9CNU",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天丼"
+   ]
+  },
+  {
+   "name": "天丼てんや 人形町店",
+   "id": "ChIJJ4oe0VGJGGARsVfBYKrqaZI",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天丼"
+   ]
+  },
+  {
+   "name": "鶴の家",
+   "id": "ChIJHWuFAFiJGGARjGTjQRyZteA",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "japanese_izakaya_restaurant",
+    "seafood_restaurant",
+    "hot_pot_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "定食"
+   ]
+  },
+  {
+   "name": "とんかつ富士㐂 人形町店",
+   "id": "ChIJQwUVMVCJGGARG8wA8PIpv-c",
+   "primaryType": "tonkatsu_restaurant",
+   "types": [
+    "tonkatsu_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "とんかつ"
+   ]
+  },
+  {
+   "name": "新潟カツ丼 タレカツ 日比谷店",
+   "id": "ChIJFWx7nF-LGGARFQpXXoY68a4",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "tonkatsu_restaurant",
+    "sandwich_shop",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food_store",
+    "store",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "とんかつ"
+   ]
+  },
+  {
+   "name": "ARALIYA LANKA 京橋店",
+   "id": "ChIJ12pAioCLGGARRumuiyg3n_U",
+   "primaryType": "sri_lankan_restaurant",
+   "types": [
+    "sri_lankan_restaurant",
+    "japanese_curry_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "カレー"
+   ]
+  },
+  {
+   "name": "インドカレー OLD DELHI オールドデリー銀座店",
+   "id": "ChIJawXVyY-LGGAR3Np3Uh4Pf7Q",
+   "primaryType": "indian_restaurant",
+   "types": [
+    "indian_restaurant",
+    "japanese_curry_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "カレー"
+   ]
+  },
+  {
+   "name": "肉汁餃子のダンダダン 八重洲店",
+   "id": "ChIJ24rrD2mLGGAReh5NpXtqiWA",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "chicken_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "bar",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "餃子"
+   ]
+  },
+  {
+   "name": "GYOZA OHSHO 有楽町国際フォーラム口店",
+   "id": "ChIJUSf41tWLGGAR2_aYzrYkIWo",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "餃子"
+   ]
+  },
+  {
+   "name": "東京餃子楼 コレド室町2店",
+   "id": "ChIJTcro5qyJGGAR4X5iwZHDIl8",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "dumpling_restaurant",
+    "japanese_izakaya_restaurant",
+    "chinese_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "餃子"
+   ]
+  },
+  {
+   "name": "東京餃子楼 京橋店",
+   "id": "ChIJXZHlPOOLGGARPZObVQ5b4P4",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "dumpling_restaurant",
+    "japanese_izakaya_restaurant",
+    "chinese_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "餃子"
+   ]
+  },
+  {
+   "name": "塚田農場OBENTO＆DELI 京葉ストリート店",
+   "id": "ChIJs0MQm_uLGGARkFrWZbqfV-U",
+   "primaryType": "food_store",
+   "types": [
+    "meal_takeaway",
+    "food_store",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "弁当"
+   ]
+  },
+  {
+   "name": "人形町今半 日本橋髙島屋店 弁当売り場",
+   "id": "ChIJq43H5VeJGGARa0sox_dbZco",
+   "primaryType": "food_store",
+   "types": [
+    "meal_takeaway",
+    "food_store",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "弁当"
+   ]
+  },
+  {
+   "name": "ゐざさ茶屋 グランスタ東京店",
+   "id": "ChIJBUQiY_mLGGARjGo4Pyc6lR4",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "meal_takeaway",
+    "deli",
+    "food_store",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "弁当"
+   ],
+   "dineIn": false,
+   "detailStatus": 200
+  },
+  {
+   "name": "香港美食園 人形町店",
+   "id": "ChIJAQAs3lGJGGARatUKyhG6n4I",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "buffet_restaurant",
+    "ramen_restaurant",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "過門香 銀座本店",
+   "id": "ChIJH60z3uOLGGARIF1-hY7kyV4",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "dim_sum_restaurant",
+    "chinese_noodle_restaurant",
+    "cantonese_restaurant",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "小籠包マニア 神田店",
+   "id": "ChIJ_4M21mqNGGAR5W5QF3o7Oqw",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "dim_sum_restaurant",
+    "dumpling_restaurant",
+    "cantonese_restaurant",
+    "snack_bar",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "重慶厨房 コレド室町2",
+   "id": "ChIJqX0WqVWJGGARlitOBfYI5_Y",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "deli",
+    "meal_takeaway",
+    "chinese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food_store",
+    "store",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "万豚記 日本橋店",
+   "id": "ChIJK7meLFSJGGAR-0hJxMBj_80",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "銀座アスター 銀座南店",
+   "id": "ChIJ06RiVuaLGGAR1MhkrRfbCj0",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "dim_sum_restaurant",
+    "cantonese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "中華料理・香港飲茶 紹興苑 銀座",
+   "id": "ChIJP0dRh5WLGGARjNzSje9pxqo",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "dim_sum_restaurant",
+    "chicken_restaurant",
+    "chinese_noodle_restaurant",
+    "cantonese_restaurant",
+    "snack_bar",
+    "asian_restaurant",
+    "meal_takeaway",
+    "seafood_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "百菜百味 東急プラザ銀座店",
+   "id": "ChIJVVUlUO-LGGARGzZVJQAUnN4",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "dumpling_restaurant",
+    "hot_pot_restaurant",
+    "meal_takeaway",
+    "chinese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "麒麟",
+   "id": "ChIJx47xGOaLGGARByJFtUdHHug",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "chinese_noodle_restaurant",
+    "meal_takeaway",
+    "dessert_shop",
+    "confectionery",
+    "meal_delivery",
+    "food_delivery",
+    "restaurant",
+    "point_of_interest",
+    "food_store",
+    "store",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "珉珉 八重洲店",
+   "id": "ChIJ56bcZvuLGGAROaBDRWT3OX4",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "南天玉 銀座一丁目店 （Chinese Dining ナンテンユー）",
+   "id": "ChIJZePASuOLGGARBtQJRp3zQc4",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "dim_sum_restaurant",
+    "chinese_noodle_restaurant",
+    "cantonese_restaurant",
+    "banquet_hall",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "event_venue",
+    "japanese_restaurant",
+    "chinese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "過門香 點 有楽町イトシア店",
+   "id": "ChIJL2ELaOWLGGARrXTcbh6MNq4",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "chinese_restaurant",
+    "dim_sum_restaurant",
+    "chinese_noodle_restaurant",
+    "cantonese_restaurant",
+    "meal_takeaway",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "台湾料理 老李 東京 日本橋本店",
+   "id": "ChIJQdi4-VOJGGARYGBgCMMEHO0",
+   "primaryType": "taiwanese_restaurant",
+   "types": [
+    "taiwanese_restaurant",
+    "dim_sum_restaurant",
+    "chinese_noodle_restaurant",
+    "ramen_restaurant",
+    "cantonese_restaurant",
+    "snack_bar",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "chinese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華 テイクアウト"
+   ]
+  },
+  {
+   "name": "東京下町ラーメン 鶴の恩がえし",
+   "id": "ChIJTd3eZRWJGGARsGQgBnE87-Q",
+   "primaryType": "ramen_restaurant",
+   "types": [
+    "ramen_restaurant",
+    "japanese_izakaya_restaurant",
+    "noodle_shop",
+    "meal_delivery",
+    "food_delivery",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "chinese_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "ラーメン"
+   ]
+  },
+  {
+   "name": "はなまるうどん 八丁堀店",
+   "id": "ChIJkewI_FuJGGARnQ8iOZ_2wBc",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "fast_food_restaurant",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "うどん"
+   ]
+  },
+  {
+   "name": "はなまるうどん 茅場町店",
+   "id": "ChIJeYjJU1qJGGARvnQGa-Yqjfw",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "fast_food_restaurant",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "うどん"
+   ]
+  },
+  {
+   "name": "はなまるうどん 京橋店",
+   "id": "ChIJi6YhAuOLGGARgFEy_yQWV0k",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "fast_food_restaurant",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "うどん"
+   ]
+  },
+  {
+   "name": "はなまるうどん 銀座松屋通り店",
+   "id": "ChIJy6K-LOGLGGARYT0j3TF2-ow",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "fast_food_restaurant",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "うどん"
+   ]
+  }
+ ],
+ "samples": []
+}

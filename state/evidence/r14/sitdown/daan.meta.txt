@@ -1,0 +1,5 @@
+URL: https://general-decision-avufhlku5-cc4wang-uis-projects.vercel.app/api/probe?mode=takeaway&loc=daan&q=%E4%BE%BF%E7%95%B6%2C%E6%BB%B7%E8%82%89%E9%A3%AF%2C%E5%B0%8F%E5%90%83%2C%E7%89%9B%E8%82%89%E9%BA%B5%2C%E9%8D%8B%E8%B2%BC%2C%E9%9F%93%E5%BC%8F%E4%BE%BF%E7%95%B6%2C%E5%A3%BD%E5%8F%B8%20%E5%A4%96%E5%B8%B6%2C%E7%82%92%E9%A3%AF%2C%E6%B0%B4%E9%A4%83%2C%E9%9B%9E%E8%82%89%E9%A3%AF%2C%E6%8B%89%E9%BA%B5%2C%E5%92%96%E5%93%A9
+deployment: dpl_7nvsboS4DyTAHCix7GWyhLcNZQRi（520c70c）
+date: 2026-11-06 03:18:24 UTC（東京 12:18）
+status: 200
+x-vercel-id: iad1::iad1::pwnzw-1793935101047-2fbd36d4dcc2

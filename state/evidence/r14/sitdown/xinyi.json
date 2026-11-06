@@ -1,0 +1,327 @@
+{
+ "loc": "台北信義（市府）",
+ "country": "TW",
+ "queries": [
+  {
+   "q": "便當",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "滷肉飯",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "小吃",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "牛肉麵",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "鍋貼",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "韓式便當",
+   "status": 200,
+   "raw": 9
+  },
+  {
+   "q": "壽司 外帶",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "炒飯",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "水餃",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "雞肉飯",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "拉麵",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "咖哩",
+   "status": 200,
+   "raw": 20
+  }
+ ],
+ "rows": [
+  {
+   "name": "烤食煮盒 永吉店",
+   "id": "ChIJt-ijkryrQjQRajdKQFsVvls",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "chinese_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "food_store",
+    "supplier",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "service",
+    "establishment"
+   ],
+   "queries": [
+    "便當"
+   ],
+   "dineIn": true,
+   "detailStatus": 200
+  },
+  {
+   "name": "麻媽家(信義店)",
+   "id": "ChIJWckPPF6rQjQR9LvkezSqZ30",
+   "primaryType": "restaurant",
+   "types": [
+    "restaurant",
+    "asian_restaurant",
+    "snack_bar",
+    "meal_takeaway",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "滷肉飯"
+   ]
+  },
+  {
+   "name": "白家通化 十全排骨 滷肉飯 大安區小吃 通化街小吃",
+   "id": "ChIJI4gJYsurQjQRi2mcgps7j4E",
+   "primaryType": "snack_bar",
+   "types": [
+    "snack_bar",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "滷肉飯"
+   ]
+  },
+  {
+   "name": "正純小吃店",
+   "id": "ChIJmWcpDaqrQjQRBZRq3SnVGGo",
+   "primaryType": "snack_bar",
+   "types": [
+    "snack_bar",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "小吃"
+   ]
+  },
+  {
+   "name": "福鼎肉片 林記正宗福建特色小吃（臨江店）",
+   "id": "ChIJ8SPXlnWrQjQR9Y_1lsMmcSY",
+   "primaryType": "snack_bar",
+   "types": [
+    "snack_bar",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "小吃"
+   ]
+  },
+  {
+   "name": "潮饌麵府 吳興創始店",
+   "id": "ChIJb8iskbWrQjQRycn44JpR2d4",
+   "primaryType": "chinese_noodle_restaurant",
+   "types": [
+    "chinese_noodle_restaurant",
+    "soup_restaurant",
+    "dumpling_restaurant",
+    "food_court",
+    "deli",
+    "meal_takeaway",
+    "food_store",
+    "restaurant",
+    "food",
+    "store",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "小吃"
+   ]
+  },
+  {
+   "name": "鴻瀧 燉品 麵 台南米糕",
+   "id": "ChIJx2BkeoWrQjQRBRxBpOd07Iw",
+   "primaryType": "snack_bar",
+   "types": [
+    "snack_bar",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "小吃"
+   ]
+  },
+  {
+   "name": "半島牛肉麵",
+   "id": "ChIJT5Lgu7yrQjQR-4z6kZ30ZOc",
+   "primaryType": "restaurant",
+   "types": [
+    "restaurant",
+    "dumpling_restaurant",
+    "snack_bar",
+    "chinese_restaurant",
+    "chinese_noodle_restaurant",
+    "meal_takeaway",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "牛肉麵"
+   ]
+  },
+  {
+   "name": "吳興12號 ＜俊賢水餃號(鍋貼水餃店)＞",
+   "id": "ChIJ4Q03c8qrQjQRNWfu4nRAnKg",
+   "primaryType": "dumpling_restaurant",
+   "types": [
+    "dumpling_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    "food_delivery",
+    "chinese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "鍋貼",
+    "水餃"
+   ]
+  },
+  {
+   "name": "Aum Aum Dosirak 韓定食 信義店",
+   "id": "ChIJv8Elhv-rQjQRrVAXYBcuEfw",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "meal_takeaway",
+    "korean_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "韓式便當"
+   ],
+   "dineIn": null,
+   "detailStatus": 200
+  },
+  {
+   "name": "爭鮮gogo 市政府轉運站店",
+   "id": "ChIJyyYLH16rQjQRativowdJkI0",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "壽司 外帶"
+   ],
+   "dineIn": null,
+   "detailStatus": 200
+  },
+  {
+   "name": "京都御握丸 遠東Garden City大巨蛋店",
+   "id": "ChIJ10a6fwCrQjQRNcJqRGPLCxk",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "壽司 外帶"
+   ],
+   "dineIn": null,
+   "detailStatus": 200
+  },
+  {
+   "name": "濃濃雞湯廚房",
+   "id": "ChIJuSggpferQjQR5PF5I9NgUCA",
+   "primaryType": "snack_bar",
+   "types": [
+    "snack_bar",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "雞肉飯"
+   ]
+  },
+  {
+   "name": "すき家信義安和",
+   "id": "ChIJ_3WWEcyrQjQR-tvya11aBt8",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_curry_restaurant",
+    "coffee_shop",
+    "family_restaurant",
+    "fast_food_restaurant",
+    "breakfast_restaurant",
+    "meal_takeaway",
+    "cafe",
+    "japanese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food_store",
+    "store",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "咖哩"
+   ]
+  }
+ ],
+ "samples": []
+}
