@@ -350,14 +350,16 @@ export function sceneTiers<T extends Cand>(cands: T[], scene: Scene | null): T[]
 /** Round 14：每一單最多查幾家「可內用」（Place Details Enterprise + Atmosphere，每月前 1,000 次免費）。 */
 export const DINE_IN_CHECK_MAX = 2
 /**
- * Round 14：要查「可內用」的候選——只有擋外帶店的情境（約會、朋友聚餐），主類別是外帶店、到店時開著、走得到（步行上限內），
- * 還沒查過的；評分高的先查，最多 DINE_IN_CHECK_MAX 家。
+ * Round 14：要查「可內用」的候選——只有擋外帶店的情境（約會、朋友聚餐），主類別是外帶店、還沒查過，
+ * 而且除了外帶標籤和評分之外都合格（到店時開著、步行上限內、營業夠久…）；評分高的先查，最多 DINE_IN_CHECK_MAX 家。
  */
 export function dineInChecks<T extends Cand>(cands: T[], scene: Scene | null): T[] {
   if (!scene?.rule.avoidTypes?.includes('meal_takeaway')) return []
-  const max = scene.rule.maxWalk
+  // checker R14 第 1 輪：名額只給「除了外帶標籤和評分之外都合格」的店（營業時間、步行、店名…），
+  // 不讓會被營業時間擋掉的店佔掉名額。評分不算，因為評分不夠時會放寬。
+  const rest = { ...scene.rule, minRating: undefined }
   return reachablePool(cands, scene)
-    .filter((c) => c.primaryType === 'meal_takeaway' && c.dineIn === undefined && (max === undefined || (c.walkMin ?? 0) <= max))
+    .filter((c) => c.primaryType === 'meal_takeaway' && c.dineIn === undefined && passes({ ...c, primaryType: undefined }, rest))
     .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
     .slice(0, DINE_IN_CHECK_MAX)
 }

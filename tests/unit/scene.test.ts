@@ -1068,6 +1068,11 @@ describe('Round 14：被標成外帶店、其實能坐下吃（dineIn）', () =>
     expect(dineInChecks(cands, null)).toEqual([])
     expect(dineInChecks([take('closed', { closeInMin: 3 })], date)).toEqual([])
   })
+  it('dineInChecks（checker R14 第 1 輪）：會被營業時間擋掉的外帶店不佔名額；評分不夠的照查（評分會放寬）', () => {
+    const short1 = take('s49', { rating: 4.9, closeInMin: 40 }), short2 = take('s48', { rating: 4.8, closeInMin: 40 })
+    const ok = take('ok46', { rating: 4.6 }), low = take('low40', { rating: 4.0 })
+    expect(dineInChecks([short1, short2, ok, low], date).map((x) => x.id)).toEqual(['ok46', 'low40'])
+  })
   it('fetchDineIn：GET、fieldMask 只有 dineIn；不是 true／false、錯誤、例外 → undefined', async () => {
     process.env.GOOGLE_PLACES_KEY = 'k'
     const seen: { url: string; init?: RequestInit }[] = []

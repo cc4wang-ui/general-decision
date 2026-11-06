@@ -36,7 +36,10 @@ async function handler(request: Request): Promise<Response> {
     }
     if (q.get('mode') === 'scene') return json(await runSceneMatrix(loc))
     if (q.get('mode') === 'lanes') return json(await runLaneProbe(loc))
-    if (q.get('mode') === 'takeaway') return json(await runTakeawayProbe(loc, { sample: Math.min(20, Math.max(0, Number(q.get('sample') ?? 0) || 0)) }))
+    if (q.get('mode') === 'takeaway') {
+      const words = (q.get('q') ?? '').split(',').map((w) => w.trim()).filter(Boolean).slice(0, 12)
+      return json(await runTakeawayProbe(loc, { sample: Math.min(20, Math.max(0, Number(q.get('sample') ?? 0) || 0)), ...(words.length ? { queries: words } : {}) }))
+    }
     if (q.get('mode') === 'go') {
       const m = Number(q.get('minutes') ?? 30)
       const seed = Number(q.get('seed'))

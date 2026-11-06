@@ -159,5 +159,10 @@ describe('runTakeawayProbe（Round 14）', () => {
       return fetchFn(u, init)
     }) as typeof fetch, key: 'k', sample: 3 })
     expect(s2.samples).toEqual([{ name: '普通の寿司', primaryType: 'sushi_restaurant', status: 200, dineIn: null }])
+    // 指定關鍵字 → 只查指定的
+    const before = queries.length
+    const s3 = await runTakeawayProbe('shinjuku', { fetchFn, key: 'k', queries: ['すし屋のはなれ', '海鮮丼'] })
+    expect(queries.slice(before)).toEqual(['すし屋のはなれ', '海鮮丼'])
+    expect(s3.queries.map((x) => x.q)).toEqual(['すし屋のはなれ', '海鮮丼'])
   })
 })

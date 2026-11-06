@@ -624,7 +624,7 @@ export interface TakeawayProbeRow { name: string; primaryType?: string; types: s
 export interface TakeawaySample { name: string; primaryType?: string; status: number; dineIn: boolean | null }
 export interface TakeawayProbeResult { loc: string; country: Country; queries: { q: string; status: number; raw: number }[]; rows: TakeawayProbeRow[]; samples: TakeawaySample[] }
 
-export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof fetch; key?: string; sample?: number } = {}): Promise<TakeawayProbeResult> {
+export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof fetch; key?: string; sample?: number; queries?: string[] } = {}): Promise<TakeawayProbeResult> {
   const loc = PROBE_LOCS[locKey]
   if (!loc) throw new Error(`未知地點 ${locKey}`)
   const key = opts.key ?? process.env.GOOGLE_PLACES_KEY
@@ -633,8 +633,9 @@ export async function runTakeawayProbe(locKey: string, opts: { fetchFn?: typeof 
   const country = countryOf(loc)
   const local = country === 'TW' || country === 'JP' ? country : null
   const lang = placesLanguage(country)
-  const words = new Set<string>()
-  for (const id of ['約會吃好一點', '朋友聚餐']) {
+  const words = new Set<string>(opts.queries ?? [])
+  // 有指定關鍵字（checker R14 第 1 輪：找「被標成外帶店、其實能坐」的店）→ 只查指定的；沒有 → 約會、聚餐的關鍵字。
+  if (!opts.queries?.length) for (const id of ['約會吃好一點', '朋友聚餐']) {
     const rule = sceneOf('eat', { scene: id })?.rule
     if (!rule || !local) continue
     for (const q of rule.queries?.[local] ?? []) words.add(q.q)
