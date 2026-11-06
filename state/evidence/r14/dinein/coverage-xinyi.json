@@ -1,0 +1,169 @@
+{
+ "loc": "台北信義（市府）",
+ "country": "TW",
+ "queries": [
+  {
+   "q": "義大利麵",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "餐酒館",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "日式料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "牛排",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "鐵板燒",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "法式料理",
+   "status": 200,
+   "raw": 16
+  },
+  {
+   "q": "餐廳",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "熱炒",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "火鍋",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "燒肉",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "韓式料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "泰式料理",
+   "status": 200,
+   "raw": 20
+  }
+ ],
+ "rows": [
+  {
+   "name": "大灣碼頭-松隆店",
+   "id": "ChIJVRATO7yrQjQRa6RKD81Eisg",
+   "primaryType": "taiwanese_restaurant",
+   "types": [
+    "taiwanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "熱炒"
+   ]
+  },
+  {
+   "name": "成家小館 仁愛店｜酸菜白肉鍋・熱炒料理",
+   "id": "ChIJ6xFUKsmrQjQRMT_M9ptOb6M",
+   "primaryType": "chinese_restaurant",
+   "types": [
+    "snack_bar",
+    "meal_takeaway",
+    "chinese_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "熱炒"
+   ]
+  },
+  {
+   "name": "Aum Aum Dosirak 韓定食 信義店",
+   "id": "ChIJv8Elhv-rQjQRrVAXYBcuEfw",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "meal_takeaway",
+    "korean_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "韓式料理"
+   ],
+   "dineIn": null,
+   "detailStatus": 200
+  }
+ ],
+ "samples": [
+  {
+   "name": "PROMETTENTE 義大利麵 永春店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "麵食主義 KIRIN PASTA 忠孝店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "薩莉亞 信義ATT店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "Cin Cin Osteria請請義大利餐廳(逸仙店)",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "米家廚房義大利麵",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "PapaRoy Italian Cuisine / PapaRoy 義式手作料理",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "就是義大利麵屋 ITS PASTA(台北市)",
+   "primaryType": "family_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "堤諾義大利比薩 Tino's Pizza 台北莊敬店",
+   "primaryType": "pizza_restaurant",
+   "status": 200,
+   "dineIn": true
+  }
+ ]
+}

@@ -52,3 +52,46 @@
 | C 不改（主類別是外帶店一律擋） | — | — | US$0 |
 
 → 🔒 動錢，停在這裡交 Cross 決定（契約保留事項）。
+
+## Cross 決定（2026-11-06 東京）
+
+- Cross 原話：「A」→ 只對約會／聚餐碰到主類別是外帶店的候選，查一次 Place Details 的 `dineIn`（🔒 動錢已核准，預估 ≈ US$0／月）。
+- 契約 STOP 1、2、4 依此改：判斷用 `dineIn`（不是 types）；費用＝Place Details Enterprise + Atmosphere，每月前 1,000 次免費。
+
+### 程式（`139bd25`＋量測 `9e7a0cb`）
+
+| 項目 | 改了什麼 |
+|---|---|
+| 查「可內用」 | `src/orderHandler.ts` `fetchDineIn`：GET `/v1/places/{id}`，fieldMask 只有 `dineIn`，3 秒逾時；失敗／沒有欄位 → undefined。挑店前對 `dineInChecks` 選出的候選並行查，算進 `x-places-calls`（前端每日上限），`dbg.dineIn` 記結果 |
+| 誰要查 | `src/scene.ts` `dineInChecks`：只在擋外帶店的情境（約會、朋友聚餐）；主類別是外帶店、到店時開著、步行上限內、還沒查過；評分高的先，每單最多 2 家（`DINE_IN_CHECK_MAX`） |
+| 放行規則 | `blockedType`：主類別是外帶店、`dineIn === true` → 不當外帶店擋（正常篩選、整批放回都一樣）；false／沒查到 → 照樣擋。其他主類別不受 dineIn 影響 |
+| 量測 | probe 列 `dineIn`；`mode=takeaway` 對外帶店查 dineIn、記 HTTP 狀態，`sample=N` 抽一般餐廳量涵蓋率 |
+
+測試：`scene.test.ts`「Round 14」7 條（放行／照擋、購物中心不受影響、dineInChecks 選法與上限、fetchDineIn、handler 3 種結果與 x-places-calls、聚餐查／外帶不查／最多 2 家）；`probe.test.ts` 1 條。突變：拿掉放行 → 3 條失敗；拿掉上限 → 2 條；不算進每日上限 → 1 條。
+
+### 閘門
+
+- `139bd25`：typecheck ✅、單元 739/739 ✅、build ✅（`index-BxpohqeD.js`，跟正式站同一個前端檔）、check:bundle ✅、smoke ✅、e2e 127/127 ✅。
+- `9e7a0cb`（只改 probe）：typecheck ✅、單元 739/739 ✅、check:bundle ✅、smoke ✅、e2e 單獨重跑 127/127 ✅。
+- ⚠️ 中間有一次 e2e 97 條失敗：兩組全套同時跑，共用 4173 埠與 `dist/`（後一組 build 時前一組正在測）。單獨重跑 127/127。教訓：全套 e2e 一次只跑一組。
+
+### 真資料：dineIn 分得出來（`state/evidence/r14/dinein/`，11:52–11:56 東京）
+
+| 店 | 主類別 | dineIn | 結果 |
+|---|---|---|---|
+| ちよだ鮨 人形町店（外帶壽司連鎖） | meal_takeaway | **false** | 照擋 ✅ |
+| Aum Aum Dosirak 韓定食（便當） | meal_takeaway | 沒資料 | 照擋（安全的預設）✅ |
+| 一般餐廳抽樣 32 家（新宿、八重洲、信義、大安各 8） | *_restaurant | 32/32 **true** | Google 在這兩國有 dineIn 資料 |
+
+- 所有 Place Details 呼叫 HTTP 200（金鑰與 API 都可用）。
+
+### 測試版實測（`dpl_8Sjkv7eA23p6vDyruKsYXjFEGHoi`，`9e7a0cb`，11:54 東京）
+
+| 地點 | 情境 | 派錯／到店已關／約會酒吧／約會走超過 15 分 | 約會 | 聚餐 |
+|---|---|---|---|---|
+| 新宿 | 12/12 | 全 0 | JeMare 4.8★ 走 8 分 | 街中華X&C 4.4★ |
+| 八重洲 | 12/12 | 全 0 | シェ・イノ 4.7★ 走 4 分 | 万福 4.2★ |
+| 信義 | 12/12 | 全 0 | Bouillon 布雍家 4.3★ 走 4 分 | 王鍋屋 4.6★ |
+
+- 信義「還沒開」1 筆是外帶：朱記 11:00 開、10:54 出發走 7 分＝到店已開（規則允許，這輪沒動）。
+- 這三次的約會／聚餐候選裡沒有主類別是外帶店的（dineIn 沒被觸發）；dineIn 的真請求證據在 `dinein/`（跟正式查法同一個 URL 與 fieldMask）。

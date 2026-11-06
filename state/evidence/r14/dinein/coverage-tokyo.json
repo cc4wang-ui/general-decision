@@ -1,0 +1,385 @@
+{
+ "loc": "東京八重洲",
+ "country": "JP",
+ "queries": [
+  {
+   "q": "イタリアン",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "フレンチ",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "寿司",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "天ぷら",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "和食",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "レストラン",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "居酒屋",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "焼肉",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "焼き鳥",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "お好み焼き",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "中華料理",
+   "status": 200,
+   "raw": 20
+  },
+  {
+   "q": "韓国料理",
+   "status": 200,
+   "raw": 20
+  }
+ ],
+ "rows": [
+  {
+   "name": "angelo",
+   "id": "ChIJ9frbIO-LGGAROB4y7ep1wMw",
+   "primaryType": "italian_restaurant",
+   "types": [
+    "italian_restaurant",
+    "japanese_izakaya_restaurant",
+    "snack_bar",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "european_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "イタリアン"
+   ]
+  },
+  {
+   "name": "東京寿司 ITAMAE SUSHI 銀座コリドー店",
+   "id": "ChIJh0c-ze6LGGARYol64XwKjCo",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ]
+  },
+  {
+   "name": "ちよだ鮨 人形町店",
+   "id": "ChIJWVRx1FGJGGARu-tClW9_aV8",
+   "primaryType": "meal_takeaway",
+   "types": [
+    "sushi_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ],
+   "dineIn": false,
+   "detailStatus": 200
+  },
+  {
+   "name": "すしざんまい 匠銀座6丁目店",
+   "id": "ChIJq6pWQe-LGGARJ199D_hXWnI",
+   "primaryType": "sushi_restaurant",
+   "types": [
+    "sushi_restaurant",
+    "japanese_izakaya_restaurant",
+    "seafood_restaurant",
+    "snack_bar",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "food_store",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "store",
+    "establishment"
+   ],
+   "queries": [
+    "寿司"
+   ]
+  },
+  {
+   "name": "天丼てんや 銀座店",
+   "id": "ChIJbWIRNuGLGGARJMb-vHaiWmo",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天ぷら"
+   ]
+  },
+  {
+   "name": "天丼てんや 八重洲店",
+   "id": "ChIJzQEVm_yLGGAR1QSl3jr9CNU",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "天ぷら"
+   ]
+  },
+  {
+   "name": "創作和食居酒屋 いわ瀬（美酒味肴） 人形町",
+   "id": "ChIJJ6O_M1CJGGARMfN33Nnrb-M",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "和食",
+    "居酒屋"
+   ]
+  },
+  {
+   "name": "和もと",
+   "id": "ChIJF-Khw-aLGGARnKCqBZ8AdtU",
+   "primaryType": "japanese_restaurant",
+   "types": [
+    "japanese_restaurant",
+    "snack_bar",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "和食"
+   ]
+  },
+  {
+   "name": "大衆居酒屋 とりいちず 人形町店",
+   "id": "ChIJm83wv1GJGGARS0FV5GuhLEE",
+   "primaryType": "japanese_izakaya_restaurant",
+   "types": [
+    "japanese_izakaya_restaurant",
+    "yakitori_restaurant",
+    "chicken_restaurant",
+    "japanese_restaurant",
+    "hot_pot_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "居酒屋"
+   ]
+  },
+  {
+   "name": "東京一頭やコレド室町テラス店",
+   "id": "ChIJZwsk_9iLGGAR8QKh8OWZISQ",
+   "primaryType": "yakiniku_restaurant",
+   "types": [
+    "yakiniku_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "焼肉"
+   ]
+  },
+  {
+   "name": "焼肉とワイン 醍醐銀座店",
+   "id": "ChIJk4z8B-aLGGARRKEbEaSHJcw",
+   "primaryType": "restaurant",
+   "types": [
+    "restaurant",
+    "wine_bar",
+    "japanese_izakaya_restaurant",
+    "yakiniku_restaurant",
+    "japanese_restaurant",
+    "korean_restaurant",
+    "bar",
+    "meal_takeaway",
+    "steak_house",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "焼肉"
+   ]
+  },
+  {
+   "name": "台湾料理 老李 東京 日本橋本店",
+   "id": "ChIJQdi4-VOJGGARYGBgCMMEHO0",
+   "primaryType": "taiwanese_restaurant",
+   "types": [
+    "taiwanese_restaurant",
+    "dim_sum_restaurant",
+    "chinese_noodle_restaurant",
+    "ramen_restaurant",
+    "cantonese_restaurant",
+    "snack_bar",
+    "meal_takeaway",
+    "japanese_restaurant",
+    "chinese_restaurant",
+    "restaurant",
+    "point_of_interest",
+    "food",
+    "establishment"
+   ],
+   "queries": [
+    "中華料理"
+   ]
+  },
+  {
+   "name": "土火土火 東京・八重洲本店",
+   "id": "ChIJk-lqlf2LGGAR_fA7NTQEeG0",
+   "primaryType": "korean_restaurant",
+   "types": [
+    "korean_restaurant",
+    "japanese_izakaya_restaurant",
+    "japanese_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "韓国料理"
+   ]
+  },
+  {
+   "name": "韓豚屋 有楽町店",
+   "id": "ChIJaww8rO-LGGAR7CymGop9AVw",
+   "primaryType": "korean_restaurant",
+   "types": [
+    "korean_restaurant",
+    "korean_barbecue_restaurant",
+    "japanese_izakaya_restaurant",
+    "buffet_restaurant",
+    "yakiniku_restaurant",
+    "japanese_restaurant",
+    "hot_pot_restaurant",
+    "meal_takeaway",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "queries": [
+    "韓国料理"
+   ]
+  }
+ ],
+ "samples": [
+  {
+   "name": "トラットリア・ドゥ・タスク",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "La Cornice",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "la radice",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "トラットリア リアナ",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "オステリア・トラマンダーレ",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "タヴェルナ グスタヴィーノ",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "オステリア ダ アダ",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  },
+  {
+   "name": "トラットリア・イタリア 銀座店",
+   "primaryType": "italian_restaurant",
+   "status": 200,
+   "dineIn": true
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+URL: https://general-decision-jgnoe2la1-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=tokyo
+fetched: curl（分享連結 cookie）
+date: 2026-11-06 02:54:55 UTC（東京 11:54）
+status: 200
+x-vercel-id: iad1::iad1::gq9pv-1793933691961-fb8b6ffdd0a6

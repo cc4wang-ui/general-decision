@@ -1,0 +1,504 @@
+{
+ "loc": "東京八重洲",
+ "localHour": 11,
+ "rows": [
+  {
+   "id": "eat:一個人快吃",
+   "module": "eat",
+   "scene": "一個人快吃",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "風雲児 東京ラーメン横丁店",
+   "type": "ramen_restaurant",
+   "rating": 3.9,
+   "walkMin": 3,
+   "distM": 227,
+   "radiusM": 500,
+   "closeIn": 635,
+   "how": "text=\"ラーメン\" rank=DISTANCE",
+   "dbg": {
+    "id": "一個人快吃",
+    "kept": 18,
+    "total": 18,
+    "relaxed": false
+   },
+   "steps": [
+    "11:57 前抵達，點一碗招牌拉麵",
+    "喝完湯，12:17 前離開"
+   ],
+   "bot": "一碗湯麵，20分鐘內解決",
+   "ms": 2504
+  },
+  {
+   "id": "eat:外帶",
+   "module": "eat",
+   "scene": "外帶",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "海苔弁 八重八 by YANMAR MARCHÉ",
+   "type": "meal_takeaway",
+   "rating": 4.5,
+   "walkMin": 1,
+   "distM": 65,
+   "radiusM": 600,
+   "closeIn": 485,
+   "how": "text=\"テイクアウト\" rank=RELEVANCE",
+   "dbg": {
+    "id": "外帶",
+    "kept": 19,
+    "total": 19,
+    "relaxed": false
+   },
+   "takeaways": [
+    {
+     "name": "海苔弁 八重八 by YANMAR MARCHÉ",
+     "types": [
+      "meal_takeaway",
+      "food_store",
+      "restaurant",
+      "food",
+      "store",
+      "point_of_interest",
+      "establishment"
+     ]
+    },
+    {
+     "name": "屋台DELi丸の内トラストタワー店",
+     "types": [
+      "meal_takeaway",
+      "restaurant",
+      "food",
+      "point_of_interest",
+      "establishment"
+     ]
+    },
+    {
+     "name": "ゐざさ茶屋 グランスタ東京店",
+     "types": [
+      "meal_takeaway",
+      "deli",
+      "food_store",
+      "restaurant",
+      "food",
+      "store",
+      "point_of_interest",
+      "establishment"
+     ]
+    }
+   ],
+   "steps": [
+    "決定主餐：海苔飯便當選一款",
+    "決定配菜：漬物或小菜選一樣",
+    "外帶回去，12:30 前吃完"
+   ],
+   "bot": "一個口令一個動作，點了就走",
+   "ms": 2647
+  },
+  {
+   "id": "eat:朋友聚餐",
+   "module": "eat",
+   "scene": "朋友聚餐",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "個室居酒屋 万福 東京駅八重洲店",
+   "type": "japanese_izakaya_restaurant",
+   "rating": 4.2,
+   "walkMin": 5,
+   "distM": 390,
+   "radiusM": 1200,
+   "opensAt": "12:00",
+   "how": "text=\"居酒屋\" rank=DISTANCE",
+   "dbg": {
+    "id": "朋友聚餐",
+    "kept": 6,
+    "total": 8,
+    "relaxed": false
+   },
+   "steps": [
+    "12:00 到店，點 3～4 道串燒與 2～3 道下酒菜共享",
+    "輪流夾，別搶食",
+    "13:30 前離開"
+   ],
+   "bot": "點串燒拼盤、逸品下酒菜，90 分鐘內搞定",
+   "ms": 3171
+  },
+  {
+   "id": "eat:約會吃好一點",
+   "module": "eat",
+   "scene": "約會吃好一點",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "シェ・イノ",
+   "type": "french_restaurant",
+   "rating": 4.7,
+   "walkMin": 4,
+   "distM": 311,
+   "radiusM": 1200,
+   "closeIn": 95,
+   "how": "text=\"フレンチ\" rank=DISTANCE",
+   "dbg": {
+    "id": "約會吃好一點",
+    "kept": 10,
+    "total": 13,
+    "relaxed": false
+   },
+   "cands": [
+    {
+     "name": "シェ・イノ",
+     "type": "french_restaurant",
+     "rating": 4.7,
+     "walkMin": 4,
+     "closeIn": 95
+    },
+    {
+     "name": "Plaiga TOKYO",
+     "type": "french_restaurant",
+     "rating": 4.8,
+     "walkMin": 12,
+     "closeIn": 185
+    },
+    {
+     "name": "Le midi Ariso",
+     "type": "french_restaurant",
+     "rating": 4.8,
+     "walkMin": 10,
+     "closeIn": 185
+    },
+    {
+     "name": "デジレ銀座オザミ",
+     "type": "french_restaurant",
+     "rating": 4.7,
+     "walkMin": 11,
+     "closeIn": 155
+    },
+    {
+     "name": "ラペ La paix",
+     "type": "french_restaurant",
+     "rating": 4.6,
+     "walkMin": 11,
+     "closeIn": 155
+    },
+    {
+     "name": "レストラン プルニエ ／東京會舘",
+     "type": "french_restaurant",
+     "rating": 4.6,
+     "walkMin": 11,
+     "closeIn": 155
+    },
+    {
+     "name": "ISHIDA GINZA",
+     "type": "french_restaurant",
+     "rating": 4.7,
+     "walkMin": 8,
+     "opensAt": "12:00"
+    },
+    {
+     "name": "ドミニク・ブシェ トーキョー",
+     "type": "french_restaurant",
+     "rating": 4.5,
+     "walkMin": 8,
+     "opensAt": "12:00"
+    },
+    {
+     "name": "ドミナス",
+     "type": "french_restaurant",
+     "rating": 4.6,
+     "walkMin": 14,
+     "closeIn": 95
+    },
+    {
+     "name": "ポンドール・イノ",
+     "type": "french_restaurant",
+     "rating": 4.5,
+     "walkMin": 12,
+     "closeIn": 185
+    },
+    {
+     "name": "ラ・ボンヌターブル",
+     "type": "french_restaurant",
+     "rating": 4.4,
+     "walkMin": 12,
+     "closeIn": 185
+    },
+    {
+     "name": "BISTRO DOUBLE",
+     "type": "french_restaurant",
+     "rating": 4.1,
+     "walkMin": 9,
+     "closeIn": 185
+    },
+    {
+     "name": "Le Beurre Noisette TOKYO",
+     "type": "french_restaurant",
+     "rating": 4,
+     "walkMin": 10,
+     "closeIn": 185
+    }
+   ],
+   "steps": [
+    "11:58 到門口，點招牌主菜與酒水搭配",
+    "細嚼慢嚥，一道一道來，至少 90 分鐘",
+    "13:28 前離開"
+   ],
+   "bot": "招牌菜點下去，慢慢享受，不趕時間",
+   "ms": 2854
+  },
+  {
+   "id": "eat:宵夜",
+   "module": "eat",
+   "scene": "宵夜",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "蕎麦一心たすけ 日本橋店",
+   "type": "restaurant",
+   "rating": 3.8,
+   "walkMin": 5,
+   "distM": 400,
+   "radiusM": 1000,
+   "closeIn": 185,
+   "how": "text=\"牛丼\" rank=DISTANCE",
+   "dbg": {
+    "id": "宵夜",
+    "kept": 18,
+    "total": 18,
+    "relaxed": false
+   },
+   "takeaways": [
+    {
+     "name": "大漁丼家たまや 茅場町店",
+     "types": [
+      "meal_takeaway",
+      "restaurant",
+      "point_of_interest",
+      "food",
+      "establishment"
+     ]
+    }
+   ],
+   "steps": [
+    "點一碗蕎麦，清湯或冷麥選一種",
+    "就著配菜吃，不要磨蹭",
+    "12:29前起身，回宿舍"
+   ],
+   "bot": "30分鐘內輕輕吃，11:59到店，12:29回家",
+   "ms": 2888
+  },
+  {
+   "id": "eat:其他",
+   "module": "eat",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "サイアムヘリテイジ東京",
+   "type": "thai_restaurant",
+   "rating": 4.1,
+   "walkMin": 8,
+   "distM": 585,
+   "radiusM": 1000,
+   "closeIn": 155,
+   "how": "text=\"食べ放題 レストラン\" rank=DISTANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "吃到飽",
+    "kept": 19,
+    "total": 19,
+    "relaxed": false
+   },
+   "steps": [
+    "12:02 到店，直接入場",
+    "點飲料配菜色，輪流夾，不要猶豫",
+    "14:25 最後一輪，吃到飽就是吃飽"
+   ],
+   "bot": "12 點到，14 點前全部吃完，一個盤子一個動作",
+   "ms": 3189
+  },
+  {
+   "id": "rest:一個人放空",
+   "module": "rest",
+   "scene": "一個人放空",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "カフェカルディーノ／HAGARE ヤエチカ店",
+   "type": "cafe",
+   "rating": 3.9,
+   "walkMin": 2,
+   "distM": 137,
+   "radiusM": 600,
+   "closeIn": 635,
+   "how": "text=\"カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "一個人放空",
+    "kept": 11,
+    "total": 11,
+    "relaxed": false
+   },
+   "steps": [
+    "點一杯咖啡坐下",
+    "12:26 前不准離開",
+    "手機面朝下放包包"
+   ],
+   "bot": "坐 30 分鐘，手機收起來",
+   "ms": 2256
+  },
+  {
+   "id": "rest:工作讀書",
+   "module": "rest",
+   "scene": "工作讀書",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "スターバックス コーヒー 東京ミッドタウン八重洲店",
+   "type": "coffee_shop",
+   "rating": 4,
+   "walkMin": 2,
+   "distM": 85,
+   "radiusM": 1000,
+   "closeIn": 605,
+   "how": "text=\"電源 カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "工作讀書",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "進門先問店員插座位置",
+    "點一杯中杯咖啡，12:05前點完",
+    "12:05到13:35專心工作，中途不滑手機"
+   ],
+   "bot": "問插座、點咖啡、90分鐘專心讀書",
+   "ms": 3060
+  },
+  {
+   "id": "rest:朋友聊天",
+   "module": "rest",
+   "scene": "朋友聊天",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "ROARCOFFEE Tokyo Hatchobori",
+   "type": "coffee_shop",
+   "rating": 4.6,
+   "walkMin": 9,
+   "distM": 658,
+   "radiusM": 1000,
+   "closeIn": 365,
+   "how": "text=\"カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "朋友聊天",
+    "kept": 15,
+    "total": 15,
+    "relaxed": false
+   },
+   "steps": [
+    "找個四人座位坐下",
+    "點兩杯咖啡，一起喝",
+    "13:03 前不准走"
+   ],
+   "bot": "朋友聊天，坐滿一小時",
+   "ms": 2546
+  },
+  {
+   "id": "rest:談事情",
+   "module": "rest",
+   "scene": "談事情",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "日本橋ぺしゃわーる/カフェ&バー",
+   "type": "coffee_shop",
+   "rating": 4.3,
+   "walkMin": 3,
+   "distM": 230,
+   "radiusM": 1000,
+   "closeIn": 695,
+   "how": "text=\"静か カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "談事情",
+    "kept": 5,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "11:57 到門口，直接進去找角落位子坐下",
+    "點一杯咖啡，¥1,000～2,000 以內結帳",
+    "12:57 前離開，邊喝邊談完"
+   ],
+   "bot": "先點再談，別讓嘴巴閒著",
+   "ms": 3015
+  },
+  {
+   "id": "rest:等人",
+   "module": "rest",
+   "scene": "等人",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "神乃珈琲 ヤエチカ店",
+   "type": "cafe",
+   "rating": 3.8,
+   "walkMin": 2,
+   "distM": 148,
+   "radiusM": 400,
+   "closeIn": 605,
+   "how": "text=\"カフェ\" rank=DISTANCE",
+   "dbg": {
+    "id": "等人",
+    "kept": 13,
+    "total": 13,
+    "relaxed": false
+   },
+   "steps": [
+    "11:56 到店點一杯",
+    "坐滿 20 分鐘",
+    "12:16 起身離開"
+   ],
+   "bot": "20 分鐘內點一杯、手機放下、時間到就撤",
+   "ms": 2355
+  },
+  {
+   "id": "rest:其他",
+   "module": "rest",
+   "scene": "其他",
+   "status": 200,
+   "ok": true,
+   "pass": true,
+   "picked": "タリーズコーヒー ヤエチカ店",
+   "type": "coffee_shop",
+   "rating": 3.8,
+   "walkMin": 2,
+   "distM": 132,
+   "radiusM": 1000,
+   "closeIn": 605,
+   "how": "text=\"電源 カフェ\" rank=RELEVANCE",
+   "dbg": {
+    "id": "其他",
+    "text": "有插座",
+    "kept": 20,
+    "total": 20,
+    "relaxed": false
+   },
+   "steps": [
+    "進店直接問店員哪些座位有插座",
+    "點一杯咖啡，找插座座位坐下",
+    "60分鐘內喝完，手機面朝下"
+   ],
+   "bot": "先確認插座位置，再點餐",
+   "ms": 2631
+  }
+ ],
+ "summary": {
+  "scenarios": 12,
+  "ok": 12,
+  "pass": 12,
+  "failed": [],
+  "maxMs": 3189
+ }
+}
