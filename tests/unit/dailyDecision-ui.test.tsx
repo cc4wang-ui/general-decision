@@ -265,6 +265,11 @@ describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新�
     vi.stubGlobal('fetch', fetchMock)
     return fetchMock
   }
+  /** 最後一次 /api/daily-route 請求的 body（round 6 地區偏好區塊的既有 helper，型別正確）。 */
+  const lastBody = (mock: ReturnType<typeof vi.fn>) => {
+    const call = mock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route'))
+    return JSON.parse(String(call![1].body)) as Record<string, unknown>
+  }
   it('F2b：markDailyDislike 寫入失敗 → 顯示失敗、不進 localStorage 的 disliked、店還在（再按一次可以重試）', async () => {
     const { markDailyDislike } = await import('../../src/placeMem.ts')
     vi.mocked(markDailyDislike).mockRejectedValueOnce(new Error('IndexedDB 寫入失敗'))
@@ -291,7 +296,7 @@ describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新�
     const saved = JSON.parse(localStorage.getItem(KEY)!) as { disliked: string[]; seen?: Record<string, string[]> }
     expect(saved.disliked).toEqual(['d47'])
     expect(saved.seen?.meal).toEqual(['d47'])
-    const body = JSON.parse(String(fetchMock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route'))![1]!.body)) as { exclude: string[]; shuffle?: string }
+    const body = lastBody(fetchMock) as { exclude: string[]; shuffle?: string }
     expect(body.exclude).toContain('d47')
     expect(body.shuffle).toBe('meal')
   })
@@ -307,7 +312,7 @@ describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新�
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.click(screen.getByTestId('daily-generate'))
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
-    const body = JSON.parse(String(fetchMock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route'))![1]!.body)) as { seen?: string[]; shuffle?: string }
+    const body = lastBody(fetchMock) as { seen?: string[]; shuffle?: string }
     expect(body.seen).toEqual(expect.arrayContaining(['old-1', 'old-2', 'cur-1']))
     expect('shuffle' in body).toBe(false)
   })

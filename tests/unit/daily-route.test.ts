@@ -1580,7 +1580,6 @@ describe('round 10：R9-K1 同一請求內防重複（本請求已挑出的店�
 })
 
 describe('round 11：壁畫地標拒絕／完整重新生成隨機化／seen 送完整重新生成／N1～N7＋品牌表伺服器雙向', () => {
-  const SHIBUYA = { lat: 35.6595, lng: 139.7005 } // 渋谷駅＝澀谷地區中心
   type StopOut = { id: string; title?: string; candidate?: { id: string; name?: string; userRatingCount?: number; types?: string[]; primaryType?: string }; noCandidate?: boolean; noCandidateReason?: string }
   const readStops = async (res: Response) => (await res.json() as { stops: StopOut[] }).stops
   const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
