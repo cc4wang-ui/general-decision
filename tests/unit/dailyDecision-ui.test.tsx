@@ -1,6 +1,11 @@
 // UI 誠實度（紅隊 §3.1）：認不出種類的店，不顯示「不要這類」按鈕；認得出的才顯示。
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+/** placeMem 封鎖清單 mock：截斷通知測試需要 150 個封鎖 id；其他測試不按「不喜歡」，不受影響。 */
+vi.mock('../../src/placeMem.ts', () => ({
+  blockedPlaceIds: async () => Array.from({ length: 150 }, (_, i) => 'p' + i),
+  markNeverAgain: async () => {},
+}))
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { DailyDecision } from '../../src/dailyDecision.tsx'
 
@@ -35,8 +40,16 @@ describe('「不要這類」按鈕只在認得出種類時出現', () => {
     const dislike = screen.getByText('不喜歡這間店')
     expect(dislike.getAttribute('title')).toBe('只排除這一間店（無法判斷種類）')
   })
-  it('麺喜やしま（認得出是烏龍麵）：出現「不要『烏龍麵』這類」按鈕', async () => {
+  it('麺喜やしま（round 7 是漏判）：沒有「不要這類」按鈕；「不喜歡這間店」標明只排除這一間', async () => {
     seed(cand('yashima-1', '麺喜やしま'))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.queryByText(/不要「/)).toBeNull()
+    const dislike = screen.getByText('不喜歡這間店')
+    expect(dislike.getAttribute('title')).toBe('只排除這一間店（無法判斷種類）')
+  })
+  it('讃岐うどん まるや（認得出是烏龍麵）：出現「不要『烏龍麵』這類」按鈕', async () => {
+    seed(cand('maruya-1', '讃岐うどん まるや'))
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     expect(screen.getByText('不要「烏龍麵」這類')).toBeTruthy()
@@ -109,5 +122,58 @@ describe('單站換站文案（紅隊 round 5 F8，round 6）', () => {
     expect(screen.getByTestId('daily-generate').textContent).not.toBe('搜尋中…')
     resolveFetch({ ok: true, json: async () => ({ stops: [], routeVerified: false, conflicts: [] }) })
     await waitFor(() => expect(screen.queryByText('正在找這一站的替代地點…')).toBeNull())
+  })
+})
+
+describe('無候選站顯示（紅隊 round 6 L1／L2，round 7）', () => {
+  const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
+  const seedNoCandidate = (reason: 'area' | 'filtered' | 'empty') => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      tasks: [{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: reason }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+  }
+  it('原因 area：顯示地區偏好是原因、怎麼解除（不是籠統的「地點尚未確認」）', async () => {
+    seedNoCandidate('area')
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.getByText(/地區偏好（澀谷，1 公里內）可能擋住了附近的店/)).toBeTruthy()
+    expect(screen.getByText(/關掉「只在這一帶找店」或改選其他地區再試/)).toBeTruthy()
+  })
+  it('原因 filtered：顯示都被排除了、要清「不喜歡」或放寬條件', async () => {
+    seedNoCandidate('filtered')
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.getByText(/符合的店都被排除了/)).toBeTruthy()
+  })
+  it('無候選站有「換這一站」按鈕（可以重找），沒有「不喜歡這間店」按鈕（沒有店可按）', async () => {
+    seedNoCandidate('area')
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.getByText('↻ 換這一站')).toBeTruthy()
+    expect(screen.queryByText('不喜歡這間店')).toBeNull()
+    expect(screen.queryByText(/不要「/)).toBeNull()
+  })
+})
+
+describe('排除清單截斷通知（round 7）', () => {
+  const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
+  it('placeMem 封鎖 150＋不喜歡 100 → 生成後顯示截斷通知（50 個未送出）', async () => {
+    const disliked = Array.from({ length: 100 }, (_, i) => 'd' + i)
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('s1', '某咖啡店') }],
+      notes: [], avoid: [], seen: {}, disliked, dislikedKinds: [],
+    }))
+    const fetchMock = vi.fn(async (url: string | URL | Request) => String(url).includes('/api/daily-route')
+      ? { ok: true, json: async () => ({ stops: [], routeVerified: false, conflicts: [] }) }
+      : { ok: false })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(screen.getByText(/排除清單已滿（上限 200）：50 個/)).toBeTruthy())
   })
 })

@@ -201,14 +201,15 @@ describe('shuffle 不重複（seen-list＋隨機）', () => {
     expect(new Set(picked).size).toBe(5)
   })
 
-  it('候選全被排除：回 422 no_more_options，而不是靜默留原店', async () => {
+  it('候選全被排除：該站顯示無候選（200），而不是整單 422，也不是靜默留原店', async () => {
     const g = mockGoogleSinglePage()
     void g
     const res = await handler(post({ origin: HERE, shuffle: 'meal', exclude: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
-    expect(res.status).toBe(422)
-    const data = await res.json() as { error: string; message: string }
-    expect(data.error).toBe('no_more_options')
-    expect(data.message).toContain('沒有更多選擇')
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(data.stops[0]!.candidate).toBeUndefined()
+    expect(data.stops[0]!.noCandidate).toBe(true)
+    expect(data.stops[0]!.noCandidateReason).toBe('filtered')
   })
 
   it('第一頁候選全被排除：用 pageToken 翻下一頁，選到第二頁的店', async () => {
@@ -288,13 +289,31 @@ describe('種類級排除（真實店名，紅隊 §3.1）', () => {
     vi.stubGlobal('fetch', f)
     return { f, calls }
   }
-  it("excludeKinds ['udon']：麺喜やしま不被選（名字只有一個「麺」字，類型只有 restaurant）", async () => {
-    const g = mockKind(yashimaShop)
+  function mockSingle(first: unknown) {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [first] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f }
+  }
+  it("excludeKinds ['udon']：麺喜やしま不被種類排除（round 7：弱訊號刪掉後是漏判——名字只有一個「麺」字、類型只有 restaurant，種類判不出來；擋它只能靠單店排除）", async () => {
+    const g = mockSingle(yashimaShop)
     void g
     const res = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
-    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+    expect(data.stops[0]!.candidate?.id).toBe('yashima-1')
+  })
+  it('exclude [麺喜やしま的 id]：單店排除照樣擋得住它（漏判的店只能這樣擋）', async () => {
+    const g = mockSingle(yashimaShop)
+    void g
+    const res = await handler(post({ origin: HERE, exclude: ['yashima-1'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(data.stops[0]!.candidate).toBeUndefined()
+    expect(data.stops[0]!.noCandidate).toBe(true)
+    expect(data.stops[0]!.noCandidateReason).toBe('filtered')
   })
   it("excludeKinds ['yakiniku']：叙々苑不被選（yakiniku_restaurant 歸一化成 yakiniku）", async () => {
     const g = mockKind(jojoenShop)
@@ -334,7 +353,7 @@ const chukaSobaShop = place('chuka-soba-1', 35.691, 139.701, {
 })
 
 describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
-  /** 池子裡只有一家店：被排除就 422，選中才是沒被誤判。 */
+  /** 池子裡只有一家店：被排除就無候選，選中才是沒被誤判。 */
   function mockSingle(first: unknown) {
     const f = vi.fn(async (url: string | URL | Request) => {
       if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
@@ -378,7 +397,7 @@ describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
 })
 
 describe('種類判斷修正（紅隊 round 3 Finding B：中華そば）', () => {
-  /** 池子裡只有一家店：被排除就 422，選中才是沒被誤判。 */
+  /** 池子裡只有一家店：被排除就無候選，選中才是沒被誤判。 */
   function mockSingle(first: unknown) {
     const f = vi.fn(async (url: string | URL | Request) => {
       if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
@@ -491,7 +510,7 @@ const sobaAnShop = place('soba-an-1', 35.691, 139.701, {
 })
 
 describe('種類判斷修正（紅隊 round 4 Finding 1／2／3）', () => {
-  /** 池子裡只有一家店：被排除就 422，選中才是沒被誤判。 */
+  /** 池子裡只有一家店：被排除就無候選，選中才是沒被誤判。 */
   function mockSingle(first: unknown) {
     const f = vi.fn(async (url: string | URL | Request) => {
       if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
@@ -601,22 +620,26 @@ describe('非自動站新解析也跑 DENY 檢查（紅隊 round 4 Finding 4）'
     vi.stubGlobal('fetch', f)
     return { f }
   }
-  it('meal 指定「渋谷駅」、查回只有車站：不回傳車站當候選（422 no_more_options）', async () => {
+  it('meal 指定「渋谷駅」、查回只有車站：不回傳車站當候選（200＋無候選，不是整單 422）', async () => {
     const g = mockPlaces([stationShop])
     void g
     const res = await handler(post({ origin: HERE, stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, specified: true, place: '渋谷駅' }] }))
-    expect(res.status).toBe(422)
-    const data = await res.json() as { error?: string }
-    expect(data.error).toBe('no_more_options')
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(data.stops[0]!.candidate).toBeUndefined()
+    expect(data.stops[0]!.noCandidate).toBe(true)
+    expect(data.stops[0]!.noCandidateReason).toBe('filtered')
     expect(JSON.stringify(data)).not.toContain('shibuya-station')
   })
-  it('meal 固定安排「渋谷駅」、查回只有車站：不回傳車站當候選（422 unresolved_stops）', async () => {
+  it('meal 固定安排「渋谷駅」、查回只有車站：不回傳車站當候選（200＋無候選，不是 422 unresolved_stops）', async () => {
     const g = mockPlaces([stationShop])
     void g
     const res = await handler(post({ origin: HERE, stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, locked: true, custom: true, place: '渋谷駅' }] }))
-    expect(res.status).toBe(422)
-    const data = await res.json() as { error?: string }
-    expect(data.error).toBe('unresolved_stops')
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(data.stops[0]!.candidate).toBeUndefined()
+    expect(data.stops[0]!.noCandidate).toBe(true)
+    expect(data.stops[0]!.noCandidateReason).toBe('filtered')
     expect(JSON.stringify(data)).not.toContain('shibuya-station')
   })
   it('meal 指定「渋谷駅」、查回車站＋合格店：選合格店，不選車站', async () => {
@@ -630,7 +653,7 @@ describe('非自動站新解析也跑 DENY 檢查（紅隊 round 4 Finding 4）'
 })
 
 describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表）', () => {
-  /** 池子裡只有一家店：被排除就 422，選中才是沒被誤判。雙向都要驗：排除真種類要 422，排除誤判種類要 200。 */
+  /** 池子裡只有一家店：被排除就無候選，選中才是沒被誤判。雙向都要驗：排除真種類要 200＋無候選，排除誤判種類要 200 選中。 */
   function mockSingle(first: unknown) {
     const f = vi.fn(async (url: string | URL | Request) => {
       if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
@@ -641,33 +664,39 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
   }
   const mealStop = [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }]
   const coffeeStop = [{ id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 30 }]
-  const shop = (id: string, name: string) => place(id, 35.691, 139.701, {
+  const shop = (id: string, name: string, primaryType = 'restaurant') => place(id, 35.691, 139.701, {
     displayName: { text: name }, rating: 4.5, userRatingCount: 200,
-    types: ['restaurant'], primaryType: 'restaurant',
+    types: [primaryType, 'restaurant'], primaryType,
   })
   const kaenShop = shop('kaen-1', 'らあめん花月嵐')
   const nitenShop = shop('niten-1', 'つけそば 弐天')
   const ryusukeShop = shop('ryusuke-1', '特級鶏蕎麦 龍介')
-  const nagayoshiShop = shop('nagayoshi-1', '手打麺 永吉')
+  // 手打麺 永吉／麺食堂88：名字只有模糊前綴（round 7 刪掉前綴表後認不出來），
+  // 真實的 Google primaryType 是 ramen_restaurant——類型優先就認得出。
+  const nagayoshiShop = shop('nagayoshi-1', '手打麺 永吉', 'ramen_restaurant')
   const oomeShop = shop('oome-1', 'らー麺 大芽')
-  const shokudo88Shop = shop('shokudo88-1', '麺食堂88')
+  const shokudo88Shop = shop('shokudo88-1', '麺食堂88', 'ramen_restaurant')
   const akedoyaShop = shop('akedoya-1', 'ら～麺あけどや')
   const sobaShinShop = shop('sobashin-1', '麺処、そば志ん、')
   const miyagawaShop = shop('miyagawa-1', 'やき鳥 宮川')
   const nagomiyaShop = shop('nagomiya-1', '炭火焼き鳥 池袋 和み屋')
   const saitoShop = shop('saito-1', '鮨 さいとう')
   const renoirShop = shop('renoir-1', '喫茶室ルノアール')
-  it("F1：らあめん花月嵐是拉麵——excludeKinds ['ramen'] → 422；['udon'] → 200 選中", async () => {
+  it("F1：らあめん花月嵐是拉麵——excludeKinds ['ramen'] → 200 無候選；['udon'] → 200 選中", async () => {
     mockSingle(kaenShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
     mockSingle(kaenShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: mealStop }))
     expect(good.status).toBe(200)
     const data = await good.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('kaen-1')
   })
-  it("F3：つけそば 弐天是拉麵——['soba'] → 200 選中；['ramen'] → 422", async () => {
+  it("F3：つけそば 弐天是拉麵——['soba'] → 200 選中；['ramen'] → 200 無候選", async () => {
     mockSingle(nitenShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -675,9 +704,13 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(data.stops[0]!.candidate?.id).toBe('niten-1')
     mockSingle(nitenShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F3：特級鶏蕎麦 龍介是拉麵——['soba'] → 200 選中；['ramen'] → 422", async () => {
+  it("F3：特級鶏蕎麦 龍介是拉麵——['soba'] → 200 選中；['ramen'] → 200 無候選", async () => {
     mockSingle(ryusukeShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -685,9 +718,13 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(data.stops[0]!.candidate?.id).toBe('ryusuke-1')
     mockSingle(ryusukeShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F4：手打麺 永吉是拉麵——['udon'] → 200 選中；['ramen'] → 422", async () => {
+  it("F4：手打麺 永吉是拉麵——['udon'] → 200 選中；['ramen'] → 200 無候選", async () => {
     mockSingle(nagayoshiShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -695,9 +732,13 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(data.stops[0]!.candidate?.id).toBe('nagayoshi-1')
     mockSingle(nagayoshiShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F4：らー麺 大芽是拉麵——['udon'] → 200 選中；['ramen'] → 422", async () => {
+  it("F4：らー麺 大芽是拉麵——['udon'] → 200 選中；['ramen'] → 200 無候選", async () => {
     mockSingle(oomeShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -705,9 +746,13 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(data.stops[0]!.candidate?.id).toBe('oome-1')
     mockSingle(oomeShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F4：麺食堂88是拉麵——['udon'] → 200 選中；['ramen'] → 422", async () => {
+  it("F4：麺食堂88是拉麵——['udon'] → 200 選中；['ramen'] → 200 無候選", async () => {
     mockSingle(shokudo88Shop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -715,9 +760,13 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(data.stops[0]!.candidate?.id).toBe('shokudo88-1')
     mockSingle(shokudo88Shop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F4：ら～麺あけどや是拉麵——['udon'] → 200 選中；['ramen'] → 422", async () => {
+  it("F4：ら～麺あけどや是拉麵——['udon'] → 200 選中；['ramen'] → 200 無候選", async () => {
     mockSingle(akedoyaShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -725,9 +774,13 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(data.stops[0]!.candidate?.id).toBe('akedoya-1')
     mockSingle(akedoyaShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F6：麺処、そば志ん、是蕎麥麵——['ramen'] → 200 選中；['soba'] → 422", async () => {
+  it("F6：麺処、そば志ん、是蕎麥麵——['ramen'] → 200 選中；['soba'] → 200 無候選", async () => {
     mockSingle(sobaShinShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -735,42 +788,62 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(data.stops[0]!.candidate?.id).toBe('sobashin-1')
     mockSingle(sobaShinShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F2：やき鳥 宮川是串燒——['yakitori'] → 422；['ramen'] → 200 選中", async () => {
+  it("F2：やき鳥 宮川是串燒——['yakitori'] → 200 無候選；['ramen'] → 200 選中", async () => {
     mockSingle(miyagawaShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['yakitori'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
     mockSingle(miyagawaShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(good.status).toBe(200)
     const data = await good.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('miyagawa-1')
   })
-  it("F2：炭火焼き鳥 池袋 和み屋是串燒——['yakitori'] → 422；['ramen'] → 200 選中", async () => {
+  it("F2：炭火焼き鳥 池袋 和み屋是串燒——['yakitori'] → 200 無候選；['ramen'] → 200 選中", async () => {
     mockSingle(nagomiyaShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['yakitori'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
     mockSingle(nagomiyaShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(good.status).toBe(200)
     const data = await good.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('nagomiya-1')
   })
-  it("F5：鮨 さいとう是壽司——['sushi'] → 422；['ramen'] → 200 選中", async () => {
+  it("F5：鮨 さいとう是壽司——['sushi'] → 200 無候選；['ramen'] → 200 選中", async () => {
     mockSingle(saitoShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['sushi'], stops: mealStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
     mockSingle(saitoShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(good.status).toBe(200)
     const data = await good.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('saito-1')
   })
-  it("F5：喫茶室ルノアール是咖啡——咖啡站 ['cafe'] → 422；['ramen'] → 200 選中", async () => {
+  it("F5：喫茶室ルノアール是咖啡——咖啡站 ['cafe'] → 200 無候選；['ramen'] → 200 選中", async () => {
     mockSingle(renoirShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['cafe'], stops: coffeeStop }))
-    expect(bad.status).toBe(422)
+    expect(bad.status).toBe(200)
+    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(badData.stops[0]!.candidate).toBeUndefined()
+    expect(badData.stops[0]!.noCandidate).toBe(true)
+    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
     mockSingle(renoirShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: coffeeStop }))
     expect(good.status).toBe(200)
@@ -812,12 +885,14 @@ describe('地區偏好（紅隊 round 5 F7，round 6 結構化修復）', () => 
     expect(res.status).toBe(200)
     expect(await candidateId(res)).toBe('sundrug-shibuya')
   })
-  it('地區偏好開啟：池子只有原宿店 → 422 no_more_options（不是默默選跨區店）', async () => {
+  it('地區偏好開啟：池子只有原宿店 → 200＋無候選（原因 area，不是默默選跨區店，也不是整單 422）', async () => {
     mockPlaces([harajukuDrug])
     const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: shoppingStop }))
-    expect(res.status).toBe(422)
-    const data = await res.json() as { error?: string }
-    expect(data.error).toBe('no_more_options')
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(data.stops[0]!.candidate).toBeUndefined()
+    expect(data.stops[0]!.noCandidate).toBe(true)
+    expect(data.stops[0]!.noCandidateReason).toBe('area')
   })
   it('地區偏好關掉：池子只有原宿店 → 200 選中原宿店', async () => {
     mockPlaces([harajukuDrug])
@@ -825,12 +900,14 @@ describe('地區偏好（紅隊 round 5 F7，round 6 結構化修復）', () => 
     expect(res.status).toBe(200)
     expect(await candidateId(res)).toBe('sugi-harajuku')
   })
-  it('地區偏好開啟、澀谷店被排除：池子有原宿店＋澀谷店 → 422（不退回跨區店）', async () => {
+  it('地區偏好開啟、澀谷店被排除：池子有原宿店＋澀谷店 → 200＋無候選（原因 area，不退回跨區店）', async () => {
     mockPlaces([harajukuDrug, shibuyaDrug])
     const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, exclude: ['sundrug-shibuya'], stops: shoppingStop }))
-    expect(res.status).toBe(422)
-    const data = await res.json() as { error?: string }
-    expect(data.error).toBe('no_more_options')
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(data.stops[0]!.candidate).toBeUndefined()
+    expect(data.stops[0]!.noCandidate).toBe(true)
+    expect(data.stops[0]!.noCandidateReason).toBe('area')
   })
   it('地區偏好關掉、澀谷店被排除：池子有原宿店＋澀谷店 → 200 選中原宿店', async () => {
     mockPlaces([harajukuDrug, shibuyaDrug])
@@ -838,11 +915,14 @@ describe('地區偏好（紅隊 round 5 F7，round 6 結構化修復）', () => 
     expect(res.status).toBe(200)
     expect(await candidateId(res)).toBe('sugi-harajuku')
   })
-  it('未知地區名：不過濾（防禦：舊資料或打錯字不該整單失敗）', async () => {
+  it('未知地區名：退回澀谷（round 7，不再 fail-open——未知地區＋開啟時原宿店要被擋掉，顯示無候選原因 area）', async () => {
     mockPlaces([harajukuDrug])
     const res = await handler(post({ origin: SHIBUYA, area: '吉祥寺', areaOnly: true, stops: shoppingStop }))
     expect(res.status).toBe(200)
-    expect(await candidateId(res)).toBe('sugi-harajuku')
+    const data = await res.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
+    expect(data.stops[0]!.candidate).toBeUndefined()
+    expect(data.stops[0]!.noCandidate).toBe(true)
+    expect(data.stops[0]!.noCandidateReason).toBe('area')
   })
   it('指定地點不受地區限制：指定「スギ薬局 原宿店」、地區偏好開啟 → 照樣保留', async () => {
     mockPlaces([harajukuDrug])
@@ -893,5 +973,206 @@ describe('既有候選保留規則統一（紅隊 round 5 item 7，round 6）', 
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate).toBeUndefined()
+  })
+})
+
+/** Round 7 結構性修復：既有候選重驗（L1／L2）、無候選取代整單 422、F7 錨點、邊界、Routes 成功合併。 */
+describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）', () => {
+  const SHIBUYA = { lat: 35.6595, lng: 139.7005 } // 渋谷駅＝澀谷地區中心
+  /** 澀谷店（距中心約 72 公尺）、第二間澀谷店（約 35 公尺）、原宿店（約 1233 公尺）。 */
+  const shibuyaDrug = place('sundrug-shibuya', 35.6590, 139.7010, {
+    displayName: { text: 'サンドラッグ 渋谷店' }, rating: 4.1, userRatingCount: 200,
+    types: ['drugstore'], primaryType: 'drugstore',
+  })
+  const shibuyaDrug2 = place('matsukiyo-shibuya', 35.6592, 139.7008, {
+    displayName: { text: 'マツモトキヨシ 渋谷店' }, rating: 4.0, userRatingCount: 180,
+    types: ['drugstore'], primaryType: 'drugstore',
+  })
+  const harajukuDrug = place('sugi-harajuku', 35.6704, 139.7030, {
+    displayName: { text: 'スギ薬局 原宿店' }, rating: 4.0, userRatingCount: 150,
+    types: ['drugstore'], primaryType: 'drugstore',
+  })
+  /** 伺服器收到的既有候選是 lat／lng 形狀。 */
+  const drugCandidate = (p: ReturnType<typeof place>, extra: Record<string, unknown> = {}) => ({
+    id: p.id, name: p.displayName.text, address: p.formattedAddress, mapUrl: p.googleMapsUri,
+    lat: p.location.latitude, lng: p.location.longitude, rating: p.rating,
+    userRatingCount: p.userRatingCount, types: p.types, primaryType: p.primaryType, ...extra,
+  })
+  const shoppingStop = (candidate?: unknown) => [{ id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30, ...(candidate ? { candidate } : {}) }]
+  type StopOut = { id: string; candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string; place?: string }
+  /** Response 的 body 只能讀一次：一次讀完再按 id 找站。 */
+  const readStops = async (res: Response) => (await res.json() as { stops: StopOut[] }).stops
+  const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
+  function mockPlaces(places: unknown[]) {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f }
+  }
+  /** 依查詢回不同池子：meal 查回麺喜やしま（只有它），coffee 查回一間咖啡店。 */
+  function mockPerQuery() {
+    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      const q = String(body.textQuery)
+      const places = q.includes('coffee') ? [validShop('cafe-1', 0)] : [yashimaShop]
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f }
+  }
+  it('L1：地區偏好開啟＋既有原宿候選＋整單重找 → 原宿店被換成澀谷店，不再照留', async () => {
+    mockPlaces([harajukuDrug, shibuyaDrug])
+    const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: shoppingStop(drugCandidate(harajukuDrug)) }))
+    expect(res.status).toBe(200)
+    const stop = stopOf(await readStops(res), 'shopping')
+    expect(stop.candidate?.id).toBe('sundrug-shibuya')
+    expect(stop.noCandidate).toBeUndefined()
+  })
+  it('L1：既有候選評論只有 12 則 → 不保留，換成合格店', async () => {
+    mockPlaces([shibuyaDrug])
+    const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: shoppingStop(drugCandidate(shibuyaDrug, { userRatingCount: 12 })) }))
+    expect(res.status).toBe(200)
+    const stop = stopOf(await readStops(res), 'shopping')
+    expect(stop.candidate?.id).toBe('sundrug-shibuya')
+  })
+  it('L1：既有候選在 exclude 裡 → 不保留，換成另一間澀谷店', async () => {
+    mockPlaces([shibuyaDrug, shibuyaDrug2])
+    const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, exclude: ['sundrug-shibuya'], stops: shoppingStop(drugCandidate(shibuyaDrug)) }))
+    expect(res.status).toBe(200)
+    const stop = stopOf(await readStops(res), 'shopping')
+    expect(stop.candidate?.id).toBe('matsukiyo-shibuya')
+  })
+  it('L1：既有候選的種類在 excludeKinds 裡 → 不保留，換成別的店', async () => {
+    const maruyaCandidate = { id: 'maruya-1', name: '讃岐うどん まるや', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=maruya-1', lat: 35.6590, lng: 139.7010, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' }
+    mockPlaces([validShop('ok1', 0)])
+    const res = await handler(post({ origin: SHIBUYA, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: maruyaCandidate }] }))
+    expect(res.status).toBe(200)
+    const stop = stopOf(await readStops(res), 'meal')
+    expect(stop.candidate?.id).toBe('ok1')
+  })
+  it('L1：指定地點的候選被按「不喜歡」：id 排除對所有站生效，改顯示無候選（地點文字留著）', async () => {
+    const stationCandidate = { id: 'shibuya-station', name: '渋谷駅', address: '渋谷駅地下 1F', mapUrl: 'https://maps.google.com/?cid=shibuya-station', lat: 35.6595, lng: 139.7005, rating: 4.2, userRatingCount: 9000, types: ['transit_station', 'train_station'], primaryType: 'transit_station' }
+    mockPlaces([stationShop])
+    const res = await handler(post({ origin: HERE, exclude: ['shibuya-station'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, specified: true, place: '渋谷駅', candidate: stationCandidate }] }))
+    expect(res.status).toBe(200)
+    const stop = stopOf(await readStops(res), 'meal')
+    expect(stop.candidate).toBeUndefined()
+    expect(stop.noCandidate).toBe(true)
+    expect(stop.noCandidateReason).toBe('filtered')
+    expect(stop.place).toBe('渋谷駅')
+  })
+  it('L2：不喜歡的店＋池子只有它＋shuffle → 該站無候選（200），店消失，整單不 422，其他站照常', async () => {
+    mockPerQuery()
+    const yashimaCandidate = { id: 'yashima-1', name: '麺喜やしま', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=yashima-1', lat: 35.691, lng: 139.701, rating: 4.2, userRatingCount: 808, types: ['restaurant'], primaryType: 'restaurant' }
+    const res = await handler(post({ origin: HERE, shuffle: 'meal', exclude: ['yashima-1'], stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: yashimaCandidate },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60 },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    const meal = stopOf(stops, 'meal')
+    expect(meal.candidate).toBeUndefined()
+    expect(meal.noCandidate).toBe(true)
+    expect(meal.noCandidateReason).toBe('filtered')
+    const coffee = stopOf(stops, 'coffee')
+    expect(coffee.candidate?.id).toBe('cafe-1')
+    // 再重找一次：還是無候選，不會把不喜歡的店找回來。
+    mockPerQuery()
+    const again = await handler(post({ origin: HERE, exclude: ['yashima-1'], stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, noCandidate: true, noCandidateReason: 'filtered' },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60, candidate: { id: 'cafe-1', name: 'cafe-1食堂', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=cafe-1', lat: 35.69, lng: 139.70, rating: 4.5, userRatingCount: 120, types: ['restaurant'], primaryType: 'restaurant' } },
+    ] }))
+    expect(again.status).toBe(200)
+    const mealAgain = stopOf(await readStops(again), 'meal')
+    expect(mealAgain.candidate).toBeUndefined()
+    expect(mealAgain.noCandidate).toBe(true)
+  })
+  it('F7 錨點：GPS 在新宿、地區是澀谷、池子只有新宿店 → 200＋無候選（原因 area，不是只說換出發地）', async () => {
+    const shinjukuDrug = place('sugi-shinjuku', 35.6900, 139.7010, {
+      displayName: { text: 'スギ薬局 新宿店' }, rating: 4.0, userRatingCount: 150,
+      types: ['drugstore'], primaryType: 'drugstore',
+    })
+    mockPlaces([shinjukuDrug])
+    const res = await handler(post({ origin: HERE, area: '澀谷', areaOnly: true, stops: shoppingStop() }))
+    expect(res.status).toBe(200)
+    const stop = stopOf(await readStops(res), 'shopping')
+    expect(stop.candidate).toBeUndefined()
+    expect(stop.noCandidate).toBe(true)
+    expect(stop.noCandidateReason).toBe('area')
+  })
+  it('地區邊界：距澀谷中心 998 公尺的店在內、1003 公尺的店在外', async () => {
+    const inside = place('edge-in', 35.6595 + 0.00898, 139.7005, {
+      displayName: { text: '邊界內藥局' }, rating: 4.0, userRatingCount: 150,
+      types: ['drugstore'], primaryType: 'drugstore',
+    })
+    mockPlaces([inside])
+    const resIn = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: shoppingStop() }))
+    expect(resIn.status).toBe(200)
+    expect(stopOf(await readStops(resIn), 'shopping').candidate?.id).toBe('edge-in')
+    const outside = place('edge-out', 35.6595 + 0.00902, 139.7005, {
+      displayName: { text: '邊界外藥局' }, rating: 4.0, userRatingCount: 150,
+      types: ['drugstore'], primaryType: 'drugstore',
+    })
+    mockPlaces([outside])
+    const resOut = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: shoppingStop() }))
+    expect(resOut.status).toBe(200)
+    const out = stopOf(await readStops(resOut), 'shopping')
+    expect(out.candidate).toBeUndefined()
+    expect(out.noCandidateReason).toBe('area')
+  })
+  it('Routes 成功時 rest 站也要回來（舊版只回有候選的站，rest 在成功路徑會整站消失）', async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) {
+        const elements = [
+          { originIndex: 0, destinationIndex: 1, duration: '300s', distanceMeters: 400 },
+          { originIndex: 1, destinationIndex: 0, duration: '300s', distanceMeters: 400 },
+        ]
+        return new Response(JSON.stringify(elements), { status: 200 })
+      }
+      return new Response(JSON.stringify({ places: [validShop('m1', 0)] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const res = await handler(post({ origin: SHIBUYA, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+      { id: 'rest', kind: 'rest', title: '散步回家', minutes: 75 },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { routeVerified: boolean; stops: { id: string; candidate?: { id: string } }[] }
+    expect(data.routeVerified).toBe(true)
+    expect(data.stops.map((s) => s.id)).toEqual(['meal', 'rest'])
+    expect(data.stops.find((s) => s.id === 'meal')?.candidate?.id).toBe('m1')
+  })
+  it('Routes 成功時無候選站也要回來（不只回有候選的站）', async () => {
+    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('routes.googleapis.com')) {
+        const elements = [
+          { originIndex: 0, destinationIndex: 1, duration: '300s', distanceMeters: 400 },
+          { originIndex: 1, destinationIndex: 0, duration: '300s', distanceMeters: 400 },
+        ]
+        return new Response(JSON.stringify(elements), { status: 200 })
+      }
+      // meal 查回澀谷店；shopping 查回原宿店（地區偏好擋掉 → 無候選原因 area）。
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      const places = String(body.textQuery).includes('drugstore') ? [harajukuDrug] : [validShop('m1', 0)]
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+      { id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30 },
+      { id: 'rest', kind: 'rest', title: '散步回家', minutes: 75 },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { routeVerified: boolean; stops: StopOut[] }
+    expect(data.routeVerified).toBe(true)
+    expect(data.stops.map((s) => s.id)).toEqual(['meal', 'shopping', 'rest'])
+    const shopping = data.stops.find((s) => s.id === 'shopping')!
+    expect(shopping.candidate).toBeUndefined()
+    expect(shopping.noCandidate).toBe(true)
+    expect(shopping.noCandidateReason).toBe('area')
+    expect(data.stops.find((s) => s.id === 'rest')?.candidate).toBeUndefined()
   })
 })

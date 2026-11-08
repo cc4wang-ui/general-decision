@@ -74,7 +74,7 @@ const TYPE_EST: Record<'TW' | 'JP', Record<string, number>> = {
     fine_dining_restaurant: 4,
   },
   JP: {
-    convenience_store: 1, fast_food_restaurant: 1, hamburger_restaurant: 1, udon_noodle_restaurant: 1, soba_noodle_shop: 1, japanese_curry_restaurant: 1,
+    convenience_store: 1, fast_food_restaurant: 1, hamburger_restaurant: 1, japanese_curry_restaurant: 1,
     bakery: 1, coffee_shop: 1, cafe: 1.5, ramen_restaurant: 1.5, chinese_restaurant: 1.5, noodle_shop: 1.5,
     japanese_restaurant: 2, tonkatsu_restaurant: 2, korean_restaurant: 2, italian_restaurant: 2.5, sushi_restaurant: 2.5, seafood_restaurant: 2.5,
     yakitori_restaurant: 2.5, japanese_izakaya_restaurant: 2.5, bar: 2.5, yakiniku_restaurant: 3, steak_house: 3, fine_dining_restaurant: 4,

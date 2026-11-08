@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildDaily, replanDaily, withSeen, excludeFor, mergeExclude, loadDaily, addFixedTask, mapsNavigationUrl, originKey, routeProposal, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
+import { buildDaily, replanDaily, withSeen, excludeFor, excludeForInfo, mergeExclude, mergeExcludeInfo, loadDaily, addFixedTask, mapsNavigationUrl, originKey, routeProposal, clearStaleCandidate, noCandidateText, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
 
 const KEY = 'decide.daily.v1'
 const todayTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -117,7 +117,7 @@ describe('loadDaily：上限留最新、rest 殘留清除（紅隊 §3.3／§3.4
   expect(loadDaily().dislikedKinds).toEqual(['ramen'])
  })
  it('當天 rest 任務帶車站候選：候選與路線資訊清掉，變回純文字站；其他站候選不動',()=>{
-  const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:false,candidate:{id:'m1',name:'d47食堂',address:'渋谷',mapUrl:'https://maps.google.com/?cid=m1',lat:35.66,lng:139.70}}
+  const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:false,candidate:{id:'m1',name:'d47食堂',address:'渋谷',mapUrl:'https://maps.google.com/?cid=m1',lat:35.66,lng:139.70,userRatingCount:120}}
   const rest={id:'rest',title:'散步回家',minutes:75,kind:'rest',done:false,candidate:stationCand,eta:'18:00 抵達',departure:'17:00 離開',travelMin:30}
   seed([meal,rest],[],[])
   const out=loadDaily()
@@ -149,7 +149,7 @@ describe('loadDaily：上限留最新、rest 殘留清除（紅隊 §3.3／§3.4
  it('當天 meal 任務帶地標候選：同樣清掉；一般餐廳候選不動',()=>{
   const landmarkCand={id:'landmark-1',name:'澀谷十字路口',address:'渋谷',mapUrl:'https://maps.google.com/?cid=landmark-1',lat:35.6595,lng:139.7005,rating:4.5,userRatingCount:5000,types:['tourist_attraction'],primaryType:'tourist_attraction'}
   const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:false,candidate:landmarkCand}
-  const coffee={id:'coffee',title:'咖啡',minutes:60,kind:'creative',done:false,candidate:{id:'c1',name:'某咖啡店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=c1',lat:35.66,lng:139.70,types:['cafe'],primaryType:'cafe'}}
+  const coffee={id:'coffee',title:'咖啡',minutes:60,kind:'creative',done:false,candidate:{id:'c1',name:'某咖啡店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=c1',lat:35.66,lng:139.70,userRatingCount:200,types:['cafe'],primaryType:'cafe'}}
   seed([meal,coffee],[],[])
   const out=loadDaily()
   expect(out.tasks.find(t=>t.id==='meal')?.candidate).toBeUndefined()
@@ -284,4 +284,82 @@ describe('loadDaily：地區偏好移轉（紅隊 round 5 F7，round 6）',()=>{
   seedRaw({area:'吉祥寺',areaOnly:true})
   expect(loadDaily().area).toBe('澀谷')
  })
+})
+
+describe('loadDaily：既有候選重驗（round 7 L1／L2）', () => {
+  beforeEach(() => { localStorage.clear() })
+  afterEach(() => { localStorage.clear() })
+  const seed = (tasks: unknown[], disliked: string[] = [], dislikedKinds: string[] = [], extra: Record<string, unknown> = {}) => {
+    localStorage.setItem(KEY, JSON.stringify({ day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', mode: 'creative', tasks, notes: [], avoid: [], seen: {}, disliked, dislikedKinds, ...extra }))
+  }
+  /** 澀谷店候選（距中心約 72 公尺）、原宿店候選（約 1233 公尺）。 */
+  const shibuyaCand = { id: 'sundrug-shibuya', name: 'サンドラッグ 渋谷店', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=sundrug-shibuya', lat: 35.6590, lng: 139.7010, rating: 4.1, userRatingCount: 200, types: ['drugstore'], primaryType: 'drugstore' }
+  const harajukuCand = { id: 'sugi-harajuku', name: 'スギ薬局 原宿店', address: '原宿', mapUrl: 'https://maps.google.com/?cid=sugi-harajuku', lat: 35.6704, lng: 139.7030, rating: 4.0, userRatingCount: 150, types: ['drugstore'], primaryType: 'drugstore' }
+  const task = (id: string, candidate: unknown, extra: Record<string, unknown> = {}) => ({ id, title: id, minutes: 30, kind: id === 'shopping' ? 'shopping' : 'meal', done: false, candidate, ...extra })
+  it('自動站的既有原宿候選：地區偏好開啟時清掉（L1 前端版）', () => {
+    seed([task('shopping', harajukuCand)])
+    expect(loadDaily().tasks.find((t) => t.id === 'shopping')?.candidate).toBeUndefined()
+  })
+  it('自動站的既有澀谷候選：地區內，留著', () => {
+    seed([task('shopping', shibuyaCand)])
+    expect(loadDaily().tasks.find((t) => t.id === 'shopping')?.candidate?.id).toBe('sundrug-shibuya')
+  })
+  it('既有候選在 disliked 裡：自動站清掉；已完成站也清掉（id 排除對所有站生效）', () => {
+    seed([task('shopping', shibuyaCand), task('meal', { ...shibuyaCand, id: 'maruya-1', name: '讃岐うどん まるや' }, { done: true })], ['sundrug-shibuya', 'maruya-1'])
+    const out = loadDaily()
+    expect(out.tasks.find((t) => t.id === 'shopping')?.candidate).toBeUndefined()
+    expect(out.tasks.find((t) => t.id === 'meal')?.candidate).toBeUndefined()
+  })
+  it('既有候選的種類在 dislikedKinds 裡：自動站清掉；固定安排的站也清掉（種類排除對所有站生效）', () => {
+    const maruyaCand = { id: 'maruya-1', name: '讃岐うどん まるや', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=maruya-1', lat: 35.6590, lng: 139.7010, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' }
+    const fixedMeal = { id: 'fixed-meal', title: '午餐約會', minutes: 60, kind: 'meal', done: false, locked: true, custom: true, candidate: maruyaCand }
+    seed([task('meal', maruyaCand), fixedMeal], [], ['udon'])
+    const out = loadDaily()
+    expect(out.tasks.find((t) => t.id === 'meal')?.candidate).toBeUndefined()
+    expect(out.tasks.find((t) => t.id === 'fixed-meal')?.candidate).toBeUndefined()
+  })
+  it('既有候選評論只有 12 則：自動站清掉；固定安排的站不動（評論門檻只對自動站）', () => {
+    const lowCand = { ...shibuyaCand, userRatingCount: 12 }
+    const fixed = { id: 'fixed-1', title: '藥局', minutes: 30, kind: 'shopping', done: false, locked: true, custom: true, candidate: lowCand }
+    seed([task('shopping', lowCand), fixed])
+    const out = loadDaily()
+    expect(out.tasks.find((t) => t.id === 'shopping')?.candidate).toBeUndefined()
+    expect(out.tasks.find((t) => t.id === 'fixed-1')?.candidate?.id).toBe('sundrug-shibuya')
+  })
+  it('無候選站重開頁面還在（noCandidate 標記＋原因留著，不會被過濾掉）', () => {
+    seed([{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'area' }])
+    const out = loadDaily()
+    const stop = out.tasks.find((t) => t.id === 'shopping')!
+    expect(stop.noCandidate).toBe(true)
+    expect(stop.noCandidateReason).toBe('area')
+  })
+  it('clearStaleCandidate：指定地點的車站候選照留（item 7），但 id 在 disliked 裡就清掉（place 留著）', () => {
+    const stationCand = { id: 'shibuya-station', name: '渋谷駅', address: '渋谷駅地下 1F', mapUrl: 'https://maps.google.com/?cid=shibuya-station', lat: 35.6595, lng: 139.7005, rating: 4.2, userRatingCount: 9000, types: ['transit_station'], primaryType: 'transit_station' }
+    const specified = { id: 'meal', title: '定食', minutes: 45, kind: 'meal' as const, done: false, specified: true, place: '渋谷駅', candidate: stationCand }
+    expect(clearStaleCandidate(specified).candidate?.id).toBe('shibuya-station')
+    const cleared = clearStaleCandidate(specified, { disliked: ['shibuya-station'], dislikedKinds: [], area: '澀谷', areaOnly: true })
+    expect(cleared.candidate).toBeUndefined()
+    expect(cleared.place).toBe('渋谷駅')
+  })
+  it('noCandidateText：area 原因要寫明地區偏好是原因、怎麼解除', () => {
+    expect(noCandidateText({ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'area' }, '澀谷')).toContain('地區偏好（澀谷，1 公里內）')
+    expect(noCandidateText({ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'filtered' }, '澀谷')).toContain('都被排除了')
+  })
+})
+
+describe('排除清單截斷通知（round 7）', () => {
+  it('mergeExcludeInfo：150 封鎖＋100 不喜歡 → 截掉 50 家並回報 dropped', () => {
+    const blocked = Array.from({ length: 150 }, (_, i) => 'p' + i)
+    const disliked = Array.from({ length: 100 }, (_, i) => 'd' + i)
+    const info = mergeExcludeInfo(blocked, disliked)
+    expect(info.list).toHaveLength(200)
+    expect(info.dropped).toBe(50)
+    expect(info.list.slice(0, 150)).toEqual(blocked)
+    expect(mergeExclude(blocked, disliked)).toEqual(info.list)
+  })
+  it('excludeForInfo：同樣回報 dropped；沒截斷時 dropped 是 0', () => {
+    const s = { ...state(), tasks: buildDaily(state()), disliked: ['d1'], seen: { meal: ['m1'] } }
+    expect(excludeForInfo(s, 'meal', ['p1']).dropped).toBe(0)
+    expect(excludeFor(s, 'meal', ['p1'])).toEqual(excludeForInfo(s, 'meal', ['p1']).list)
+  })
 })

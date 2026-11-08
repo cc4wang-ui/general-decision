@@ -23,3 +23,10 @@ export const DENY_ANY = new Set([
 export function isDeniedCandidate(c: VenueLike): boolean {
   return (!!c.primaryType && DENY_PRIMARY.has(c.primaryType)) || (c.types ?? []).some((t) => DENY_ANY.has(t))
 }
+
+/**
+ * 候選店家最低評論數（單一真相來源）。伺服器（api/daily-route.ts）與前端
+ * （src/dailyDecision.tsx）共用同一份，兩邊判出來的「夠不夠格」才會一致。
+ * 使用者開的條件：評論數 50 則以上才派；userRatingCount 拿不到＝無法驗證＝不派。
+ */
+export const MIN_REVIEWS = 50

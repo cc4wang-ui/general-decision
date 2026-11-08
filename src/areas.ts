@@ -29,6 +29,31 @@ export const AREAS: Record<string, { lat: number; lng: number }> = {
 export const AREA_NAMES = Object.keys(AREAS)
 
 /** 已知地區才回中心點；未知地區回 null＝不過濾（防禦：舊資料或打錯字不該整單失敗）。 */
-export function areaCenter(area: string): { lat: number; lng: number } | null {
-  return AREAS[area] ?? null
+export function areaCenter(area: string): { lat: number; lng: number } {
+  // 未知地區退回「澀谷」（round 7：舊版回 null＝不過濾，fail-open——未知地區名
+  // 開啟偏好時全站都過，跟沒開偏好一樣。使用者生活基地是澀谷，loadDaily 也是
+  // 未知退回澀谷；UI 下拉只有 6 個已知地區，退回澀谷不會誤傷正常選項）。
+  return AREAS[area] ?? AREAS['澀谷']!
+}
+
+/**
+ * 兩點直線距離（公里，haversine）。伺服器 areaOk（api/daily-route.ts）與前端
+ * clearStaleCandidate（src/dailyDecision.tsx）共用同一份公式，兩邊判出來的
+ * 「在不在地區內」才會一致。
+ */
+export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(h))
+}
+
+/**
+ * 該點是否在地區中心半徑（AREA_RADIUS_M）內；未知地區退回澀谷（跟 areaCenter
+ * 同一規則）。
+ */
+export function withinArea(area: string, p: { lat: number; lng: number }): boolean {
+  return distanceKm(areaCenter(area), p) * 1000 <= AREA_RADIUS_M
 }
