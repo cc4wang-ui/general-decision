@@ -2,7 +2,7 @@ import { useState } from 'react'
 import './dailyDecision.css'
 import { PlacePhoto } from './PlacePhoto.tsx'
 import { getLocation, type GeoReason } from './api.ts'
-import { blockedPlaceIds, markNeverAgain } from './placeMem.ts'
+import { blockedPlaceIds, clearDislike, markNeverAgain } from './placeMem.ts'
 import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
 import { isDeniedCandidate, MIN_REVIEWS } from './venueCheck.ts'
 import { AREA_NAMES, withinArea } from './areas.ts'
@@ -63,7 +63,10 @@ export type StaleContext = { disliked: string[]; dislikedKinds: string[]; area: 
  * 使用者輸入的，留著。 */
 export function clearStaleCandidate(t: DailyTask, ctx: StaleContext = { disliked: [], dislikedKinds: [], area: '澀谷', areaOnly: false }): DailyTask {
   if (!t.candidate) return t
-  const cleared = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
+  // 候選被清掉時，title 也還原成目錄標題（跟伺服器端無候選站同一規則，紅隊 round 7
+  // §3 第 9 項）：否則卡片標題還留著被清掉的店名，只顯示「地點尚未確認」（live N5）。
+  // 指定／固定站走 clearedKeepPlace，title 是使用者自己寫的，不動。
+  const cleared = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, title: catalogTitle(t.id) ?? t.title }
   const clearedKeepPlace = { ...t, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
   if (ctx.disliked.includes(t.candidate.id)) return t.locked || t.custom || t.specified ? clearedKeepPlace : cleared
   const kind = kindOfCandidate(t.candidate)
@@ -98,7 +101,10 @@ export function loadDaily(): DailyState {
       area, areaOnly,
       // 無候選站也要留著（noCandidate 標記＋原因）：否則重開頁面後該站直接消失，
       // 使用者看不到「為什麼沒店」也沒法按「換這一站」重找。
-      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || !!t.candidate?.id || !!t.noCandidate)).map(t => clearStaleCandidate(t, ctx)) : [], notes: raw.notes.filter(n => n !== CROSS_AREA_NOTE).slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked, dislikedKinds }
+      // rest 純文字站也要留著（round 8，live N3）：它沒有候選、沒有 noCandidate 標記，
+      // 舊版過濾器只留 custom／locked／done／有候選／無候選的站，rest 每次重進頁面
+      // 都被濾掉（第 7 輪的 mergeScheduled 只修了「重新生成當下」，沒修載入路徑）。
+      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || t.kind === 'rest' || !!t.candidate?.id || !!t.noCandidate)).map(t => clearStaleCandidate(t, ctx)) : [], notes: raw.notes.filter(n => n !== CROSS_AREA_NOTE).slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked, dislikedKinds }
   } catch { return fresh }
 }
 export function saveDaily(s: DailyState): void { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch { /* private mode */ } }
@@ -110,6 +116,11 @@ const catalog: Omit<DailyTask,'done'>[] = [
   { id:'shopping', title:'澀谷｜運動長袖、純單水肌酸或生活用品（先查庫存）', minutes:55, kind:'shopping' },
   { id:'rest', title:'散步回家、休息與晚餐', minutes:75, kind:'rest' },
 ]
+/** 目錄標題（伺服器端 api/daily-route.ts 的 CATALOG_TITLES 跟這裡同步）：
+ * 候選被清掉／站變無候選時，title 還原成這個，不能留著被不喜歡店家的店名。 */
+export function catalogTitle(id: string): string | undefined {
+  return catalog.find(t => t.id === id)?.title
+}
 export function buildDaily(s: DailyState): DailyTask[] {
   const previous = new Map(s.tasks.map(t=>[t.id,t]))
   const order = s.mode === 'creative' ? ['gym','meal','creative','coffee','shopping','rest'] : ['gym','meal','shopping','coffee','rest']
@@ -165,9 +176,10 @@ export function withSeen(s: DailyState, stopId: string, placeId: string): DailyS
   return { ...s, seen: { ...(s.seen ?? {}), [stopId]: [...prev, placeId].slice(-20) } }
 }
 /** 送給伺服器的排除清單上限（跟 api/daily-route.ts 同步）：不喜歡 100＋placeMem 封鎖
- * （理論上無上限，實際是使用者明確按過「不要再來」的店）＋每站換掉過的 20＋其他站
- * 現任候選。200 蓋得住實際最大值（100＋30＋20＋8＝158 還有餘裕）；截斷時封鎖排最前，
- * 讓明確設的時效排除最後才被截。 */
+ * （理論上無上限，實際是使用者明確按過「不要再來」的店）＋每站換掉過的 20。
+ * 200 蓋得住實際最大值（100＋30＋20＝150 還有餘裕）；截斷時封鎖排最前，
+ * 讓明確設的時效排除最後才被截。其他站現任候選另外走 `others`（見 othersFor），
+ * 不再佔這 200 的額度（round 8 K1）。 */
 const EXCLUDE_LIMIT = 200
 /** 合併排除清單：去重、留前 200，並回報被截掉的數量（round 7：舊版靜默截斷，
  * 200 蓋不住時使用者完全不知道有「不喜歡」的店沒送出，下次又出現）。
@@ -177,19 +189,31 @@ export function mergeExcludeInfo(...lists: string[][]): { list: string[]; droppe
   return { list: merged.slice(0, EXCLUDE_LIMIT), dropped: Math.max(0, merged.length - EXCLUDE_LIMIT) }
 }
 /** 送給伺服器的排除清單上限（跟 api/daily-route.ts 同步）：不喜歡 100＋placeMem 封鎖
- * （理論上無上限，實際是使用者明確按過「不要再來」的店）＋每站換掉過的 20＋其他站
- * 現任候選。200 蓋得住實際最大值（100＋30＋20＋8＝158 還有餘裕）；截斷時封鎖排最前，
- * 讓明確設的時效排除最後才被截。 */
+ * （理論上無上限，實際是使用者明確按過「不要再來」的店）＋每站換掉過的 20。
+ * 200 蓋得住實際最大值（100＋30＋20＝150 還有餘裕）；截斷時封鎖排最前，
+ * 讓明確設的時效排除最後才被截。其他站現任候選另外走 `others`（見 othersFor），
+ * 不再佔這 200 的額度（round 8 K1）。 */
 export function mergeExclude(...lists: string[][]): string[] {
   return mergeExcludeInfo(...lists).list
 }
-/** shuffle 時送給伺服器的排除清單：placeMem 封鎖 → 不喜歡的店 → 該站換掉過的 → 其他站目前的候選。截斷時先保前兩者（都是使用者明確不要的店），再保換掉過的，最後才截其他站候選。封鎖排第一的理由：日常流程按的「不喜歡」同時寫進 placeMem，兩份高度重疊；封鎖期內的 id 是明確的時效排除，不能被靜默截掉。 */
+/**
+ * 兩份排除清單（round 8，K1／live N1）：
+ * - excludeFor／excludeForInfo：只有「使用者不要的店」——placeMem 封鎖 → 不喜歡
+ *   的店 → 該站換掉過的。retention 重驗與新搜尋都讀它。
+ * - othersFor：其他站目前的候選。只在新搜尋的 eligible 過濾裡用（防止新店跟別站
+ *   重複），絕對不進 retention 重驗。round 7 把兩份混在同一份清單裡，單站 shuffle
+ *   時其他站的候選全被 retentionOk 判不通過、全部清掉重找——「換這一站」變成整條
+ *   路線重排，池子不夠時其他站還變成無候選。
+ */
 export function excludeForInfo(s: DailyState, shuffleId: string, memBlocked: string[] = []): { list: string[]; dropped: number } {
-  const others = s.tasks.filter(t => t.id !== shuffleId).map(t => t.candidate?.id).filter((x): x is string => !!x)
-  return mergeExcludeInfo(memBlocked, s.disliked ?? [], (s.seen ?? {})[shuffleId] ?? [], others)
+  return mergeExcludeInfo(memBlocked, s.disliked ?? [], (s.seen ?? {})[shuffleId] ?? [])
 }
 export function excludeFor(s: DailyState, shuffleId: string, memBlocked: string[] = []): string[] {
   return excludeForInfo(s, shuffleId, memBlocked).list
+}
+/** 其他站目前的候選（去重、留順序）：只在新搜尋時防重複，不進 retention 重驗。 */
+export function othersFor(s: DailyState, shuffleId: string): string[] {
+  return [...new Set(s.tasks.filter(t => t.id !== shuffleId).map(t => t.candidate?.id).filter((x): x is string => !!x))]
 }
 
 export function DailyDecision({ onBack }: { onBack: () => void }) {
@@ -230,11 +254,13 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     try { memBlocked = await blockedPlaceIds(Date.now()) } catch { memBlocked = [] }
     try {
       // 排除清單超過 200 時截斷不再靜默：回應欄位沒有單獨的 notice 通道，寫進畫面的
-      // notice（搜尋成功後也不洗掉）；被截掉的是排在後面的店（其他站候選優先被截）。
+      // notice（搜尋成功後也不洗掉）；被截掉的是排在後面的店（該站換掉過的 seen 優先被截）。
       const excludeInfo = shuffle ? excludeForInfo(proposed, shuffle, memBlocked) : mergeExcludeInfo(memBlocked, proposed.disliked ?? [])
       if (excludeInfo.dropped > 0) setNotice(prev => (prev ? prev + ' ' : '') + `排除清單已滿（上限 200）：${excludeInfo.dropped} 個「不喜歡／封鎖」的店家未送出，較舊的可能再次出現。`)
       // 地區偏好（F7）真的送往伺服器：area＋areaOnly。搜尋結果會顯示沒有更多選擇。
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind)})})
+      // others（其他站現任候選，round 8 K1）：單站 shuffle 時另外送，只在新搜尋防重複，
+      // 不進伺服器的 retention 重驗；完整重新生成不送（沒有要換的站，也沒有「其他站」）。
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{})})})
       const data=await response.json()
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       change(old=>({...old,tasks:data.stops,seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
@@ -280,6 +306,24 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     const next=withSeen({ ...state, dislikedKinds:[...new Set([...(state.dislikedKinds??[]),kind])].slice(-20) }, t.id, id)
     change(()=>next)
     void searchRoute(t.id, next)
+  }
+  /**
+   * 「清除『不喜歡』的紀錄」（round 8，F7 死路文案的修正：加一個真的能按的控制，
+   * 不是只改文案）。無候選卡片的原因是「都被排除了」時，唯一的出路就是清掉排除
+   * 紀錄——不加控制，文案說「清除『不喜歡』的紀錄」是死路；只改文案（例如「等
+   * 100 家滿了自動移除最舊的」）雖然是真的行為，但使用者當下還是卡著。
+   * 清掉今日行程的 disliked／dislikedKinds，同時解除 placeMem 裡這些店的封鎖
+   * （只清封鎖，不動 shown／done／愛店）；核心班長 app 裡直接按「不要再來」的
+   * 店不在這份清單裡，不會被一起清掉。清完使用者要按「換這一站」或「重新產生」
+   * 才會重找——這裡只清紀錄，不自動重搜。
+   */
+  const clearDisliked = () => {
+    const ids = state.disliked ?? []
+    const kinds = state.dislikedKinds ?? []
+    if (!ids.length && !kinds.length) { setNotice('目前沒有「不喜歡」的紀錄。'); return }
+    void Promise.all(ids.map((id) => clearDislike(id))).catch(() => {})
+    change((s) => ({ ...s, disliked: [], dislikedKinds: [] }))
+    setNotice(`已清除 ${ids.length} 家「不喜歡」的店${kinds.length ? `與 ${kinds.length} 種「不要這類」` : ''}，可以重新搜尋。`)
   }
   const completed=state.tasks.filter(t=>t.done).length
   return <section className="screen dd" data-screen="daily-decision">
@@ -356,7 +400,10 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                   <strong>⌖ {t.candidate.address}</strong>
                   <span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{t.candidate.openNow===true?'Google 顯示目前營業中':t.candidate.openNow===false?'Google 顯示目前未營業':'營業狀態未確認'} · Google Places</span>
                   <a className="dd-place-link" href={t.candidate.mapUrl} target="_blank" rel="noopener noreferrer">Google Maps 店家詳情 ↗</a>
-                </div> : t.noCandidate ? <div className="dd-place-unresolved" role="status">⚠ {noCandidateText(t, state.area)}</div> : t.kind==='rest' ? <div className="dd-place-meta"><span>散步回家，不用找店家。</span></div> : <div className="dd-place-unresolved" role="status">⚠ 地點尚未確認。請搜尋行程後再導航。</div>}
+                </div> : t.noCandidate ? <div className="dd-place-unresolved" role="status">⚠ {noCandidateText(t, state.area)}
+                  {t.noCandidateReason === 'area' && <> <a className="dd-place-link" href="#daily-area">前往地區偏好設定</a></>}
+                  {t.noCandidateReason === 'filtered' && <> <button className="dd-muted" disabled={busy !== null} onClick={clearDisliked}>清除「不喜歡」的紀錄</button></>}
+                </div> : t.kind==='rest' ? <div className="dd-place-meta"><span>散步回家，不用找店家。</span></div> : <div className="dd-place-unresolved" role="status">⚠ 地點尚未確認。請搜尋行程後再導航。</div>}
                 {t.eta&&<p className="dd-eta">{t.eta} 抵達｜{t.departure} 離開｜步行 {t.travelMin} 分鐘</p>}
                 {t.conflict&&<p className="dd-stop-conflict" role="alert">⚠ {t.conflict}</p>}
                 <p className="dd-description">{t.detail||'預計停留 '+t.minutes+' 分鐘；請出發前確認店家資訊。'}</p>

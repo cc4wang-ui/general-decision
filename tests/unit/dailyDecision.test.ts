@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildDaily, replanDaily, withSeen, excludeFor, excludeForInfo, mergeExclude, mergeExcludeInfo, loadDaily, addFixedTask, mapsNavigationUrl, originKey, routeProposal, clearStaleCandidate, noCandidateText, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
+import { buildDaily, replanDaily, withSeen, excludeFor, excludeForInfo, othersFor, catalogTitle, mergeExclude, mergeExcludeInfo, loadDaily, addFixedTask, mapsNavigationUrl, originKey, routeProposal, clearStaleCandidate, noCandidateText, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
 
 const KEY = 'decide.daily.v1'
 const todayTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -34,15 +34,26 @@ describe('shuffle 排除清單（seen／disliked）',()=>{
   expect(withSeen(once,'meal','m1').seen?.meal).toEqual(['m1'])
   expect(withSeen(once,'meal','m2').seen?.meal).toEqual(['m1','m2'])
  })
- it('excludeFor：不喜歡的店優先，其次該站換掉過的，再來是其他站目前的候選',()=>{
+ it('excludeFor（round 8 K1）：只含「使用者不要的店」——不喜歡的店、該站換掉過的；其他站目前的候選不再進 exclude（另外走 othersFor）',()=>{
   const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
   const s={...state(),tasks,disliked:['d1'],seen:{meal:['m1','m2']}}
-  expect(excludeFor(s,'meal')).toEqual(['d1','m1','m2','c-gym','c-creative','c-coffee','c-shopping','c-rest'])
+  expect(excludeFor(s,'meal')).toEqual(['d1','m1','m2'])
  })
- it('excludeFor：placeMem 封鎖排在最前，再來是不喜歡的店、該站換掉過的、其他站目前的候選',()=>{
+ it('othersFor（round 8 K1）：其他站目前的候選另外送——只在新搜尋防重複，不進 retention 重驗',()=>{
+  const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
+  const s={...state(),tasks,disliked:['d1'],seen:{meal:['m1','m2']}}
+  expect(othersFor(s,'meal')).toEqual(['c-gym','c-creative','c-coffee','c-shopping','c-rest'])
+  // 被換的那一站自己的候選不在 others 裡（它已經在 seen 裡了）
+  expect(othersFor(s,'meal')).not.toContain('c-meal')
+  // 沒有候選的站不會進 others
+  const noCand={...s,tasks:s.tasks.map(t=>t.id==='coffee'?{...t,candidate:undefined}:t)}
+  expect(othersFor(noCand,'meal')).toEqual(['c-gym','c-creative','c-shopping','c-rest'])
+ })
+ it('excludeFor：placeMem 封鎖排在最前，再來是不喜歡的店、該站換掉過的（其他站候選另外走 othersFor）',()=>{
   const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
   const s={...state(),tasks,disliked:['d1'],seen:{meal:['m1']}}
-  expect(excludeFor(s,'meal',['p1','p2'])).toEqual(['p1','p2','d1','m1','c-gym','c-creative','c-coffee','c-shopping','c-rest'])
+  expect(excludeFor(s,'meal',['p1','p2'])).toEqual(['p1','p2','d1','m1'])
+  expect(othersFor(s,'meal')).toEqual(['c-gym','c-creative','c-coffee','c-shopping','c-rest'])
  })
  it('excludeFor：不喜歡 100＋placeMem 封鎖 30（不重疊）→ 30 家封鎖全在排除清單裡',()=>{
   const disliked=Array.from({length:100},(_,i)=>'d'+i)
@@ -50,12 +61,12 @@ describe('shuffle 排除清單（seen／disliked）',()=>{
   const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
   const s={...state(),tasks,disliked,seen:{meal:['s1','s2','s3','s4','s5']}}
   const out=excludeFor(s,'meal',blocked)
-  expect(out).toHaveLength(140)
+  expect(out).toHaveLength(135)
   expect(blocked.every(id=>out.includes(id))).toBe(true)
   expect(out.slice(0,30)).toEqual(blocked)
   expect(out.slice(30,130)).toEqual(disliked)
  })
- it('excludeFor：截斷時先保 placeMem 封鎖與不喜歡的店，最後才截換掉過的與其他站候選',()=>{
+ it('excludeFor：截斷時先保 placeMem 封鎖與不喜歡的店，最後才截換掉過的',()=>{
   const blocked=Array.from({length:100},(_,i)=>'p'+i)
   const disliked=Array.from({length:100},(_,i)=>'d'+i)
   const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
@@ -65,17 +76,17 @@ describe('shuffle 排除清單（seen／disliked）',()=>{
   expect(out.slice(0,100)).toEqual(blocked)
   expect(out.slice(100,200)).toEqual(disliked)
   expect(out).not.toContain('s0')
-  expect(out).not.toContain('c-gym')
+  expect(excludeForInfo(s,'meal',blocked).dropped).toBe(20)
  })
- it('excludeFor：不喜歡滿 100＋換掉過 5＋其他站 5，全都塞得下（上限 200），一個都不截',()=>{
+ it('excludeFor：不喜歡滿 100＋換掉過 5，全都塞得下（上限 200），一個都不截；其他站候選另外走 othersFor，不佔額度',()=>{
   const disliked=Array.from({length:100},(_,i)=>'d'+i)
   const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
   const s={...state(),tasks,disliked,seen:{meal:['m1','m2','m3','m4','m5']}}
   const out=excludeFor(s,'meal')
-  expect(out).toHaveLength(110)
+  expect(out).toHaveLength(105)
   expect(out.slice(0,100)).toEqual(disliked)
   expect(out.slice(100,105)).toEqual(['m1','m2','m3','m4','m5'])
-  expect(out).toContain('c-gym')
+  expect(othersFor(s,'meal')).toHaveLength(5)
  })
 })
 
@@ -154,6 +165,38 @@ describe('loadDaily：上限留最新、rest 殘留清除（紅隊 §3.3／§3.4
   const out=loadDaily()
   expect(out.tasks.find(t=>t.id==='meal')?.candidate).toBeUndefined()
   expect(out.tasks.find(t=>t.id==='coffee')?.candidate?.id).toBe('c1')
+ })
+ it('round 8 N3：rest 純文字站（沒候選、沒 noCandidate 標記）重進頁面還在，不再被過濾器濾掉（live round 7 N3）',()=>{
+  const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:false,candidate:{id:'m1',name:'d47食堂',address:'渋谷',mapUrl:'https://maps.google.com/?cid=m1',lat:35.66,lng:139.70,userRatingCount:120}}
+  const rest={id:'rest',title:'散步回家、休息與晚餐',minutes:75,kind:'rest',done:false}
+  seed([meal,rest],[],[])
+  const out=loadDaily()
+  expect(out.tasks.map(t=>t.id)).toEqual(['meal','rest'])
+  expect(out.tasks.find(t=>t.id==='rest')?.kind).toBe('rest')
+ })
+ it('round 8 標題還原：候選被清掉時 title 還原成目錄標題（不是被清掉的店名）；指定站的 title 不動',()=>{
+  const meal={id:'meal',title:'麺喜やしま',minutes:45,kind:'meal',done:false,place:'渋谷駅地下 1F',candidate:stationCand}
+  const specified={id:'meal',title:'我指定的店',minutes:45,kind:'meal',done:false,specified:true,place:'某定食店',candidate:stationCand}
+  // clearStaleCandidate 直接測：自動站 title 還原，指定站 title 照留
+  expect(clearStaleCandidate(meal as DailyTask).title).toBe('澀谷｜一人友善的日式定食')
+  expect(clearStaleCandidate(meal as DailyTask).candidate).toBeUndefined()
+  expect(clearStaleCandidate(specified as DailyTask).title).toBe('我指定的店')
+  // catalogTitle 跟伺服器端 CATALOG_TITLES 同步（改一邊要改另一邊）
+  expect(catalogTitle('meal')).toBe('澀谷｜一人友善的日式定食')
+  expect(catalogTitle('rest')).toBe('散步回家、休息與晚餐')
+  expect(catalogTitle('gym')).toBe('FIT-EASY｜80 分鐘力量訓練')
+  expect(catalogTitle('fixed-1')).toBeUndefined()
+  // 經 loadDaily 走一遍：meal 的 title 也還原了
+  seed([meal],[],[])
+  expect(loadDaily().tasks.find(t=>t.id==='meal')?.title).toBe('澀谷｜一人友善的日式定食')
+ })
+ it('round 8 N3：rest 帶車站候選重進頁面——候選清掉，站還在，title 是目錄標題',()=>{
+  const rest={id:'rest',title:'散步回家',minutes:75,kind:'rest',done:false,candidate:stationCand}
+  seed([rest],[],[])
+  const out=loadDaily()
+  const loadedRest=out.tasks.find(t=>t.id==='rest')!
+  expect(loadedRest.candidate).toBeUndefined()
+  expect(loadedRest.title).toBe('散步回家、休息與晚餐')
  })
 })
 describe('Daily itinerary controls',()=>{

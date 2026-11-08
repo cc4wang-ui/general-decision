@@ -155,6 +155,20 @@ export async function markNeverAgain(id: string, now: number, module: MemModule 
   })
 }
 
+/** 解除一間店的「不要再來」封鎖（round 8：今日行程「清除『不喜歡』的紀錄」用）。
+ * 只清封鎖（dislikeUntil）與不要再來次數（歸零，下次再按從 90 天重新算，不會
+ * 因為之前按過一次就直接永久）；shown／done／愛店／品牌鍵／細類鍵都不動。
+ * 核心班長 app 裡直接按「不要再來」的店不在今日行程的 disliked 清單裡，
+ * 不會被這裡清掉。沒有這家店的紀錄時什麼都不做。 */
+export async function clearDislike(id: string): Promise<void> {
+  await mutate(Date.now(), (store) => {
+    const e = store[id]
+    if (!e) return
+    delete e.dislikeUntil
+    e.dislikes = 0
+  })
+}
+
 /** 列入愛店／取消。 */
 export async function setFav(id: string, on: boolean, module: MemModule = 'eat'): Promise<void> {
   await mutate(Date.now(), (store) => {

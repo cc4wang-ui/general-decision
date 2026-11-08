@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../src/placeMem.ts', () => ({
   blockedPlaceIds: async () => Array.from({ length: 150 }, (_, i) => 'p' + i),
   markNeverAgain: async () => {},
+  clearDislike: async () => {},
 }))
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { DailyDecision } from '../../src/dailyDecision.tsx'
@@ -154,6 +155,45 @@ describe('無候選站顯示（紅隊 round 6 L1／L2，round 7）', () => {
     expect(screen.getByText('↻ 換這一站')).toBeTruthy()
     expect(screen.queryByText('不喜歡這間店')).toBeNull()
     expect(screen.queryByText(/不要「/)).toBeNull()
+  })
+  it('round 8 F7：原因 area 的卡片有連到地區偏好設定的連結（href #daily-area），不是只寫文字', async () => {
+    seedNoCandidate('area')
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const link = screen.getByText('前往地區偏好設定')
+    expect(link.getAttribute('href')).toBe('#daily-area')
+    // 地區偏好 select 真的有這個 id，連結點下去才到得了
+    expect((screen.getByLabelText('地區偏好') as HTMLSelectElement).id).toBe('daily-area')
+  })
+  it('round 8 F7：原因 filtered 的卡片有「清除『不喜歡』的紀錄」按鈕，按了真的清掉 localStorage 的 disliked／dislikedKinds 並顯示確認', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      tasks: [{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'filtered' }],
+      notes: [], avoid: [], seen: {}, disliked: ['d1', 'd2'], dislikedKinds: ['udon'],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByText('清除「不喜歡」的紀錄'))
+    await waitFor(() => expect(screen.getByText(/已清除 2 家「不喜歡」的店與 1 種「不要這類」/)).toBeTruthy())
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { disliked: string[]; dislikedKinds: string[] }
+    expect(saved.disliked).toEqual([])
+    expect(saved.dislikedKinds).toEqual([])
+  })
+  it('round 8 F7：原因 filtered 但沒有不喜歡紀錄時，按鈕照樣在，按了說目前沒有紀錄', async () => {
+    seedNoCandidate('filtered')
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByText('清除「不喜歡」的紀錄'))
+    await waitFor(() => expect(screen.getByText('目前沒有「不喜歡」的紀錄。')).toBeTruthy())
+  })
+  it('round 8 A：麺処讃岐うどん配 noodle_shop，顯示「不要『烏龍麵』這類」——不是「不要『麵食』這類」（紅隊 round 7 A 的 UI 陷阱）', async () => {
+    seed(cand('udon-noodle', '麺処讃岐うどん', 'noodle_shop', ['noodle_shop', 'restaurant']))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.getByText('不要「烏龍麵」這類')).toBeTruthy()
+    expect(screen.queryByText('不要「麵食」這類')).toBeNull()
   })
 })
 

@@ -14,6 +14,12 @@ type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;don
 const queries:Record<string,string>={gym:'FIT-EASY Shibuya Sakura Stage',meal:'Japanese set meal restaurant',creative:'art gallery exhibition',coffee:'quiet specialty coffee cafe',shopping:'sports goods drugstore'}
 /** 每一站的 Places includedType（Table A）。沒有這一層，通用查詢字串回什麼全憑 Google 相關度，車站／地標／商場都會混進來。 */
 const includedTypes:Record<string,string>={gym:'gym',meal:'restaurant',creative:'art_gallery',coffee:'cafe',shopping:'drugstore'}
+/** 目錄標題（跟 src/dailyDecision.tsx 的 catalog 同步，改一邊要改另一邊）：
+ * 站變成無候選時，title 還原成目錄標題，不能留著被不喜歡店家的店名
+ * （紅隊 round 7 §3 第 9 項／live N5：卡片標題仍是被不喜歡的店名，嚴格標準下是
+ * 殘留；狀態列點名無候選站時也會點到那間店名）。固定安排（id 不是目錄裡的站）
+ * 不在表裡，title 照留——那是使用者自己寫的。 */
+const CATALOG_TITLES:Record<string,string>={gym:'FIT-EASY｜80 分鐘力量訓練',meal:'澀谷｜一人友善的日式定食',creative:'澀谷｜藝術展／日本 IP 快閃探索（出發前查活動與營業）',coffee:'安靜咖啡廳｜閱讀、寫下 3 個新觀察',shopping:'澀谷｜運動長袖、純單水肌酸或生活用品（先查庫存）',rest:'散步回家、休息與晚餐'}
 // 評論數門檻 MIN_REVIEWS（50）在 src/venueCheck.ts（單一真相來源），伺服器與前端共用。
 // 距離公式 distanceKm 在 src/areas.ts（單一真相來源），伺服器與前端共用。
 const safe=(s:unknown,n=120)=>typeof s==='string'?s.slice(0,n).trim():''
@@ -92,11 +98,15 @@ function retentionOk(c:Candidate,s:Stop,opts:{excluded:string[];excludeKinds:str
 }
 function order(stops:Stop[],origin:Coord):{stops:Stop[];distanceKm:number;warning?:string}{
  // Preserve fixed appointments and completed tasks in their relative slots; optimize only movable segments.
+ // Round 8：沒有候選的站（無候選站、rest 純文字站）也是錨點，留在原位——舊版只把
+ // locked／done／custom 當錨點，沒候選的站會沉到同段落最後（紅隊 round 7 G：
+ // meal→shopping（無候選）→coffee 變成 meal→coffee→shopping；站的順序就是行程
+ // 本身，無候選站被往後移，使用者看到的先後跟他排的先後不一樣）。
  let at=origin,km=0
  const result:Stop[]=[]
  const pending:Stop[]=[]
  const flush=()=>{while(pending.length){let best=0,score=Infinity;pending.forEach((s,i)=>{if(!s.candidate)return;const d=distanceKm(at,s.candidate);if(d<score){score=d;best=i}});const next=pending.splice(best,1)[0];if(next.candidate){km+=distanceKm(at,next.candidate);at={lat:next.candidate.lat,lng:next.candidate.lng}}result.push(next)}}
- for(const s of stops){if(s.locked||s.done||s.custom){flush();if(s.candidate){km+=distanceKm(at,s.candidate);at={lat:s.candidate.lat,lng:s.candidate.lng}}result.push(s)}else pending.push(s)}
+ for(const s of stops){if(s.locked||s.done||s.custom||!s.candidate){flush();if(s.candidate){km+=distanceKm(at,s.candidate);at={lat:s.candidate.lat,lng:s.candidate.lng}}result.push(s)}else pending.push(s)}
  flush()
  return {stops:result,distanceKm:Math.round(km*10)/10,warning:'路線按地理距離估算，非 Google Maps 實際步行／大眾運輸時間；固定行程時段衝突尚未自動驗證。'}
 }
@@ -135,8 +145,18 @@ async function handler(req:Request):Promise<Response>{
  const list=Array.isArray(input.stops)?input.stops.slice(0,9):[]
  const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,specified:x.specified===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate:x.candidate&&typeof x.candidate==='object'&&typeof x.candidate.id==='string'&&Number.isFinite(x.candidate.lat)&&Number.isFinite(x.candidate.lng)?x.candidate:undefined}))
  const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,200):[]
- // 排除清單上限 200（跟前端 mergeExclude 同步）：不喜歡 100＋placeMem 封鎖＋每站換掉過的 20＋其他站候選；舊版種類鍵（'ramen_restaurant'）先轉新鍵，舊的不喜歡才不會失效。
+ // 排除清單上限 200（跟前端 mergeExclude 同步）：不喜歡 100＋placeMem 封鎖＋每站換掉過的 20；其他站現任候選另外走 `others`（見下方），不再佔這 200 的額度。舊版種類鍵（'ramen_restaurant'）先轉新鍵，舊的不喜歡才不會失效。
  const excludeKinds=Array.isArray(input.excludeKinds)?[...new Set(input.excludeKinds.filter(x=>typeof x==='string').map(normalizeKind))].slice(0,20):[]
+ /**
+  * 兩份排除清單（round 8，K1／live N1）：`exclude` 是「使用者不要的店」
+  * （不喜歡／placeMem 封鎖／該站換掉過的），retention 重驗與新搜尋都讀它；
+  * `others` 是「其他站現任候選」，只在新搜尋的 eligible 過濾裡用（防止新店
+  * 跟別站重複），絕對不進 retentionOk。round 7 把兩份混在同一份 `exclude`
+  * 裡，前端單站 shuffle 時其他站的候選 id 全在清單裡，retentionOk 全部判
+  * 不通過、全部清掉重找——「換這一站」變成整條路線重排，池子不夠時其他站
+  * 還變成無候選。前端（src/dailyDecision.tsx othersFor）分開送，伺服器分開讀。
+  */
+ const others=Array.isArray(input.others)?input.others.filter(x=>typeof x==='string').slice(0,9):[]
  // 地區偏好（F7）：開啟才生效；未知地區名退回澀谷（src/areas.ts areaCenter），
  // 不再 fail-open——未知地區名＋開啟時全站都過，跟沒開偏好一樣（紅隊 round 6 F7 註記）。
  const areaPref=input.areaOnly===true&&typeof input.area==='string'?areaCenter(input.area):null
@@ -166,7 +186,7 @@ async function handler(req:Request):Promise<Response>{
    const preserve=s.done||s.locked||s.custom
    const named=stop.place&&stop.place!== '澀谷站周邊'&&!stop.place.includes('周邊')&&!stop.place.includes('／')&&!stop.place.includes('（')
    const q=s.specified?stop.place:(preserve||(named&&shuffle!==s.id)?stop.place:queries[stop.id]??queries[stop.kind]??stop.title)
-   if(!q){result.push({...stop,candidate:undefined,noCandidate:true,noCandidateReason:'empty'});continue}
+   if(!q){result.push({...stop,candidate:undefined,title:CATALOG_TITLES[stop.id]??stop.title,noCandidate:true,noCandidateReason:'empty'});continue}
    // 自動挑店才送 includedType：指定／固定地點的類型由使用者決定，不由系統收窄。
    const stopType=preserve||s.specified?undefined:(includedTypes[stop.id]??includedTypes[stop.kind])
    // 目前位置模式沒有地名可附加：只靠 locationBias（中心＝目前位置）找附近的店。
@@ -182,7 +202,10 @@ async function handler(req:Request):Promise<Response>{
     sawAny=sawAny||found.places.length>0
     // 翻頁時也要記錄「有店回來但被地區擋掉」：那是無候選的原因（area），不是「什麼都沒有」（empty）。
     if(areaPref&&found.places.some(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&!areaOk(p,s,areaPref)))sawAreaBlocked=true
-    eligible=found.places.filter(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
+    // eligible 過濾：exclude（使用者不要的店）＋others（其他站現任候選，防重複）。
+    // others 只在這裡用，絕對不進 retentionOk（round 8 K1：否則單站 shuffle
+    // 會連帶清掉其他站的候選）。
+    eligible=found.places.filter(p=>!excluded.includes(p.id)&&!others.includes(p.id)&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
     if(eligible.length||!found.nextPageToken)break
     pageToken=found.nextPageToken
    }
@@ -190,7 +213,8 @@ async function handler(req:Request):Promise<Response>{
     // 無候選：該站顯示「無候選」，路線繼續——整單不再為了一站回 422
     // （no_more_options 已刪除），也不再把被排除的店留著當候選（L2）。
     // 原因寫進回應，前端照原因顯示提示（地區偏好擋住時寫明要關偏好或換地區）。
-    result.push({...stop,candidate:undefined,place:auto?undefined:stop.place,noCandidate:true,noCandidateReason:sawAreaBlocked?'area':sawAny?'filtered':'empty'})
+    // title 還原成目錄標題：被不喜歡店家的店名不能留在卡片標題上（紅隊 round 7 §3 第 9 項）。
+    result.push({...stop,candidate:undefined,place:auto?undefined:stop.place,title:CATALOG_TITLES[stop.id]??stop.title,noCandidate:true,noCandidateReason:sawAreaBlocked?'area':sawAny?'filtered':'empty'})
     continue
    }
    const ranked=eligible.sort((a,b)=>distanceKm(center,a)-distanceKm(center,b)+((b.rating??0)-(a.rating??0))*.18)

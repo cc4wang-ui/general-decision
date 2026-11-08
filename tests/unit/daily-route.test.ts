@@ -1176,3 +1176,171 @@ describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）',
     expect(data.stops.find((s) => s.id === 'rest')?.candidate).toBeUndefined()
   })
 })
+
+describe('round 8：兩份排除清單分開（K1）／無候選標題還原／order() 不移無候選站', () => {
+  const SHIBUYA = { lat: 35.6595, lng: 139.7005 }
+  /** 伺服器收到的既有候選是 lat／lng 形狀。 */
+  const cand = (p: ReturnType<typeof place>) => ({
+    id: p.id, name: p.displayName.text, address: p.formattedAddress, mapUrl: p.googleMapsUri,
+    lat: p.location.latitude, lng: p.location.longitude, rating: p.rating,
+    userRatingCount: p.userRatingCount, types: p.types, primaryType: p.primaryType,
+  })
+  type StopOut = { id: string; title?: string; candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }
+  const readStops = async (res: Response) => (await res.json() as { stops: StopOut[] }).stops
+  const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
+  /** 依查詢回不同池子：meal → 兩間定食店，coffee → 只有一間咖啡店。 */
+  function mockTwoPools() {
+    const mealA = validShop('meal-a', 0)
+    const mealB = validShop('meal-b', 1)
+    const cafe1 = validShop('cafe-1', 0)
+    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      const q = String(body.textQuery)
+      const places = q.includes('coffee') ? [cafe1] : [mealA, mealB]
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { mealA, mealB, cafe1 }
+  }
+  it('K1：單站 shuffle 換 meal，coffee 的現任候選照留（others 只在新搜尋防重複，不進 retention 重驗；池子只有一間咖啡店時也不能變無候選）', async () => {
+    const { mealA, cafe1 } = mockTwoPools()
+    const res = await handler(post({ origin: HERE, shuffle: 'meal', exclude: ['meal-a'], others: ['cafe-1'], stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: cand(mealA) },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60, candidate: cand(cafe1) },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    // meal 換成另一間，coffee 的現任候選留著（round 7 會把它清掉重找，池子只有一間就變無候選）
+    expect(stopOf(stops, 'meal').candidate?.id).toBe('meal-b')
+    expect(stopOf(stops, 'coffee').candidate?.id).toBe('cafe-1')
+    expect(stopOf(stops, 'coffee').noCandidate).toBeUndefined()
+  })
+  it('K1 對照（K2）：完整重新生成（不帶 shuffle、不帶 others），兩站的現任候選都照留', async () => {
+    const { mealA, cafe1 } = mockTwoPools()
+    const res = await handler(post({ origin: HERE, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: cand(mealA) },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60, candidate: cand(cafe1) },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    expect(stopOf(stops, 'meal').candidate?.id).toBe('meal-a')
+    expect(stopOf(stops, 'coffee').candidate?.id).toBe('cafe-1')
+  })
+  it('K1：others 還能防重複——meal 重找時不會選到 coffee 現任候選那間店', async () => {
+    const cafe1 = validShop('cafe-1', 0)
+    const mealB = validShop('meal-b', 1)
+    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      const q = String(body.textQuery)
+      // meal 池子裡第一間就是 coffee 的現任候選（同一間店也會出現在別站的查詢結果裡）
+      const places = q.includes('coffee') ? [cafe1] : [cafe1, mealB]
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const res = await handler(post({ origin: HERE, shuffle: 'meal', exclude: ['meal-a'], others: ['cafe-1'], stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: cand(validShop('meal-a', 0)) },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60, candidate: cand(cafe1) },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    expect(stopOf(stops, 'meal').candidate?.id).toBe('meal-b')
+    expect(stopOf(stops, 'coffee').candidate?.id).toBe('cafe-1')
+  })
+  it('無候選標題還原：麺喜やしま被不喜歡、池子只有它 → 該站無候選，title 是目錄標題「澀谷｜一人友善的日式定食」，不是店名', async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [yashimaShop] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const res = await handler(post({ origin: HERE, shuffle: 'meal', exclude: ['yashima-1'], stops: [
+      { id: 'meal', kind: 'meal', title: '麺喜やしま', minutes: 45, candidate: cand(yashimaShop) },
+    ] }))
+    expect(res.status).toBe(200)
+    const meal = stopOf(await readStops(res), 'meal')
+    expect(meal.candidate).toBeUndefined()
+    expect(meal.noCandidate).toBe(true)
+    expect(meal.noCandidateReason).toBe('filtered')
+    expect(meal.title).toBe('澀谷｜一人友善的日式定食')
+  })
+  it('order() 不移無候選站：meal（有候選）→ shopping（無候選，地區擋住）→ coffee（有候選），順序照樣是 meal、shopping、coffee（紅隊 round 7 G）', async () => {
+    const harajukuDrug = place('sugi-harajuku', 35.6704, 139.7030, {
+      displayName: { text: 'スギ薬局 原宿店' }, rating: 4.0, userRatingCount: 150,
+      types: ['drugstore'], primaryType: 'drugstore',
+    })
+    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      const q = String(body.textQuery)
+      const places = q.includes('drugstore') ? [harajukuDrug] : q.includes('coffee') ? [validShop('cafe-1', 0)] : [validShop('m1', 0)]
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+      { id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30 },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60 },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    expect(stops.map((s) => s.id)).toEqual(['meal', 'shopping', 'coffee'])
+    const shopping = stopOf(stops, 'shopping')
+    expect(shopping.candidate).toBeUndefined()
+    expect(shopping.noCandidate).toBe(true)
+    expect(shopping.noCandidateReason).toBe('area')
+  })
+  it('A：noodle_shop 不遮店名訊號——藪蕎麦配 noodle_shop，排除 soba 時不選（伺服器雙向）；排除 ramen 時照選', async () => {
+    const yabuNoodle = place('yabu-noodle', 35.691, 139.701, {
+      displayName: { text: '藪蕎麦' }, rating: 4.1, userRatingCount: 300,
+      types: ['noodle_shop', 'restaurant'], primaryType: 'noodle_shop',
+    })
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [yabuNoodle] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const excluded = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(excluded.status).toBe(200)
+    const excludedMeal = stopOf(await readStops(excluded), 'meal')
+    expect(excludedMeal.candidate).toBeUndefined()
+    expect(excludedMeal.noCandidate).toBe(true)
+    const contrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(contrast.status).toBe(200)
+    expect(stopOf(await readStops(contrast), 'meal').candidate?.id).toBe('yabu-noodle')
+  })
+  it('A：麺処讃岐うどん配 noodle_shop，排除 udon 時不選；排除 ramen 時照選', async () => {
+    const udonNoodle = place('udon-noodle', 35.691, 139.701, {
+      displayName: { text: '麺処讃岐うどん' }, rating: 4.2, userRatingCount: 300,
+      types: ['noodle_shop', 'restaurant'], primaryType: 'noodle_shop',
+    })
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [udonNoodle] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const excluded = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(excluded.status).toBe(200)
+    expect(stopOf(await readStops(excluded), 'meal').candidate).toBeUndefined()
+    const contrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(contrast.status).toBe(200)
+    expect(stopOf(await readStops(contrast), 'meal').candidate?.id).toBe('udon-noodle')
+  })
+  it('B：RAMEN_SOBA 補的 5 間配 noodle_shop，排除 soba 時照選（是拉麵，不是蕎麥麵）', async () => {
+    const names = ['煮干しそば', '銀座鴨そば 九代目けいすけ', '塩そば専門店 桑ばら', '塩そば 一榮', 'SOBA HOUSE 金色不如帰']
+    for (const [i, name] of names.entries()) {
+      const p = place('ramen-soba-' + i, 35.691, 139.701, {
+        displayName: { text: name }, rating: 4.2, userRatingCount: 300,
+        types: ['noodle_shop', 'restaurant'], primaryType: 'noodle_shop',
+      })
+      const f = vi.fn(async (url: string | URL | Request) => {
+        if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+        return new Response(JSON.stringify({ places: [p] }), { status: 200 })
+      })
+      vi.stubGlobal('fetch', f)
+      const res = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+      expect(res.status).toBe(200)
+      expect(stopOf(await readStops(res), 'meal').candidate?.id, name).toBe('ramen-soba-' + i)
+    }
+  })
+})

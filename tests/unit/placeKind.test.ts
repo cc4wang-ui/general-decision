@@ -301,3 +301,64 @@ describe('kindOfCandidate：round 7 結構性修復（紅隊 round 6 N1／N2／N
     expect(kindOfCandidate(cand('麺処、そば志ん、'))).toBe('soba')
   })
 })
+
+describe('round 8：noodle_shop 不短路／RAMEN_SOBA 補齊／寿し／ブーランジェリー／TYPE_KINDS 補齊', () => {
+  it('A：noodle_shop 不遮店名訊號——藪蕎麦、麺処讃岐うどん、中華そば 青葉配 noodle_shop 還是 soba／udon／ramen（紅隊 round 7 A，種類排除才能擋住）', () => {
+    expect(kindOfCandidate(cand('藪蕎麦', 'noodle_shop', ['noodle_shop', 'restaurant']))).toBe('soba')
+    expect(kindOfCandidate(cand('麺処讃岐うどん', 'noodle_shop', ['noodle_shop', 'restaurant']))).toBe('udon')
+    expect(kindOfCandidate(cand('中華そば 青葉', 'noodle_shop', ['noodle_shop', 'restaurant']))).toBe('ramen')
+    // types 陣列裡有 noodle_shop 也一樣（primaryType 是 restaurant 時）
+    expect(kindOfCandidate(cand('藪蕎麦', 'restaurant', ['restaurant', 'noodle_shop']))).toBe('soba')
+    expect(kindOfCandidate(cand('麺処讃岐うどん', 'restaurant', ['restaurant', 'noodle_shop']))).toBe('udon')
+  })
+  it('A：店名真的沒訊號時 noodle_shop 才回 noodle（麵店）；chinese_noodle_restaurant 還是 dish 級短路 → ramen', () => {
+    expect(kindOfCandidate(cand('麵店', 'noodle_shop', ['noodle_shop']))).toBe('noodle')
+    expect(kindOfCandidate(cand('中華麵店', 'chinese_noodle_restaurant', ['chinese_noodle_restaurant']))).toBe('ramen')
+    expect(kindOfCandidate(cand('某店', 'chinese_noodle_restaurant', ['chinese_noodle_restaurant']))).toBe('ramen')
+  })
+  it('B：RAMEN_SOBA 補的 5 間都是拉麵——煮干しそば、銀座鴨そば 九代目けいすけ、塩そば専門店 桑ばら、塩そば 一榮、SOBA HOUSE 金色不如帰（紅隊 round 7 B）', () => {
+    for (const name of ['煮干しそば', '銀座鴨そば 九代目けいすけ', '塩そば専門店 桑ばら', '塩そば 一榮', 'SOBA HOUSE 金色不如帰']) {
+      expect(kindOfCandidate(cand(name)), name).toBe('ramen')
+    }
+  })
+  it('B 控制組：鴨蕎麦尖（真蕎麥割烹，寫漢字「蕎麦」）還是 soba，平假名「鴨そば」補丁碰不到它', () => {
+    expect(kindOfCandidate(cand('鴨蕎麦尖'))).toBe('soba')
+  })
+  it('B：純手打ち麺と未来不再是烏龍麵（round 8 從 UDON_STRONG 拿掉「手打ち麺」）——現在是漏判（undefined），不是烏龍麵也不是拉麵；擋它只能靠單店排除', () => {
+    expect(kindOfCandidate(cand('純手打ち麺と未来'))).toBeUndefined()
+    expect(kindOfCandidate(cand('純手打ち麺と未来'))).not.toBe('udon')
+    // 真的烏龍麵店名一定有うどん／讃岐可認，拿掉「手打ち麺」不影響它們
+    expect(kindOfCandidate(cand('手打ちうどん さくら'))).toBe('udon')
+  })
+  it('C：寿し是壽司——寿し常、寿し 小むらさき、寿しの いく味（紅隊 round 7 C）', () => {
+    for (const name of ['寿し常', '寿し 小むらさき', '寿しの いく味']) {
+      expect(kindOfCandidate(cand(name)), name).toBe('sushi')
+    }
+  })
+  it('C：ブーランジェリー／BOULANGERIE 是麵包——ブーランジェリー ラ・テール、BOULANGERIE LANDEMAINE（紅隊 round 7 C）', () => {
+    expect(kindOfCandidate(cand('ブーランジェリー ラ・テール'))).toBe('bakery')
+    expect(kindOfCandidate(cand('BOULANGERIE LANDEMAINE'))).toBe('bakery')
+  })
+  it('TYPE_KINDS 補齊（round 8 對照 Google 官方 Table A Food and Drink 全表）：dish 級類型認得到', () => {
+    expect(kindOfCandidate(cand('PIZZA SLICE', 'pizza_restaurant', ['pizza_restaurant']))).toBe('pizza')
+    expect(kindOfCandidate(cand('モスバーガー', 'hamburger_restaurant', ['hamburger_restaurant']))).toBe('hamburger')
+    expect(kindOfCandidate(cand('添好運', 'dim_sum_restaurant', ['dim_sum_restaurant']))).toBe('dim_sum')
+    expect(kindOfCandidate(cand('某店', 'steak_house', ['steak_house']))).toBe('steak')
+    expect(kindOfCandidate(cand('某店', 'sandwich_shop', ['sandwich_shop']))).toBe('sandwich')
+    expect(kindOfCandidate(cand('某店', 'ice_cream_shop', ['ice_cream_shop']))).toBe('ice_cream')
+    expect(kindOfCandidate(cand('某店', 'seafood_restaurant', ['seafood_restaurant']))).toBe('seafood')
+    expect(kindOfCandidate(cand('某店', 'hot_pot_restaurant', ['hot_pot_restaurant']))).toBe('hot_pot')
+    expect(kindOfCandidate(cand('某店', 'dumpling_restaurant', ['dumpling_restaurant']))).toBe('dumpling')
+    expect(kindOfCandidate(cand('某店', 'vegan_restaurant', ['vegan_restaurant']))).toBe('vegan')
+    expect(kindOfCandidate(cand('某店', 'vegetarian_restaurant', ['vegetarian_restaurant']))).toBe('vegetarian')
+    expect(kindLabel('pizza')).toBe('披薩')
+    expect(kindLabel('hamburger')).toBe('漢堡')
+    expect(kindLabel('dim_sum')).toBe('點心')
+    expect(normalizeKind('pizza_restaurant')).toBe('pizza')
+  })
+  it('TYPE_KINDS 守衛：泛料理類型（japanese／italian／korean／thai 等）刻意不收——類型 alone 不認種類，店名沒訊號就漏判', () => {
+    for (const t of ['japanese_restaurant', 'italian_restaurant', 'korean_restaurant', 'thai_restaurant', 'french_restaurant', 'american_restaurant', 'fast_food_restaurant', 'buffet_restaurant']) {
+      expect(kindOfCandidate(cand('某店', t, [t])), t).toBeUndefined()
+    }
+  })
+})

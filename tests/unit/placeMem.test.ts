@@ -11,7 +11,7 @@ vi.mock('idb-keyval', () => ({
 
 const {
   CLOSED_MS, KEEP_EVENTS, NEVER_AGAIN_MS, MAX_ENTRIES, REPEAT_MS,
-  allMem, blockedPlaceIds, clearPlaceMem, cuisineStats, discoveryStats, getMem, markClosed, markDone, markNeverAgain,
+  allMem, blockedPlaceIds, clearDislike, clearPlaceMem, cuisineStats, discoveryStats, getMem, markClosed, markDone, markNeverAgain,
   markNotThisKind, markRepeat, markShown, memSummary, setFav,
 } = await import('../../src/placeMem.ts')
 
@@ -285,5 +285,36 @@ describe('blockedPlaceIds：今日行程讀的封鎖清單（紅隊 §3.2）', (
     await markNeverAgain('p4', T0)
     await markRepeat('p4', T0 + 1000)
     expect(await blockedPlaceIds(T0 + REPEAT_MS + 1000)).toEqual(['p4'])
+  })
+})
+
+describe('clearDislike：解除一間店的「不要再來」封鎖（round 8，F7「清除『不喜歡』的紀錄」）', () => {
+  it('按過不要再來 → clearDislike 後不在封鎖清單裡；shown／done／愛店不動', async () => {
+    await markShown('p1', meta, T0)
+    await markDone('p1', 'tw', T0)
+    await setFav('p1', true)
+    await markNeverAgain('p1', T0)
+    expect(await blockedPlaceIds(T0 + 1000)).toEqual(['p1'])
+    await clearDislike('p1')
+    expect(await blockedPlaceIds(T0 + 1000)).toEqual([])
+    const e = await getMem('p1')
+    expect(e?.doneCount).toBe(1)
+    expect(e?.fav).toBe(true)
+    expect(e?.shown.length).toBe(1)
+    expect(e?.done.length).toBe(1)
+  })
+  it('永久封鎖（按過 2 次）也能清；清完再按一次是 90 天，不是直接永久', async () => {
+    await markNeverAgain('p1', T0)
+    await markNeverAgain('p1', T0 + 1)
+    expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS * 10)).toEqual(['p1'])
+    await clearDislike('p1')
+    expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS * 10)).toEqual([])
+    await markNeverAgain('p1', T0 + 2)
+    expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS + 1000)).toEqual([])
+    expect(await blockedPlaceIds(T0 + 1000)).toEqual(['p1'])
+  })
+  it('沒有這家店的紀錄時什麼都不做、不報錯', async () => {
+    await clearDislike('no-such-place')
+    expect(await allMem()).toEqual([])
   })
 })
