@@ -11,7 +11,7 @@ vi.mock('idb-keyval', () => ({
 
 const {
   CLOSED_MS, KEEP_EVENTS, NEVER_AGAIN_MS, MAX_ENTRIES, REPEAT_MS,
-  allMem, clearPlaceMem, cuisineStats, discoveryStats, getMem, markClosed, markDone, markNeverAgain,
+  allMem, blockedPlaceIds, clearPlaceMem, cuisineStats, discoveryStats, getMem, markClosed, markDone, markNeverAgain,
   markNotThisKind, markRepeat, markShown, memSummary, setFav,
 } = await import('../../src/placeMem.ts')
 
@@ -264,5 +264,26 @@ describe('容量', () => {
     await clearPlaceMem()
     expect(await allMem()).toEqual([])
     expect(await cuisineStats()).toEqual({})
+  })
+})
+
+describe('blockedPlaceIds：今日行程讀的封鎖清單（紅隊 §3.2）', () => {
+  it('不要再來 90 天內在清單裡；過期就不在；第 2 次變永久', async () => {
+    await markNeverAgain('p1', T0)
+    expect(await blockedPlaceIds(T0 + 1000)).toEqual(['p1'])
+    expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS + 1000)).toEqual([])
+    await markNeverAgain('p1', T0 + 2000)
+    expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS * 10)).toEqual(['p1'])
+  })
+  it('店關了 24 小時內在清單裡；過期就不在；只看過的店不在清單裡', async () => {
+    await markClosed('p2', T0)
+    await markShown('p3', meta, T0)
+    expect(await blockedPlaceIds(T0 + CLOSED_MS - 1000)).toEqual(['p2'])
+    expect(await blockedPlaceIds(T0 + CLOSED_MS + 1000)).toEqual([])
+  })
+  it('又是這家 14 天內在清單裡；不會把已經更長的封鎖縮短', async () => {
+    await markNeverAgain('p4', T0)
+    await markRepeat('p4', T0 + 1000)
+    expect(await blockedPlaceIds(T0 + REPEAT_MS + 1000)).toEqual(['p4'])
   })
 })

@@ -28,6 +28,19 @@ const udonShop = place('udon-1', 35.691, 139.701, {
   displayName: { text: '烏龍麵專門店' }, rating: 4.8, userRatingCount: 300,
   types: ['restaurant'], primaryType: 'restaurant',
 })
+/** 真實店名 mock（紅隊 §3.1）：麺喜やしま是使用者實際不喜歡的烏龍麵店，名字只有一個「麺」字；叙々苑是燒肉；藪蕎麦是蕎麥麵。 */
+const yashimaShop = place('yashima-1', 35.691, 139.701, {
+  displayName: { text: '麺喜やしま' }, rating: 4.2, userRatingCount: 808,
+  types: ['restaurant'], primaryType: 'restaurant',
+})
+const jojoenShop = place('jojoen-1', 35.691, 139.701, {
+  displayName: { text: '叙々苑' }, rating: 4.4, userRatingCount: 1200,
+  types: ['yakiniku_restaurant', 'restaurant'], primaryType: 'yakiniku_restaurant',
+})
+const yabuSobaShop = place('yabu-1', 35.691, 139.701, {
+  displayName: { text: '藪蕎麦' }, rating: 4.1, userRatingCount: 300,
+  types: ['restaurant'], primaryType: 'restaurant',
+})
 const ramenShop = place('ramen-1', 35.691, 139.701, {
   displayName: { text: '拉麵店' }, rating: 4.8, userRatingCount: 300,
   types: ['ramen_restaurant', 'restaurant'], primaryType: 'ramen_restaurant',
@@ -245,10 +258,56 @@ describe('種類級排除（dislikedKinds）', () => {
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('ok1')
   })
-  it('dislikedKinds 含 ramen_restaurant：primaryType 是拉麵的店不被選', async () => {
+  it('dislikedKinds 含 ramen（歸一化鍵）：primaryType 是拉麵的店不被選', async () => {
+    const g = mockKind(ramenShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+  })
+  it('舊版種類鍵 ramen_restaurant 照樣排除（第一輪存的「不喜歡」不會失效）', async () => {
     const g = mockKind(ramenShop)
     void g
     const res = await handler(post({ origin: HERE, excludeKinds: ['ramen_restaurant'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+  })
+})
+
+describe('種類級排除（真實店名，紅隊 §3.1）', () => {
+  function mockKind(first: unknown) {
+    const calls: { url: string; body: Record<string, unknown> }[] = []
+    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      calls.push({ url: String(url), body })
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [first, validShop('ok1', 0)] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f, calls }
+  }
+  it("excludeKinds ['udon']：麺喜やしま不被選（名字只有一個「麺」字，類型只有 restaurant）", async () => {
+    const g = mockKind(yashimaShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+  })
+  it("excludeKinds ['yakiniku']：叙々苑不被選（yakiniku_restaurant 歸一化成 yakiniku）", async () => {
+    const g = mockKind(jojoenShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['yakiniku'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+  })
+  it("excludeKinds ['soba']：藪蕎麦不被選（簡體「蕎麦」要認得到）", async () => {
+    const g = mockKind(yabuSobaShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('ok1')
