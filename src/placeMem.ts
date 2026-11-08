@@ -206,6 +206,17 @@ export async function memSummary(module: MemModule, now: number, limit = 200): P
 }
 
 /**
+ * 今日行程用：仍在封鎖期的 place_id（不要再來 90 天／第 2 次永久、店關了 24 小時、
+ * 又是這家 14 天）。生成／shuffle 前讀它，併進排除清單：核心班長 app 按的
+ * 「不要再來」才會影響今日行程；清掉 localStorage 也不會讓店回來。
+ * 模組不分 eat／rest：同一個 place_id，哪邊封鎖都算不要再來。
+ */
+export async function blockedPlaceIds(now: number): Promise<string[]> {
+  const all = await allMem()
+  return all.filter((e) => isBlocked(e, now)).map((e) => e.id)
+}
+
+/**
  * 本週新占領／回防（B1）。
  * 新占領 = 本週有 done，而且本週之前從沒 done 過的店；該店本週第一次 done 算新占領，
  * 同店本週其餘的 done 與「本週前就去過的店」的 done 都算回防。

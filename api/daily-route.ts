@@ -1,5 +1,5 @@
 import { travelMatrix, scheduleRoute, validPoint } from '../src/dailyRouting.ts'
-import { kindOfCandidate } from '../src/placeKind.ts'
+import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
 // Daily Decision: real Google Places results and approximate geographic route ordering.
 // Does not claim live traffic, transit ETAs, reservations or confirmed stock.
 export const config = { runtime:'nodejs' }
@@ -81,8 +81,9 @@ async function handler(req:Request):Promise<Response>{
  if(!gps&&!location)return respond({error:'location_required',message:'請先指定出發地。'},400)
  const list=Array.isArray(input.stops)?input.stops.slice(0,9):[]
  const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,specified:x.specified===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate:x.candidate&&typeof x.candidate==='object'&&typeof x.candidate.id==='string'&&Number.isFinite(x.candidate.lat)&&Number.isFinite(x.candidate.lng)?x.candidate:undefined}))
- const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,100):[]
- const excludeKinds=Array.isArray(input.excludeKinds)?input.excludeKinds.filter(x=>typeof x==='string').slice(0,20):[]
+ const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,120):[]
+ // 排除清單上限 120（跟前端 mergeExclude 同步）：不喜歡 100＋每站換掉過的 20；舊版種類鍵（'ramen_restaurant'）先轉新鍵，舊的不喜歡才不會失效。
+ const excludeKinds=Array.isArray(input.excludeKinds)?[...new Set(input.excludeKinds.filter(x=>typeof x==='string').map(normalizeKind))].slice(0,20):[]
  try{
   let origin:Record<string,unknown>,center:Coord
   if(gps){center=gps;origin={name:'目前位置',current:true,lat:gps.lat,lng:gps.lng}}
