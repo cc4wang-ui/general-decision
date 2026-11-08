@@ -17,8 +17,9 @@ describe('kindOfCandidate：真實店名', () => {
   it('藪蕎麦（蕎麥麵，類型只有 restaurant）→ soba：簡體「蕎麦」要認得到', () => {
     expect(kindOfCandidate(cand('藪蕎麦'))).toBe('soba')
   })
-  it('丸亀製麺 → undefined：round 7 刪掉弱「麺」訊號後是漏判（跟麺喜やしま同一原因）；擋它只能靠單店排除', () => {
-    expect(kindOfCandidate(cand('丸亀製麺'))).toBeUndefined()
+  it('丸亀製麺 → udon：round 11 品牌別名表（用戶有條件接受漏判率的條件之一）——名字只有一個「麺」字、類型只有 restaurant，但品牌名本身就是種類事實', () => {
+    expect(kindOfCandidate(cand('丸亀製麺'))).toBe('udon')
+    expect(kindOfCandidate(cand('丸亀製麺 渋谷井の頭通り店'))).toBe('udon')
   })
   it('麺屋武蔵 → ramen：round 7 刪掉前綴表後，靠真實的 primaryType ramen_restaurant 認（類型優先）', () => {
     expect(kindOfCandidate(cand('麺屋武蔵', 'ramen_restaurant', ['ramen_restaurant', 'restaurant']))).toBe('ramen')
@@ -56,8 +57,9 @@ describe('kindOfCandidate：拉麵標記集中表（紅隊 round 5 結構性修�
   it('麺喜やしま還是漏判：round 7 刪掉弱訊號後回 undefined（不是 udon）', () => {
     expect(kindOfCandidate(cand('麺喜やしま'))).toBeUndefined()
   })
-  it('丸亀製麺還是漏判：round 7 刪掉弱訊號後回 undefined（不是 udon）', () => {
-    expect(kindOfCandidate(cand('丸亀製麺'))).toBeUndefined()
+  it('丸亀製麺不再是漏判：round 11 品牌別名表認得出它是烏龍麵（不是靠弱「麺」訊號加回來——麺喜やしま還是漏判，見下方）', () => {
+    expect(kindOfCandidate(cand('丸亀製麺'))).toBe('udon')
+    expect(kindOfCandidate(cand('麺喜やしま'))).toBeUndefined()
   })
 })
 
@@ -135,15 +137,21 @@ describe('kindOfCandidate：繁體蕎麥（紅隊 round 4 Finding 3）', () => {
   })
 })
 
-describe('kindOfCandidate：已知限制——名字完全無訊號的店', () => {
-  it('鳥貴族（串燒連鎖）→ undefined：名字無關鍵字，店名啟發式無解，以類型為準', () => {
-    expect(kindOfCandidate(cand('鳥貴族'))).toBeUndefined()
+describe('kindOfCandidate：已知限制——名字完全無訊號的店（round 11：連鎖品牌由品牌別名表認）', () => {
+  it('鳥貴族（串燒連鎖）→ izakaya：round 11 品牌別名表——名字無關鍵字，但品牌名本身就是種類事實', () => {
+    expect(kindOfCandidate(cand('鳥貴族'))).toBe('izakaya')
+    expect(kindOfCandidate(cand('鳥貴族 渋谷道玄坂店'))).toBe('izakaya')
   })
-  it('川上庵（蕎麥麵）→ undefined：名字無 そば／蕎麦，店名啟發式無解', () => {
-    expect(kindOfCandidate(cand('川上庵'))).toBeUndefined()
+  it('川上庵（蕎麥麵）→ soba：round 11 品牌別名表——名字無 そば／蕎麦，但品牌名本身就是種類事實', () => {
+    expect(kindOfCandidate(cand('川上庵'))).toBe('soba')
   })
-  it('一蘭（拉麵連鎖）→ undefined：名字無關鍵字，店名啟發式無解', () => {
-    expect(kindOfCandidate(cand('一蘭'))).toBeUndefined()
+  it('一蘭（拉麵連鎖）→ ramen：round 11 品牌別名表——名字無關鍵字，但品牌名本身就是種類事實', () => {
+    expect(kindOfCandidate(cand('一蘭'))).toBe('ramen')
+    expect(kindOfCandidate(cand('一蘭 渋谷スペイン坂店'))).toBe('ramen')
+  })
+  it('品牌表之外的無訊號店還是漏判：麺喜やしま（烏龍麵，名字只有一個「麺」字）與鳥竹総本店（串燒，單店名不是連鎖品牌）', () => {
+    expect(kindOfCandidate(cand('麺喜やしま'))).toBeUndefined()
+    expect(kindOfCandidate(cand('鳥竹総本店'))).toBeUndefined()
   })
 })
 
@@ -220,11 +228,11 @@ describe('kindOfCandidate：兩層拉麵表（紅隊 round 5 F1／F3／F4／F6�
   it('F6 守衛：麺処讃岐うどん → udon：明確烏龍麵關鍵字在兩層拉麵表之前', () => {
     expect(kindOfCandidate(cand('麺処讃岐うどん'))).toBe('udon')
   })
-  it('守衛：麺喜やしま是漏判、藪蕎麦 → soba、中華そば 青葉 → ramen、丸亀製麺是漏判、麺処ほん田靠類型是 ramen', () => {
+  it('守衛：麺喜やしま是漏判、藪蕎麦 → soba、中華そば 青葉 → ramen、丸亀製麺 → udon（round 11 品牌別名表）、麺処ほん田靠類型是 ramen', () => {
     expect(kindOfCandidate(cand('麺喜やしま'))).toBeUndefined()
     expect(kindOfCandidate(cand('藪蕎麦'))).toBe('soba')
     expect(kindOfCandidate(cand('中華そば 青葉'))).toBe('ramen')
-    expect(kindOfCandidate(cand('丸亀製麺'))).toBeUndefined()
+    expect(kindOfCandidate(cand('丸亀製麺'))).toBe('udon')
     expect(kindOfCandidate(cand('麺処ほん田', 'ramen_restaurant', ['ramen_restaurant', 'restaurant']))).toBe('ramen')
   })
   it('守衛：つけ麺 さなだ、らぁ麺 飯田商店、支那そばや、油そば 東京油組総本店、台湾まぜそば はなび → ramen（明確標記，名字就認得出）', () => {
@@ -293,11 +301,11 @@ describe('kindOfCandidate：round 7 結構性修復（紅隊 round 6 N1／N2／N
     expect(kindOfCandidate(cand('某店', 'bakery', ['bakery']))).toBe('bakery')
     expect(normalizeKind('chinese_restaurant')).toBe('chinese')
   })
-  it('控制組：藪蕎麦 → soba、麺処讃岐うどん → udon、中華そば 青葉 → ramen、丸亀製麺是漏判、麺処、そば志ん、 → soba', () => {
+  it('控制組：藪蕎麦 → soba、麺処讃岐うどん → udon、中華そば 青葉 → ramen、丸亀製麺 → udon（round 11 品牌別名表）、麺処、そば志ん、 → soba', () => {
     expect(kindOfCandidate(cand('藪蕎麦'))).toBe('soba')
     expect(kindOfCandidate(cand('麺処讃岐うどん'))).toBe('udon')
     expect(kindOfCandidate(cand('中華そば 青葉'))).toBe('ramen')
-    expect(kindOfCandidate(cand('丸亀製麺'))).toBeUndefined()
+    expect(kindOfCandidate(cand('丸亀製麺'))).toBe('udon')
     expect(kindOfCandidate(cand('麺処、そば志ん、'))).toBe('soba')
   })
 })
@@ -402,15 +410,19 @@ describe('round 10：紅隊 round 9 B1～B4（新店名變體＋片假名正規�
     expect(kindOfCandidate(cand('よもだそば'))).toBe('soba')
     expect(kindOfCandidate(cand('手打蕎麦ふじや'))).toBe('soba')
   })
-  it('B2：つけそば／つけ蕎麦靠字體消歧義——平假名つけそば是拉麵，漢字つけ蕎麦是蕎麥麵（紅隊 round 9 B2；跟鴨そば／鴨蕎麦同一原則）', () => {
+  it('B2（round 11 更正，紅隊 round 10 R10-F1）：字體消歧義是錯的——漢字つけ蕎麦兩邊都有真店，歧義標記不判（回 undefined，靠 Google 類型）；平假名つけそば判拉麵維持不變', () => {
     // 拉麵：平假名つけそば（つけそば 弐天、つけそば神田勝本、つけそば 周，皆真實拉麵店）
     for (const name of ['つけそば 弐天', 'つけそば神田勝本', 'つけそば 周']) {
       expect(kindOfCandidate(cand(name)), name).toBe('ramen')
     }
-    // 蕎麥麵：漢字つけ蕎麦（つけ蕎麦 安土、つけ蕎麦 周庵，皆真實蕎麥麵店）
-    for (const name of ['つけ蕎麦 安土', 'つけ蕎麦 周庵']) {
-      expect(kindOfCandidate(cand(name)), name).toBe('soba')
+    // 歧義：漢字つけ蕎麦（つけ蕎麦尚念是真拉麵店，つけ蕎麦 安土／周庵／和だす是真蕎麥麵店）——名字本身不判
+    for (const name of ['つけ蕎麦尚念', 'つけ蕎麦 安土', 'つけ蕎麦 周庵', 'つけ蕎麦 和だす']) {
+      expect(kindOfCandidate(cand(name)), name).toBeUndefined()
     }
+    // 類型決定：尚念配 ramen_restaurant 是拉麵；安土配泛用 restaurant 時是漏判（不是誤判），單店排除擋得住
+    expect(kindOfCandidate(cand('つけ蕎麦尚念', 'ramen_restaurant', ['ramen_restaurant', 'restaurant']))).toBe('ramen')
+    // 全名另有明確拉麵標記時先判：つけ蕎麦 中華蕎麦 尚念（正式全名）裡的中華蕎麦是拉麵
+    expect(kindOfCandidate(cand('つけ蕎麦 中華蕎麦 尚念'))).toBe('ramen')
     // つけ麺（沾麵）不動，還是拉麵
     expect(kindOfCandidate(cand('つけ麺 さなだ'))).toBe('ramen')
   })
@@ -429,5 +441,72 @@ describe('round 10：紅隊 round 9 B1～B4（新店名變體＋片假名正規�
     // 既有的焼肉／やきとり寫法不受影響
     expect(kindOfCandidate(cand('叙々苑', 'yakiniku_restaurant', ['yakiniku_restaurant']))).toBe('yakiniku')
     expect(kindOfCandidate(cand('やきとり大吉'))).toBe('yakitori')
+  })
+})
+
+describe('round 11：紅隊 round 10 N1～N7＋品牌別名表（BRAND_KINDS）', () => {
+  it('N1：きしめん 住よし → udon（名古屋名駅的烏龍麵店，Retty 分類うどん／そば；きしめん本身就是平打烏龍麵）', () => {
+    expect(kindOfCandidate(cand('きしめん 住よし'))).toBe('udon')
+    expect(kindOfCandidate(cand('きしめん 住よし JR名古屋駅 3・4番線店'))).toBe('udon')
+  })
+  it('N2：ほうとう不動 → udon（山梨鄉土料理，味噌煮平打烏龍麵；ほうとう就是那道菜的名字）', () => {
+    expect(kindOfCandidate(cand('ほうとう不動'))).toBe('udon')
+    expect(kindOfCandidate(cand('ほうとう不動 河口湖北本店'))).toBe('udon')
+  })
+  it('N3：かつや → tonkatsu（品牌別名表；澀谷道玄坂店是炸豬排連鎖）', () => {
+    expect(kindOfCandidate(cand('かつや'))).toBe('tonkatsu')
+    expect(kindOfCandidate(cand('かつや 渋谷道玄坂店'))).toBe('tonkatsu')
+  })
+  it('N4：焼きとり ささのや／焼きとり 辻 → yakitori（「焼きとり」拼字缺口）', () => {
+    for (const name of ['焼きとり ささのや', '焼きとり 辻']) {
+      expect(kindOfCandidate(cand(name)), name).toBe('yakitori')
+    }
+    // 既有的串燒寫法不受影響
+    for (const name of ['やきとり大吉', '焼鳥 おがわ', 'やき鳥 宮川', '串鳥']) {
+      expect(kindOfCandidate(cand(name)), name).toBe('yakitori')
+    }
+  })
+  it('N5：居酒屋 てっぺん 渋谷女道場 → izakaya（居酒屋是唯一零名稱關鍵字的種類；名字本身就含「居酒屋」）', () => {
+    expect(kindOfCandidate(cand('居酒屋 てっぺん 渋谷女道場'))).toBe('izakaya')
+    expect(kindOfCandidate(cand('居酒屋 和民'))).toBe('izakaya')
+  })
+  it('N6：裸「パン」放寬成麵包，但鬆餅店與香檳酒吧除外——パンとエスプレッソと → bakery；幸せのパンケーキ → undefined（不是麵包）', () => {
+    expect(kindOfCandidate(cand('パンとエスプレッソと'))).toBe('bakery')
+    expect(kindOfCandidate(cand('パンとエスプレッソと 表参道店'))).toBe('bakery')
+    // 鬆餅店：幸せのパンケーキ 渋谷店是真實鬆餅專門店（道玄坂1-18-8），不是麵包店
+    expect(kindOfCandidate(cand('幸せのパンケーキ'))).toBeUndefined()
+    expect(kindOfCandidate(cand('幸せのパンケーキ 渋谷店'))).toBeUndefined()
+    // 既有的麵包寫法不受影響
+    expect(kindOfCandidate(cand('ブーランジェリー ラ・テール'))).toBe('bakery')
+    expect(kindOfCandidate(cand('パン屋 渋谷店'))).toBe('bakery')
+  })
+  it('N6 守衛：シャンパン／champagne 裡的「パン」不是麵包（合成名，測排除正則本身——沒有找到真實香檳酒吧用這個寫法）', () => {
+    expect(kindOfCandidate(cand('シャンパンバー テスト'))).toBeUndefined()
+    expect(kindOfCandidate(cand('Champagne Bar テスト'))).toBeUndefined()
+  })
+  it('N7：博多天ぷら たかお → tempura（新種類鍵；Table A 沒有 tempura_restaurant，種類只能靠店名）', () => {
+    expect(kindOfCandidate(cand('博多天ぷら たかお 渋谷パルコ店'))).toBe('tempura')
+    expect(kindOfCandidate(cand('てんぷら 天喜'))).toBe('tempura')
+    expect(kindOfCandidate(cand('天婦羅 たかお'))).toBe('tempura')
+    expect(kindLabel('tempura')).toBe('天ぷら')
+  })
+  it('品牌別名表全表：8 個品牌各回正確種類（皆真實連鎖，名字本身無關鍵字、類型只有 restaurant 時）', () => {
+    const cases: Array<[string, string]> = [
+      ['丸亀製麺', 'udon'],
+      ['鳥貴族', 'izakaya'],
+      ['一蘭', 'ramen'],
+      ['川上庵', 'soba'],
+      ['かつや', 'tonkatsu'],
+      ['磯丸水産', 'izakaya'],
+      ['魚民', 'izakaya'],
+      ['白木屋', 'izakaya'],
+    ]
+    for (const [name, kind] of cases) {
+      expect(kindOfCandidate(cand(name)), name).toBe(kind)
+      expect(kindOfCandidate(cand(name + ' 渋谷店')), name).toBe(kind)
+    }
+  })
+  it('品牌表不蓋掉明確關鍵字：類型優先照舊（丸亀製麺配 ramen_restaurant 時類型贏——那不是真的丸亀製麺，是測試類型優先的順序）', () => {
+    expect(kindOfCandidate(cand('丸亀製麺', 'ramen_restaurant', ['ramen_restaurant', 'restaurant']))).toBe('ramen')
   })
 })

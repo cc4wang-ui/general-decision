@@ -12,7 +12,7 @@ vi.mock('idb-keyval', () => ({
 const {
   CLOSED_MS, KEEP_EVENTS, NEVER_AGAIN_MS, MAX_ENTRIES, REPEAT_MS,
   allMem, blockedPlaceIds, clearDislike, clearPlaceMem, cuisineStats, discoveryStats, getMem, markClosed, markDailyDislike, markDone, markNeverAgain,
-  markNotThisKind, markRepeat, markShown, memSummary, mergeEntry, setFav,
+  markNotThisKind, markRepeat, markShown, memSummary, mergeEntry, migrateDailyDislike, setFav,
 } = await import('../../src/placeMem.ts')
 
 const DAY = 24 * 3600 * 1000
@@ -289,29 +289,32 @@ describe('blockedPlaceIds：今日行程讀的封鎖清單（紅隊 §3.2）', (
 })
 
 describe('clearDislike：解除一間店的「不要再來」封鎖（round 8，F7「清除『不喜歡』的紀錄」）', () => {
-  it('按過不要再來 → clearDislike 後不在封鎖清單裡；shown／done／愛店不動', async () => {
+  it('核心 app 按過不要再來 → clearDislike 不動它，仍在封鎖清單裡（round 11，R10-F2a：沒有 daily 欄位就不能證明封鎖來自今日行程）；shown／done／愛店不動', async () => {
     await markShown('p1', meta, T0)
     await markDone('p1', 'tw', T0)
     await setFav('p1', true)
     await markNeverAgain('p1', T0)
     expect(await blockedPlaceIds(T0 + 1000)).toEqual(['p1'])
-    await clearDislike('p1')
-    expect(await blockedPlaceIds(T0 + 1000)).toEqual([])
+    const r = await clearDislike('p1')
+    expect(r.sharedRemains).toBe(true)
+    expect(await blockedPlaceIds(T0 + 1000)).toEqual(['p1'])
     const e = await getMem('p1')
     expect(e?.doneCount).toBe(1)
     expect(e?.fav).toBe(true)
     expect(e?.shown.length).toBe(1)
     expect(e?.done.length).toBe(1)
+    expect(e?.dislikes).toBe(1)
   })
-  it('永久封鎖（按過 2 次）也能清；清完再按一次是 90 天，不是直接永久', async () => {
+  it('核心 app 按過 2 次的永久封鎖：clearDislike 不動它（round 11，R10-F2：連按兩次的永久封鎖也不能被今日行程的清除刪掉）', async () => {
     await markNeverAgain('p1', T0)
     await markNeverAgain('p1', T0 + 1)
     expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS * 10)).toEqual(['p1'])
-    await clearDislike('p1')
-    expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS * 10)).toEqual([])
-    await markNeverAgain('p1', T0 + 2)
-    expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS + 1000)).toEqual([])
-    expect(await blockedPlaceIds(T0 + 1000)).toEqual(['p1'])
+    const r = await clearDislike('p1')
+    expect(r.sharedRemains).toBe(true)
+    expect(await blockedPlaceIds(T0 + NEVER_AGAIN_MS * 10)).toEqual(['p1'])
+    const e = await getMem('p1')
+    expect(e?.dislikeUntil).toBe('forever')
+    expect(e?.dislikes).toBe(2)
   })
   it('沒有這家店的紀錄時什麼都不做、不報錯', async () => {
     await clearDislike('no-such-place')
@@ -361,16 +364,17 @@ describe('round 10：今日行程「不喜歡」跟核心 app「不要再來」�
     const [row] = await memSummary('eat', T0 + 11 * DAY)
     expect(row.x).toBe(T0 + 10 * DAY + NEVER_AGAIN_MS)
   })
-  it('過渡（grandfathering）：分來源之前的舊紀錄沒有 daily 欄位，clearDislike 照舊版清掉共用欄位（否則舊的「不喜歡」永遠清不掉）。注意：沒有 daily 欄位的紀錄分不出是「分來源之前的舊紀錄」還是「分來源之後只在核心 app 按過的」——後者在 UI 上不會被誤傷，因為 clearDislike 只會對今日行程 disliked 清單裡的 id 呼叫，而那份清單只收今日行程按過的店（按過就有 daily 欄位）。', async () => {
-    await markNeverAgain('p1', T0) // 舊版寫法：只有共用欄位，沒有 daily 欄位
+  it('過渡（round 11，R10-F2a）：沒有 daily 欄位的舊紀錄，clearDislike 不動共用欄位——分來源之後只在核心 app 按過的紀錄也是這個形狀，分不出來就不碰；要清舊紀錄的今日行程封鎖，先走 migrateDailyDislike（見下方 round 11 測試）', async () => {
+    await markNeverAgain('p1', T0) // 只有共用欄位，沒有 daily 欄位
     const before = (await getMem('p1'))!
     expect(before.dailyDislikes).toBeUndefined()
     expect(before.dailyDislikeUntil).toBeUndefined()
-    await clearDislike('p1')
+    const r = await clearDislike('p1')
+    expect(r.sharedRemains).toBe(true)
     const e = (await getMem('p1'))!
-    expect(e.dislikeUntil).toBeUndefined()
-    expect(e.dislikes).toBe(0)
-    expect((await blockedPlaceIds(T0 + DAY))).not.toContain('p1')
+    expect(e.dislikeUntil).toBe(T0 + NEVER_AGAIN_MS)
+    expect(e.dislikes).toBe(1)
+    expect((await blockedPlaceIds(T0 + DAY))).toContain('p1')
   })
   it('mergeEntry 合併 daily 欄位：永久優先，否則取較久者；次數取大的；兩邊都沒有 daily 欄位時不寫', async () => {
     const base = { id: 'p1', module: 'eat' as const, shown: [T0], done: [], dislikes: 0 }
@@ -382,5 +386,57 @@ describe('round 10：今日行程「不喜歡」跟核心 app「不要再來」�
     const c = mergeEntry({ ...base, dislikeUntil: T0 + 5 * DAY }, { ...base })
     expect('dailyDislikeUntil' in c).toBe(false)
     expect('dailyDislikes' in c).toBe(false)
+  })
+})
+
+describe('round 11：舊紀錄移轉（R10-F2c）＋ clearDislike 回報 sharedRemains', () => {
+  it('MOVE：舊紀錄只有一次按壓（dislikes=1）→ 移轉後共用欄位刪掉、daily 欄位留著；clearDislike 清掉它，之後不再封鎖', async () => {
+    await markNeverAgain('p1', T0) // 舊版寫法：今日行程按過一次，只有共用欄位
+    await migrateDailyDislike('p1', T0 + DAY)
+    const m = (await getMem('p1'))!
+    expect(m.dailyDislikeUntil).toBe(T0 + NEVER_AGAIN_MS)
+    expect(m.dailyDislikes).toBe(1)
+    expect(m.dislikeUntil).toBeUndefined()
+    expect(m.dislikes).toBe(0)
+    expect((await blockedPlaceIds(T0 + DAY))).toContain('p1') // daily 側還在封鎖
+    const r = await clearDislike('p1')
+    expect(r.sharedRemains).toBe(false)
+    expect((await blockedPlaceIds(T0 + DAY))).not.toContain('p1')
+  })
+  it('COPY：舊紀錄按過兩次（dislikes=2，永久）→ 移轉後共用欄位不動、daily 欄位抄一份；clearDislike 只清 daily 側，共用永久封鎖還在', async () => {
+    await markNeverAgain('p1', T0)
+    await markNeverAgain('p1', T0 + 1)
+    await migrateDailyDislike('p1', T0 + DAY)
+    const m = (await getMem('p1'))!
+    expect(m.dislikeUntil).toBe('forever')
+    expect(m.dislikes).toBe(2)
+    expect(m.dailyDislikeUntil).toBe('forever')
+    expect(m.dailyDislikes).toBe(1) // 保守記 1，不從模糊資料製造永久
+    const r = await clearDislike('p1')
+    expect(r.sharedRemains).toBe(true)
+    expect((await blockedPlaceIds(T0 + DAY))).toContain('p1')
+    const e = (await getMem('p1'))!
+    expect(e.dailyDislikeUntil).toBeUndefined()
+    expect(e.dailyDislikes).toBe(0)
+  })
+  it('移轉冪等：已有 daily 欄位就不動；沒有紀錄也不動；移轉兩次結果一樣', async () => {
+    await markDailyDislike('p1', T0)
+    await migrateDailyDislike('p1', T0 + DAY)
+    const e = (await getMem('p1'))!
+    expect(e.dailyDislikeUntil).toBe(T0 + NEVER_AGAIN_MS)
+    expect(e.dailyDislikes).toBe(1)
+    await migrateDailyDislike('p1', T0 + 2 * DAY)
+    const e2 = (await getMem('p1'))!
+    expect(e2.dailyDislikeUntil).toBe(T0 + NEVER_AGAIN_MS)
+    expect(e2.dailyDislikes).toBe(1)
+    await migrateDailyDislike('no-such-place', T0)
+    expect(await allMem()).toHaveLength(1)
+  })
+  it('clearDislike 回報 sharedRemains：兩邊都按過 → true；只有今日行程按過 → false', async () => {
+    await markNeverAgain('p1', T0)
+    await markDailyDislike('p1', T0)
+    expect((await clearDislike('p1')).sharedRemains).toBe(true)
+    await markDailyDislike('p2', T0)
+    expect((await clearDislike('p2')).sharedRemains).toBe(false)
   })
 })

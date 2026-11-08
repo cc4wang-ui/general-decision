@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../src/placeMem.ts', () => ({
   blockedPlaceIds: async () => Array.from({ length: 150 }, (_, i) => 'p' + i),
   markNeverAgain: async () => {},
-  markDailyDislike: async () => {},
-  clearDislike: vi.fn(async () => {}),
+  markDailyDislike: vi.fn(async () => {}),
+  migrateDailyDislike: vi.fn(async () => {}),
+  clearDislike: vi.fn(async () => ({ sharedRemains: false })),
 }))
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { DailyDecision } from '../../src/dailyDecision.tsx'
@@ -252,5 +253,79 @@ describe('round 10：F1a-load（載入清掉的車站候選要說原因）＋ cl
     const saved = JSON.parse(localStorage.getItem(KEY)!) as { disliked: string[]; dislikedKinds: string[] }
     expect(saved.disliked).toEqual(['d1', 'd2'])
     expect(saved.dislikedKinds).toEqual(['udon'])
+  })
+})
+
+describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新生成送 seen ＋ 清除時 sharedRemains 誠實提示', () => {
+  const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
+  const routeFetch = () => {
+    const fetchMock = vi.fn(async (url: string | URL | Request) => String(url).includes('/api/daily-route')
+      ? { ok: true, json: async () => ({ stops: [], routeVerified: false, conflicts: [] }) }
+      : { ok: false })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+  it('F2b：markDailyDislike 寫入失敗 → 顯示失敗、不進 localStorage 的 disliked、店還在（再按一次可以重試）', async () => {
+    const { markDailyDislike } = await import('../../src/placeMem.ts')
+    vi.mocked(markDailyDislike).mockRejectedValueOnce(new Error('IndexedDB 寫入失敗'))
+    seed(cand('d47', 'd47食堂'))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByText('不喜歡這間店'))
+    await waitFor(() => expect(screen.getByText('「不喜歡」的紀錄寫入失敗，請再按一次。')).toBeTruthy())
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { disliked: string[]; seen?: Record<string, string[]> }
+    expect(saved.disliked).toEqual([])
+    // 店還在卡片上（沒有被換掉、也沒有被當成已排除）
+    expect(screen.getByText('d47食堂')).toBeTruthy()
+    expect(screen.getByText('不喜歡這間店')).toBeTruthy()
+  })
+  it('不喜歡成功：id 進 localStorage 的 disliked、seen 也記下，重新搜尋的請求 exclude 包含它', async () => {
+    const fetchMock = routeFetch()
+    seed(cand('d47', 'd47食堂'))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByText('不喜歡這間店'))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { disliked: string[]; seen?: Record<string, string[]> }
+    expect(saved.disliked).toEqual(['d47'])
+    expect(saved.seen?.meal).toEqual(['d47'])
+    const body = JSON.parse(String(fetchMock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route'))![1]!.body)) as { exclude: string[]; shuffle?: string }
+    expect(body.exclude).toContain('d47')
+    expect(body.shuffle).toBe('meal')
+  })
+  it('完整重新生成送 seen：存檔 seen 裡的店＋目前候選都在請求的 seen 裡，且沒有 shuffle 欄位', async () => {
+    const fetchMock = routeFetch()
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('cur-1', '目前的店') }],
+      notes: [], avoid: [], seen: { meal: ['old-1', 'old-2'] }, disliked: [], dislikedKinds: [],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    const body = JSON.parse(String(fetchMock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route'))![1]!.body)) as { seen?: string[]; shuffle?: string }
+    expect(body.seen).toEqual(expect.arrayContaining(['old-1', 'old-2', 'cur-1']))
+    expect('shuffle' in body).toBe(false)
+  })
+  it('清除「不喜歡」時 sharedRemains 為真 → 提示說其中幾家仍有其他封鎖紀錄、仍不會出現（不是只報成功）', async () => {
+    const { clearDislike } = await import('../../src/placeMem.ts')
+    vi.mocked(clearDislike).mockResolvedValue({ sharedRemains: true })
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      tasks: [{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'filtered' }],
+      notes: [], avoid: [], seen: {}, disliked: ['d1', 'd2'], dislikedKinds: [],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByText('清除「不喜歡」的紀錄'))
+    await waitFor(() => expect(screen.getByText(/已清除 2 家「不喜歡」的店/)).toBeTruthy())
+    expect(screen.getByText(/其中 2 家仍有其他封鎖紀錄，仍不會出現/)).toBeTruthy()
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { disliked: string[] }
+    expect(saved.disliked).toEqual([])
   })
 })

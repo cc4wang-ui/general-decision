@@ -179,30 +179,76 @@ export async function markDailyDislike(id: string, now: number, module: MemModul
   })
 }
 
-/** 解除一間店的「不要再來」封鎖（round 8：今日行程「清除『不喜歡』的紀錄」用；
- * round 10 改成分來源，R9-F7-leak）。
- * 只清今日行程這邊的封鎖（dailyDislikeUntil）與不要再來次數（dailyDislikes 歸零，
- * 下次再按從 90 天重新算，不會因為之前按過一次就直接永久）；核心 app 直接按
- * 「不要再來」的封鎖（dislikeUntil／dislikes）不動。shown／done／愛店／品牌鍵／
- * 細類鍵都不動。沒有這家店的紀錄時什麼都不做。
- * 過渡（grandfathering）：分來源之前（round 10 之前）的紀錄沒有 daily 欄位，
- * 今日行程的「不喜歡」是寫進共用的 dislikeUntil／dislikes 的——那種舊紀錄照舊版
- * 行為清掉共用欄位（不清掉，就等於 round 10 之前按過「不喜歡」的店永遠清不掉）。
- * 舊紀錄若同時有核心 app 的封鎖，清掉時核心封鎖也會跟著消失（舊行為，舊資料
- * 分辨不出來源）；分來源之後的新紀錄才分得開。 */
-export async function clearDislike(id: string): Promise<void> {
-  await mutate(Date.now(), (store) => {
+/** 舊紀錄移轉（round 11，紅隊 round 10 R10-F2c）：分來源之前（round 10 之前）
+ * 今日行程的「不喜歡」寫在共用欄位（dislikeUntil／dislikes），沒有 daily 欄位。
+ * 呼叫端（clearDisliked）保證這個 id 在 state.disliked 裡——只有 dislikeStop 會把
+ * id 加進那個清單，而分來源之前 dislikeStop 寫的就是共用欄位——所以舊紀錄的封鎖
+ * 來自今日行程。
+ * - dislikes <= 1：這一次按壓一定是今日行程按的（核心 app 按的不會進 state.disliked，
+ *   再按一次會讓 dislikes 變 2）——沒有核心封鎖可刪，MOVE：共用封鎖抄到 daily 欄位
+ *   後刪掉共用欄位；之後 clearDislike 只清 daily 側，整筆封鎖就清掉了。
+ *   （跟紅隊 round 10 規格的字面 COPY 不同：字面 COPY 會讓清除按鈕回報成功、店卻因為
+ *   殘留的共用封鎖繼續被擋——清除按了等於沒按。MOVE 只在「只有一次按壓、且那一次
+ *   一定是今日行程」這個可證明的情況下刪共用欄位，不會刪到核心封鎖。）
+ * - dislikes >= 2：至少一次今日行程、至少另一次可能是核心 app——分不出來，COPY：
+ *   共用封鎖抄到 daily 欄位（dailyDislikes 保守記 1，不從模糊資料製造「永久」），
+ *   共用欄位不動；之後清掉 daily 側，共用封鎖還在，店可能繼續被擋——clearDislike
+ *   回報 sharedRemains，UI 要說清楚。
+ * 冪等：已有 daily 欄位就不動；沒有共用封鎖也不動。移轉只在清除路徑呼叫（不在載入時
+ * 跑：loadDaily 是同步的、placeMem 是非同步 IndexedDB，載入時移轉會跟第一次清除競速；
+ * 而 daily 欄位唯一的消費者就是今日行程的清除——在 clearDislike 之前移轉，同一支
+ * mutate 序列化裡完成，原子又冪等。dislikes <= 1 的共用封鎖一定是 90 天時效（第 2 次
+ * 才永久），不會有「沒移轉就永遠卡住」的永久封鎖。 */
+export async function migrateDailyDislike(id: string, now: number): Promise<void> {
+  await mutate(now, (store) => {
     const e = store[id]
     if (!e) return
-    if (e.dailyDislikes === undefined && e.dailyDislikeUntil === undefined) {
-      // 舊紀錄（分來源之前）：沒有 daily 欄位，共用欄位就是當時唯一的封鎖，照舊版清掉。
+    if (e.dailyDislikes !== undefined || e.dailyDislikeUntil !== undefined) return
+    if (e.dislikeUntil === undefined && (e.dislikes ?? 0) === 0) return
+    if ((e.dislikes ?? 0) <= 1) {
+      // MOVE：只有一次按壓，一定是今日行程的。
+      if (e.dislikeUntil !== undefined) e.dailyDislikeUntil = e.dislikeUntil
+      e.dailyDislikes = 1
       delete e.dislikeUntil
       e.dislikes = 0
       return
     }
+    // COPY：分不出來，共用欄位不動。
+    if (e.dislikeUntil !== undefined) e.dailyDislikeUntil = e.dislikeUntil
+    e.dailyDislikes = 1
+  })
+}
+
+/** 解除一間店的「不要再來」封鎖（round 8：今日行程「清除『不喜歡』的紀錄」用；
+ * round 10 改成分來源，R9-F7-leak；round 11 改寫，R10-F2）。
+ * 只清今日行程這邊的封鎖（dailyDislikeUntil）與不要再來次數（dailyDislikes 歸零，
+ * 下次再按從 90 天重新算，不會因為之前按過一次就直接永久）；核心 app 直接按
+ * 「不要再來」的封鎖（dislikeUntil／dislikes）不動。shown／done／愛店／品牌鍵／
+ * 細類鍵都不動。沒有這家店的紀錄時什麼都不做。
+ * 舊紀錄（round 10，R10-F2a）：沒有 daily 欄位時，共用欄位一律不動——沒有 daily
+ * 欄位就不能證明這個封鎖來自今日行程（分來源之後只在核心 app 按過的紀錄也是這個
+ * 形狀）。舊版「照舊版清掉共用欄位」的分支是錯的：它會把核心 app 的封鎖也清掉
+ * （紅隊 round 10 R10-F2：連按兩次的永久封鎖也被刪掉）。要清舊紀錄的今日行程封鎖，
+ * 先走 migrateDailyDislike（只對 state.disliked 裡的 id 呼叫，見 clearDisliked），
+ * 移轉過的紀錄一定有 daily 欄位，走下面的 daily 分支。
+ * 回傳 sharedRemains：清完 daily 側之後，共用側若還在封鎖期，店還是被擋——呼叫端
+ * 要照這個回報說清楚（清除按鈕不能回報成功、店卻繼續被擋而不說）。 */
+export async function clearDislike(id: string): Promise<{ sharedRemains: boolean }> {
+  let sharedRemains = false
+  await mutate(Date.now(), (store) => {
+    const e = store[id]
+    if (!e) return
+    if (e.dailyDislikes === undefined && e.dailyDislikeUntil === undefined) {
+      // 舊紀錄且沒經過移轉：共用欄位不動（R10-F2a）。但回報要誠實：共用側若還在封鎖期，
+      // 店還是被擋，呼叫端要照 sharedRemains 說清楚——「沒清掉」不是「清掉了」。
+      sharedRemains = isBlocked(e, Date.now())
+      return
+    }
     delete e.dailyDislikeUntil
     e.dailyDislikes = 0
+    sharedRemains = isBlocked(e, Date.now())
   })
+  return { sharedRemains }
 }
 
 /** 列入愛店／取消。 */

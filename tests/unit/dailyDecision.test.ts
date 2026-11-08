@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildDaily, replanDaily, withSeen, excludeFor, excludeForInfo, othersFor, catalogTitle, mergeExclude, mergeExcludeInfo, loadDaily, addFixedTask, mapsNavigationUrl, originKey, routeProposal, clearStaleCandidate, noCandidateText, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
+import { buildDaily, replanDaily, withSeen, seenFor, excludeFor, excludeForInfo, othersFor, catalogTitle, mergeExclude, mergeExcludeInfo, loadDaily, addFixedTask, mapsNavigationUrl, originKey, routeProposal, clearStaleCandidate, noCandidateText, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
 
 const KEY = 'decide.daily.v1'
 const todayTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -513,5 +513,49 @@ describe('round 10：R9-F1a-load——載入時清掉候選要說原因（不是
     const loadedShopping = out.tasks.find((t) => t.id === 'shopping')!
     expect(loadedShopping.noCandidate).toBe(true)
     expect(loadedShopping.noCandidateReason).toBe('area')
+  })
+})
+
+describe('round 11：seenFor（完整重新生成送 seen）＋ 壁畫候選載入清掉', () => {
+  const cand = (id: string, name: string) => ({ id, name, address: '渋谷', mapUrl: 'https://maps.google.com/?cid=' + id, lat: 35.66, lng: 139.70, rating: 4.6, userRatingCount: 200, types: ['art_gallery'], primaryType: 'art_gallery' })
+  it('seenFor：各站 seen 合併、去重、上限 200，而且目前路線上的候選也算進去（否則隨機挑選可能挑回同一間）', () => {
+    const s = {
+      ...state(),
+      tasks: buildDaily(state()).map(t => ({ ...t, candidate: t.id === 'meal' ? cand('cur-meal', '目前的店') : undefined })),
+      seen: { meal: ['m1', 'm2'], coffee: ['m2', 'c1'] },
+    } as DailyState
+    const out = seenFor(s)
+    expect(out).toEqual(['m1', 'm2', 'c1', 'cur-meal'])
+    // 上限：每站 20 筆 × 9 站最多 180，200 夠用；超過 200 只留前 200 筆
+    const big = { ...state(), tasks: [], seen: Object.fromEntries(Array.from({ length: 15 }, (_, i) => ['s' + i, Array.from({ length: 20 }, (_, j) => 'x' + i + '-' + j)])) } as DailyState
+    expect(seenFor(big)).toHaveLength(200)
+  })
+  it('seenFor：沒有 seen、沒有候選 → 空陣列（不會送 undefined）', () => {
+    expect(seenFor({ ...state(), tasks: buildDaily(state()), seen: {} })).toEqual([])
+  })
+  it('壁畫候選載入清掉：clearStaleCandidate 把明日の神話判成 denied、標題照留；loadDaily 走一遍也一樣', () => {
+    const mural = { id: 'mural-1', name: '岡本太郎「明日の神話」', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=mural-1', lat: 35.6595, lng: 139.7005, rating: 4.6, userRatingCount: 900, types: ['art_gallery', 'point_of_interest'], primaryType: 'art_gallery' }
+    const creative = { id: 'creative', title: '探索', minutes: 65, kind: 'creative', done: false, candidate: mural }
+    const cleared = clearStaleCandidate(creative as DailyTask, { disliked: [], dislikedKinds: [], area: '澀谷', areaOnly: false })
+    expect(cleared.candidate).toBeUndefined()
+    expect(cleared.noCandidate).toBe(true)
+    expect(cleared.noCandidateReason).toBe('denied')
+    expect(cleared.title).toBe('探索')
+    // 經 loadDaily 走一遍：壁畫候選清掉、原因 denied
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      tasks: [creative], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+    const out = loadDaily().tasks.find(t => t.id === 'creative')!
+    expect(out.candidate).toBeUndefined()
+    expect(out.noCandidate).toBe(true)
+    expect(out.noCandidateReason).toBe('denied')
+  })
+  it('壁畫對照：真藝廊 DIESEL ART GALLERY 載入後候選還在（名稱規則只擋壁畫，不擋藝廊）', () => {
+    const gallery = cand('gallery-1', 'DIESEL ART GALLERY')
+    const creative = { id: 'creative', title: '探索', minutes: 65, kind: 'creative', done: false, candidate: gallery }
+    const kept = clearStaleCandidate(creative as DailyTask, { disliked: [], dislikedKinds: [], area: '澀谷', areaOnly: false })
+    expect(kept.candidate?.id).toBe('gallery-1')
+    expect(kept.noCandidate).toBeUndefined()
   })
 })

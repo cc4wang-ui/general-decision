@@ -2,9 +2,9 @@ import { useState } from 'react'
 import './dailyDecision.css'
 import { PlacePhoto } from './PlacePhoto.tsx'
 import { getLocation, type GeoReason } from './api.ts'
-import { blockedPlaceIds, clearDislike, markDailyDislike } from './placeMem.ts'
+import { blockedPlaceIds, clearDislike, markDailyDislike, migrateDailyDislike } from './placeMem.ts'
 import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
-import { isDeniedCandidate, MIN_REVIEWS } from './venueCheck.ts'
+import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from './venueCheck.ts'
 import { AREA_NAMES, withinArea } from './areas.ts'
 
 export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied' }
@@ -95,7 +95,7 @@ export function clearStaleCandidate(t: DailyTask, ctx: StaleContext = { disliked
   // round 10（R9-F1a-load）：DENY／評論數／跨區清掉時，標題照留（round 9 F1a），
   // 但該站要標成 noCandidate 並帶原因——否則卡片只剩舊店名加一句「地點尚未確認」，
   // 使用者不知道為什麼、也沒有地區連結／清除按鈕（live round 7 N5 的模式回歸）。
-  if (isDeniedCandidate(t.candidate)) return { ...clearedKeepTitle, noCandidate: true, noCandidateReason: 'denied' }
+  if (isDeniedCandidate(t.candidate) || isDeniedName(t.candidate.name)) return { ...clearedKeepTitle, noCandidate: true, noCandidateReason: 'denied' }
   // 評論數缺欄位＝未知，不清掉（round 9 F1b）：舊存檔候選本來就可能沒有
   // userRatingCount（Places 回應不一定有），缺欄位當成 0 會把整條舊行程的候選
   // 在載入時全清掉。只在欄位存在且 < 50 時清。伺服器端 retentionOk 同一規則。
@@ -240,6 +240,18 @@ export function excludeFor(s: DailyState, shuffleId: string, memBlocked: string[
 export function othersFor(s: DailyState, shuffleId: string): string[] {
   return [...new Set(s.tasks.filter(t => t.id !== shuffleId).map(t => t.candidate?.id).filter((x): x is string => !!x))]
 }
+/** 完整重新生成時送出的 seen（round 11；用戶 2026-11-08 21:22 決定：完整重新生成
+ * 也要送 seen）。各站換掉過的店＋目前路線上的店全部合併——完整重新生成時自動站
+ * 全部重找，舊店不送進 seen 的話隨機挑選可能又挑回同一間，路線就不會換；剛被換
+ * 掉的店在完整重新生成時也不能立刻回來。跟 exclude 分開送：seen 只擋「自動挑的
+ * 站的新搜尋」，不進 retention 重驗——固定／指定／已完成站的候選本來就可能在
+ * seen 裡（例如先被換掉、後來被指定成固定地點），進 retention 會把使用者自己的
+ * 選擇清掉。伺服器端同一規則（api/daily-route.ts）。上限 200，跟 exclude 同步
+ * （每站最多 20 筆，9 站最多 180）。 */
+export function seenFor(s: DailyState): string[] {
+  const current = s.tasks.map(t => t.candidate?.id).filter((x): x is string => !!x)
+  return [...new Set([...Object.values(s.seen ?? {}).flat(), ...current])].slice(0, 200)
+}
 
 export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [state,setState] = useState(loadDaily)
@@ -284,8 +296,10 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       if (excludeInfo.dropped > 0) setNotice(prev => (prev ? prev + ' ' : '') + `排除清單已滿（上限 200）：${excludeInfo.dropped} 個「不喜歡／封鎖」的店家未送出，較舊的可能再次出現。`)
       // 地區偏好（F7）真的送往伺服器：area＋areaOnly。搜尋結果會顯示沒有更多選擇。
       // others（其他站現任候選，round 8 K1）：單站 shuffle 時另外送，只在新搜尋防重複，
-      // 不進伺服器的 retention 重驗；完整重新生成不送（沒有要換的站，也沒有「其他站」）。
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{})})})
+      // 不進伺服器的 retention 重驗。完整重新生成不送 others（沒有要換的站，也沒有「其他站」），
+      // 改送 seen（round 11：各站換掉過的店全部合併，剛被換掉的店在完整重新生成時也不回來；
+      // seen 同樣只擋自動站的新搜尋、不進 retention，見 seenFor）。
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
       const data=await response.json()
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       change(old=>({...old,tasks:data.stops,seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
@@ -310,11 +324,14 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     change(s=>({ ...s, notes:[...s.notes,v].slice(-20) }))
     setFeedback('')
   }
-  /** 「不喜歡這間店」：記進 disliked（跨天保留）＋共用核心班長 app 的 placeMem 記憶（round 10 起用 markDailyDislike，跟核心 app 的「不要再來」分來源記——兩邊各按一次是 90 天不是永久；清掉今日行程的紀錄也不會連核心 app 的封鎖一起清掉），然後立刻換一間。 */
-  const dislikeStop = (t: DailyTask) => {
+  /** 「不喜歡這間店」：記進 disliked（跨天保留）＋共用核心班長 app 的 placeMem 記憶（round 10 起用 markDailyDislike，跟核心 app 的「不要再來」分來源記——兩邊各按一次是 90 天不是永久；清掉今日行程的紀錄也不會連核心 app 的封鎖一起清掉），然後立刻換一間。
+   * 先寫入再進清單（round 11，紅隊 round 10 R10-F2b）：舊版 void fire-and-forget，寫入失敗時
+   * id 已經進了 disliked 清單、紀錄卻沒有 daily 欄位，之後清除會走到舊紀錄分支。
+   * 寫入失敗就不加進清單、不重找，說清楚。 */
+  const dislikeStop = async (t: DailyTask) => {
     const id=t.candidate?.id
     if(!id||busy!==null)return
-    void markDailyDislike(id, Date.now())
+    try { await markDailyDislike(id, Date.now()) } catch { setNotice('「不喜歡」的紀錄寫入失敗，請再按一次。'); return }
     const prev=state.disliked??[]
     // 上限留最新的 100 家：滿了就移除最舊的一家，並明確提示，不要靜默丟掉剛按的「不喜歡」。
     const capped=[...new Set([...prev,id])].slice(-100)
@@ -350,12 +367,24 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     const ids = state.disliked ?? []
     const kinds = state.dislikedKinds ?? []
     if (!ids.length && !kinds.length) { setNotice('目前沒有「不喜歡」的紀錄。'); return }
-    void Promise.all(ids.map((id) => clearDislike(id))).then(() => {
-      change((s) => ({ ...s, disliked: [], dislikedKinds: [] }))
-      setNotice(`已清除 ${ids.length} 家「不喜歡」的店${kinds.length ? `與 ${kinds.length} 種「不要這類」` : ''}，可以重新搜尋。`)
-    }).catch(() => {
-      setNotice('清除失敗：無法寫入封鎖紀錄，「不喜歡」的店還在，請再試一次。')
-    })
+    void (async () => {
+      try {
+        let sharedRemains = 0
+        for (const id of ids) {
+          // 舊紀錄移轉（round 11，R10-F2c）：分來源之前的舊紀錄先把共用封鎖轉成 daily
+          // 欄位（MOVE／COPY 見 placeMem.ts migrateDailyDislike），再清 daily 側；沒移轉過的
+          // 舊紀錄 clearDislike 不會動共用欄位（R10-F2a），所以不先移轉就等於清不掉。
+          // 逐一 await：移轉失敗時停下來報錯，不讓後面的清除在沒移轉的狀態下跑。
+          await migrateDailyDislike(id, Date.now())
+          const r = await clearDislike(id)
+          if (r?.sharedRemains) sharedRemains++
+        }
+        change((s) => ({ ...s, disliked: [], dislikedKinds: [] }))
+        setNotice(`已清除 ${ids.length} 家「不喜歡」的店${kinds.length ? `與 ${kinds.length} 種「不要這類」` : ''}，可以重新搜尋。${sharedRemains ? `其中 ${sharedRemains} 家仍有其他封鎖紀錄，仍不會出現。` : ''}`)
+      } catch {
+        setNotice('清除失敗：無法寫入封鎖紀錄，「不喜歡」的店還在，請再試一次。')
+      }
+    })()
   }
   const completed=state.tasks.filter(t=>t.done).length
   return <section className="screen dd" data-screen="daily-decision">

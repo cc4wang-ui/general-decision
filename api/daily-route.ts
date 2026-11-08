@@ -1,6 +1,6 @@
 import { travelMatrix, scheduleRoute, validPoint } from '../src/dailyRouting.ts'
 import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
-import { isDeniedCandidate, MIN_REVIEWS } from '../src/venueCheck.ts'
+import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from '../src/venueCheck.ts'
 import { areaCenter, AREA_RADIUS_M, distanceKm } from '../src/areas.ts'
 // Daily Decision: real Google Places results and approximate geographic route ordering.
 // Does not claim live traffic, transit ETAs, reservations or confirmed stock.
@@ -55,7 +55,7 @@ async function search(key:string,q:string,center?:Coord,count=20,opts:{includedT
  */
 function venueOk(p:Candidate,s:Stop,excludeKinds:string[]):boolean{
  if(excludeKinds.length){const k=kindOfCandidate(p);if(k&&excludeKinds.includes(k))return false}
- if(isDeniedCandidate(p))return false
+ if(isDeniedCandidate(p)||isDeniedName(p.name))return false
  const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
  if(!auto)return true
  // 固定健身房 FIT-EASY 是使用者指定的店，不是探索發現：不套評論數門檻（類型 gym 照樣過濾）。
@@ -95,7 +95,7 @@ function retentionOk(c:Candidate,s:Stop,opts:{excluded:string[];excludeKinds:str
  if(k&&opts.excludeKinds.includes(k))return false
  const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
  if(!auto)return true
- if(isDeniedCandidate(c))return false
+ if(isDeniedCandidate(c)||isDeniedName(c.name))return false
  if(s.id!=='gym'&&s.kind!=='gym'&&c.userRatingCount!==undefined&&c.userRatingCount<MIN_REVIEWS)return false
  if(opts.areaPref&&distanceKm(opts.areaPref,c)*1000>AREA_RADIUS_M)return false
  return true
@@ -161,6 +161,16 @@ async function handler(req:Request):Promise<Response>{
   * 還變成無候選。前端（src/dailyDecision.tsx othersFor）分開送，伺服器分開讀。
   */
  const others=Array.isArray(input.others)?input.others.filter(x=>typeof x==='string').slice(0,9):[]
+ /**
+  * seen（round 11；用戶 2026-11-08 21:22 決定：完整重新生成也要送 seen）。
+  * 前端在完整重新生成時把各站換掉過的店全部合併成一份 seen 送來（單站 shuffle 時
+  * seen 照舊走 exclude——那是該站自己的 seen，不影響別站）。seen 只擋「自動挑的站
+  * 的新搜尋」（見下方 eligible 過濾），不進 retentionOk：固定／指定／已完成站的候選
+  * 本來就可能在 seen 裡（例如先被換掉、後來被指定成固定地點），進 retention 會把
+  * 使用者自己的選擇清掉。跟 `others` 同一原則：防重複的清單不進 retention 重驗。
+  * 上限 200，跟 exclude 同步（每站最多 20 筆，9 站最多 180，200 蓋得住）。
+  */
+ const seen=Array.isArray(input.seen)?input.seen.filter(x=>typeof x==='string').slice(0,200):[]
  // 地區偏好（F7）：開啟才生效；未知地區名退回澀谷（src/areas.ts areaCenter），
  // 不再 fail-open——未知地區名＋開啟時全站都過，跟沒開偏好一樣（紅隊 round 6 F7 註記）。
  const areaPref=input.areaOnly===true&&typeof input.area==='string'?areaCenter(input.area):null
@@ -195,8 +205,15 @@ async function handler(req:Request):Promise<Response>{
    // 規則見 retentionOk：id／種類排除對所有站生效，DENY／評論／地區只對自動站。
    // round 10：已經被本請求前面站挑走（或保留）的店不能再保留——否則同一家店
    // 出現在行程兩站（R9-K1：兩站舊候選本來就是同一間，或前面站剛挑了這間）。
+   // round 11（用戶 2026-11-08 21:22 決定：完整重新生成必須隨機化）：沒有帶 shuffle
+   // 就是完整重新生成，自動挑的站不保留既有候選、全部重找——舊版不管按幾次重新產生，
+   // 通過重驗的候選都原樣留著，整條路線完全一樣（live round 7 N4）。隨機挑選在
+   // 下方的新搜尋（前 5 名裡隨機挑）本來就有，確定性只來自這一層保留；跳過保留，
+   // 重新生成才會真的換店。指定／固定／已完成站照樣保留（item 7：那是使用者的選擇，
+   // 不是系統自動挑的）。rest 純文字站前面已經處理過，不走這裡。
    const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
-   const retained=!!s.candidate&&!picked.has(s.candidate.id)&&retentionOk(s.candidate,s,{excluded,excludeKinds,areaPref})
+   const fullRegen=!shuffle
+   const retained=!!s.candidate&&!picked.has(s.candidate.id)&&retentionOk(s.candidate,s,{excluded,excludeKinds,areaPref})&&(!fullRegen||!auto)
    if(retained&&(!shuffle||s.id!==shuffle)){picked.add(s.candidate!.id);result.push(s);continue}
    // 候選沒通過重驗（或本來就沒有、或是要換的站）：清掉再重找。自動站的 place
    // 是候選帶來的地名，一起丟掉；指定／固定站的 place 是使用者輸入的，留著
@@ -224,10 +241,12 @@ async function handler(req:Request):Promise<Response>{
     if(areaPref&&found.places.some(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&!areaOk(p,s,areaPref)))sawAreaBlocked=true
     // eligible 過濾：exclude（使用者不要的店）＋others（其他站現任候選，防重複）
     // ＋picked（本請求前面站已經挑走／保留的店，round 10 R9-K1：同一請求內
-    // 後處理的站不能再挑同一間）。
+    // 後處理的站不能再挑同一間）＋seen（各站換掉過的店，round 11：完整重新生成
+    // 也要排除，剛被換掉的店不能立刻回來；只對自動站生效——固定／指定站重找時
+    // 查的是使用者自己的地名，seen 不能把那間店擋掉）。
     // others 只在這裡用，絕對不進 retentionOk（round 8 K1：否則單站 shuffle
-    // 會連帶清掉其他站的候選）。
-    eligible=found.places.filter(p=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
+    // 會連帶清掉其他站的候選）；seen 也一樣不進 retentionOk（見上方 seen 的說明）。
+    eligible=found.places.filter(p=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&(!auto||!seen.includes(p.id))&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
     if(eligible.length||!found.nextPageToken)break
     pageToken=found.nextPageToken
    }
