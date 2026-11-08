@@ -38,15 +38,21 @@ async function search(key:string,q:string,center?:Coord,count=20,opts:{includedT
  return {places:(data.places??[]).filter(p=>p.id&&p.location&&Number.isFinite(p.location.latitude)&&Number.isFinite(p.location.longitude)).map(p=>({id:p.id!,name:p.displayName?.text??'未命名店家',address:p.formattedAddress??'',mapUrl:p.googleMapsUri??'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.displayName?.text??''),lat:p.location!.latitude!,lng:p.location!.longitude!,rating:p.rating,openNow:p.currentOpeningHours?.openNow,types:Array.isArray(p.types)?p.types.filter(t=>typeof t==='string'):[],primaryType:typeof p.primaryType==='string'?p.primaryType:undefined,userRatingCount:typeof p.userRatingCount==='number'?p.userRatingCount:undefined})),nextPageToken:typeof data.nextPageToken==='string'?data.nextPageToken:undefined}
 }
 /**
- * 自動挑店的過濾條件。只對「系統自動挑」的站生效：使用者明確指定／固定安排
- * 的地點是他的選擇，不套類型與評論門檻（但 id 排除與種類排除照樣生效，
- * 否則「不喜歡」按了也沒用）。
+ * 新解析候選的過濾條件。id 排除與種類排除對所有站生效；DENY 檢查（車站／地標
+ * 不是可拜訪的店家）也對所有新解析的候選生效——使用者指定／固定安排的地名
+ * 查回來的第一名也可能是車站，不能原樣當成店家（紅隊 round 4 Finding 4：
+ * meal 指定「渋谷駅」查回只有車站，舊版直接回傳車站當候選）。
+ * 只有評論數門檻還只對「系統自動挑」的站生效：使用者明確指定／固定安排
+ * 的地點是他的選擇，不套評論門檻（固定健身房 FIT-EASY 也不套）。
+ * 注意：這裡只擋「新查到的」候選；既有候選不重驗是另一條路徑（主迴圈的
+ * stale 檢查只對自動站生效，指定／固定／已完成的地點既有候選是使用者的
+ * 選擇，不動）。
  */
 function venueOk(p:Candidate,s:Stop,excludeKinds:string[]):boolean{
  if(excludeKinds.length){const k=kindOfCandidate(p);if(k&&excludeKinds.includes(k))return false}
+ if(isDeniedCandidate(p))return false
  const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
  if(!auto)return true
- if(isDeniedCandidate(p))return false
  // 固定健身房 FIT-EASY 是使用者指定的店，不是探索發現：不套評論數門檻（類型 gym 照樣過濾）。
  if(s.id!=='gym'&&s.kind!=='gym'&&(p.userRatingCount??0)<MIN_REVIEWS)return false
  return true

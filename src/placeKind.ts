@@ -49,50 +49,66 @@ export function normalizeKind(kind: string): string {
 }
 
 /**
- * 店名關鍵字 → kind，依序比對，第一個命中者勝。
- * 烏龍麵／蕎麥麵沒有對應的 Places 類型，只能靠名字認：讃岐／さぬき／手打ち麺是
- * 烏龍麵店常用的限定詞；蕎麥麵補簡體「蕎麦」（藪蕎麦這類店名才認得到）。
- * 壽司補片假名「スシ」（スシロー）；炸豬排補「とんかつ／トンカツ」（とんかつ和幸）。
- * 最後一條是最弱訊號（只有一個「麺」字，如麺喜やしま），不放在這張表裡，
- * 而是在 kindOfCandidate 末尾加拉麵守衛後才看：店名含麺処／麺や／担々麺／
- * 中華麺／冷麺時不判為烏龍麵（紅隊 round 2：麺処ほん田／麺や七彩／担々麺／
- * 中華麺都是拉麵／中華麵；守衛只擋弱訊號，前面已有明確關鍵字命中時不受影響，
- * 例如「麺処讃岐うどん」照樣是烏龍麵）。麺屋（拉麵店常用，如麺屋武蔵）與
- * つけ麺本來就不在弱訊號裡。
+ * 店名關鍵字 → kind，依序比對，第一個命中者勝。順序是設計本身，改順序前先看
+ * 下面的說明與 tests/unit/placeKind.test.ts 的守衛測試。
+ *
+ * 1. 明確的烏龍麵關鍵字（讃岐／さぬき／うどん……）：烏龍麵／蕎麥麵沒有對應的
+ *    Places 類型，只能靠名字認。手打ち麺是烏龍麵店常用的限定詞。
+ * 2. 拉麵標記集中表（round 5 結構性修復）：所有拉麵店名標記收在一處，在蕎麥麵
+ *    正則與弱「麺」訊號之前先判——任何拉麵標記都勝過弱烏龍麵與蕎麥麵。
+ *    這是第三次同一類缺陷（round 2 Finding 1 → round 3 Finding B → round 4
+ *    Finding 1）：之前每輪補一個店名模式，下一輪又冒出新的（らぁ麺、支那そば、
+ *    油そば、まぜそば、麺匠、麺場……）。現在全部收在這裡，之後新的拉麵寫法只
+ *    加進這張表，不再散到各處。
+ *    順序注意：第 1 條的明確烏龍麵關鍵字在這張表之前：「麺処讃岐うどん」同時有
+ *    拉麵標記（麺処）與烏龍麵關鍵字（讃岐）時，明確關鍵字贏，照樣是烏龍麵
+ *    （round 3 既有行為，不能改）。
+ *    取捨：麺処／麺や／麺匠／麺場這類「○○麺」前綴本身是模糊的（烏龍麵／蕎麥麵／
+ *    拉麵店都會用），沒有其他關鍵字時這裡預設判拉麵——拉麵店用得最多（麺処ほん田、
+ *    麺や七彩、麺匠 竹虎、麺場 田所商店皆是拉麵）；純「麺処＋無其他關鍵字」的
+ *    烏龍麵店會被誤判成拉麵。真正的解法仍是 Google 類型優先，店名只是備援。
+ * 3. 蕎麥麵：簡體「蕎麦」與繁體「蕎麥」單獨都能命中（紅隊 round 4 Finding 3：
+ *    繁體「蕎麥」原本必須後面接「麵」才命中，手打ち蕎麥 さくら、蕎麥庵漏判）。
+ *    壽司補片假名「スシ」（スシロー）；炸豬排補「とんかつ／トンカツ」（とんかつ和幸）；
+ *    串燒補「焼鳥／やきとり／ヤキトリ／串焼」（紅隊 round 4 Finding 2：やきとり大吉）。
+ * 4. 最弱訊號（只有一個「麺」字，如麺喜やしま）：放最後，前面都沒命中才看。
+ *    弱訊號不刪：麺喜やしま 沒有任何拉麵標記，刪了它就回 undefined。拉麵標記
+ *    在第 2 步已先判，這裡不需要守衛（round 2–4 的 RAMEN_GUARD 已併進集中表）。
  *
  * 已知限制：名字完全沒有關鍵字的店（鳥貴族／川上庵／一蘭），店名啟發式無解，
  * 回 undefined——以 Google 的 primaryType／types 為準；認不出種類時 UI 只給
  * 單店排除，不假裝種類排除有生效。
  */
+/** 明確的烏龍麵關鍵字。 */
+const UDON_STRONG = /烏龍麵|うどん|udon|讃岐|さぬき|手打ち麺/i
+/** 拉麵標記集中表：見上方說明。 */
+const RAMEN_MARKERS = /らーめん|らぁ麺|ラーメン|拉麵|拉麺|ramen|中華そば|中華蕎麦|支那そば|支那蕎麦|油そば|まぜそば|担々麺|麺処|麺や|麺匠|麺場|中華麺|冷麺|つけ麺|麺屋/i
+/** 蕎麥麵。 */
+const SOBA = /蕎麥麵|蕎麥|蕎麦|そば|soba/i
+/** 其餘種類關鍵字（不含拉麵／蕎麥麵／烏龍麵，見上方集中表）。 */
 const NAME_KINDS: Array<[RegExp, string]> = [
-  [/烏龍麵|うどん|udon|讃岐|さぬき|手打ち麺/i, 'udon'],
-  // 中華そば是拉麵的傳統名稱（小麥麵＋醬油湯），不是蕎麥麵：名字裡的「そば」
-  // 會命中下一條蕎麥麵正則，所以這條必須放在蕎麥麵之前先判（紅隊 round 3
-  // Finding B：中華そば 青葉被誤判成 soba，按「不要蕎麥麵」會把拉麵店擋到 422）。
-  // 異體字「中華蕎麦」同理。類型優先於店名，primaryType 明確時不受影響。
-  [/中華そば|中華蕎麦/i, 'ramen'],
-  [/蕎麥麵|蕎麦|そば|soba/i, 'soba'],
-  [/拉麵|拉麺|らーめん|ラーメン|ramen/i, 'ramen'],
   [/壽司|すし|スシ|寿司|sushi/i, 'sushi'],
   [/燒肉|焼肉|yakiniku/i, 'yakiniku'],
   [/咖哩|カレー|curry/i, 'curry'],
   [/とんかつ|トンカツ/i, 'tonkatsu'],
+  [/焼鳥|やきとり|ヤキトリ|串焼/i, 'yakitori'],
   [/麵包|ベーカリー|パン屋|bakery/i, 'bakery'],
   [/咖啡|カフェ|珈琲|cafe|coffee/i, 'cafe'],
 ]
 
-/** 拉麵標記：弱「麺」訊號的守衛。店名含這些詞，弱訊號不判為烏龍麵。 */
-const RAMEN_GUARD = /麺処|麺や|担々麺|中華麺|冷麺/
 /** 最弱訊號：只有一個「麺」字、前面沒有明確關鍵字時才用（麺喜やしま）。 */
-const WEAK_UDON = /麺処|(?<!つけ)麺(?!屋)/
+const WEAK_UDON = /(?<!つけ)麺(?!屋)/
 
 export function kindOfCandidate(c: { name?: string; types?: string[]; primaryType?: string }): string | undefined {
   if (c.primaryType && TYPE_KINDS[c.primaryType]) return TYPE_KINDS[c.primaryType]
   for (const t of c.types ?? []) if (TYPE_KINDS[t]) return TYPE_KINDS[t]
   const name = c.name ?? ''
+  if (UDON_STRONG.test(name)) return 'udon'
+  if (RAMEN_MARKERS.test(name)) return 'ramen'
+  if (SOBA.test(name)) return 'soba'
   for (const [re, kind] of NAME_KINDS) if (re.test(name)) return kind
-  // 最弱訊號放最後：前面都沒命中才看，且有拉麵標記時不用（見上方守衛說明）。
-  if (WEAK_UDON.test(name) && !RAMEN_GUARD.test(name)) return 'udon'
+  // 最弱訊號放最後：前面都沒命中才看（麺喜やしま）。
+  if (WEAK_UDON.test(name)) return 'udon'
   return undefined
 }
 
