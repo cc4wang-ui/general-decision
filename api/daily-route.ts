@@ -82,6 +82,10 @@ function areaOk(p:Candidate,s:Stop,pref:{lat:number;lng:number}|null):boolean{
  * - id 排除（不喜歡／封鎖）與種類排除對所有站生效——明確的「不要」永遠贏。
  * - 評論門檻／地區限制／DENY 只對自動挑的站生效：指定／固定／已完成的地點
  *   是使用者的選擇（item 7 既有規則，車站候選照留）。
+ * - 評論數缺欄位＝未知，不清掉（round 9 F1b）：舊存檔候選本來就可能沒有
+ *   userRatingCount，缺欄位當成 0 會把舊行程的候選在重驗時清掉。只在欄位
+ *   存在且 < 50 時不保留。前端 clearStaleCandidate 同一規則。新查到的候選
+ *   是另一條規則（venueOk：拿不到＝無法驗證＝不派，那是新派發的門檻，不動）。
  * 注意：venueOk 不能直接拿來重驗——它對指定／固定站的候選也跑 DENY 檢查，
  * 會把 item 7 的車站候選清掉；這裡只對自動站跑 DENY／評論／地區。
  */
@@ -92,7 +96,7 @@ function retentionOk(c:Candidate,s:Stop,opts:{excluded:string[];excludeKinds:str
  const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
  if(!auto)return true
  if(isDeniedCandidate(c))return false
- if(s.id!=='gym'&&s.kind!=='gym'&&(c.userRatingCount??0)<MIN_REVIEWS)return false
+ if(s.id!=='gym'&&s.kind!=='gym'&&c.userRatingCount!==undefined&&c.userRatingCount<MIN_REVIEWS)return false
  if(opts.areaPref&&distanceKm(opts.areaPref,c)*1000>AREA_RADIUS_M)return false
  return true
 }

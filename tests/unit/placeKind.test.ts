@@ -362,3 +362,29 @@ describe('round 8：noodle_shop 不短路／RAMEN_SOBA 補齊／寿し／ブー�
     }
   })
 })
+
+describe('round 9 F2：TYPE_KINDS 補最後 4 個官方 Table A 類型（coffee_roastery／cat_cafe／dog_cafe／japanese_izakaya_restaurant）', () => {
+  it('coffee_roastery／cat_cafe／dog_cafe → cafe：名字沒訊號時靠類型認；真實店名也認', () => {
+    expect(kindOfCandidate(cand('某店', 'coffee_roastery', ['coffee_roastery']))).toBe('cafe')
+    expect(kindOfCandidate(cand('ONIBUS COFFEE', 'coffee_roastery', ['coffee_roastery']))).toBe('cafe')
+    expect(kindOfCandidate(cand('某店', 'cat_cafe', ['cat_cafe']))).toBe('cafe')
+    expect(kindOfCandidate(cand('猫カフェ MOCHA 渋谷', 'cat_cafe', ['cat_cafe']))).toBe('cafe')
+    expect(kindOfCandidate(cand('某店', 'dog_cafe', ['dog_cafe']))).toBe('cafe')
+    // types 陣列裡有也認（primaryType 不是時）
+    expect(kindOfCandidate({ name: '某店', types: ['restaurant', 'cat_cafe'] })).toBe('cafe')
+  })
+  it('japanese_izakaya_restaurant → izakaya：鳥貴族／磯丸水産靠真實 primaryType 認（名字本身無訊號，round 8 還是 undefined）', () => {
+    expect(kindOfCandidate(cand('某店', 'japanese_izakaya_restaurant', ['japanese_izakaya_restaurant']))).toBe('izakaya')
+    expect(kindOfCandidate(cand('鳥貴族', 'japanese_izakaya_restaurant', ['japanese_izakaya_restaurant']))).toBe('izakaya')
+    expect(kindOfCandidate(cand('磯丸水産', 'japanese_izakaya_restaurant', ['japanese_izakaya_restaurant']))).toBe('izakaya')
+    expect(kindLabel('izakaya')).toBe('居酒屋')
+    expect(normalizeKind('japanese_izakaya_restaurant')).toBe('izakaya')
+  })
+  it('TYPE_KINDS 守衛：服務形式 cafeteria／diner／bistro／pizza_delivery 刻意不收（形式不是菜，與 fast_food／buffet／meal_delivery 同一政策）', () => {
+    for (const t of ['cafeteria', 'diner', 'bistro', 'pizza_delivery']) {
+      expect(kindOfCandidate(cand('某店', t, [t])), t).toBeUndefined()
+    }
+    // pizza_delivery 確實在官方 Table A 裡（2026-11-08 實查官方頁），不收是設計決定，不是表裡沒有
+    expect(kindOfCandidate(cand('ピザ宅配', 'pizza_delivery', ['pizza_delivery']))).toBeUndefined()
+  })
+})

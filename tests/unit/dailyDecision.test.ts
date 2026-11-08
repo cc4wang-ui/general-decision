@@ -174,29 +174,70 @@ describe('loadDaily：上限留最新、rest 殘留清除（紅隊 §3.3／§3.4
   expect(out.tasks.map(t=>t.id)).toEqual(['meal','rest'])
   expect(out.tasks.find(t=>t.id==='rest')?.kind).toBe('rest')
  })
- it('round 8 標題還原：候選被清掉時 title 還原成目錄標題（不是被清掉的店名）；指定站的 title 不動',()=>{
+ it('round 9 標題還原只在不喜歡／種類排除時做（F1a）：DENY 清掉時 title 不動；被不喜歡的候選清掉時才還原成目錄標題——round 8 不分原因一律還原是錯的',()=>{
   const meal={id:'meal',title:'麺喜やしま',minutes:45,kind:'meal',done:false,place:'渋谷駅地下 1F',candidate:stationCand}
   const specified={id:'meal',title:'我指定的店',minutes:45,kind:'meal',done:false,specified:true,place:'某定食店',candidate:stationCand}
-  // clearStaleCandidate 直接測：自動站 title 還原，指定站 title 照留
-  expect(clearStaleCandidate(meal as DailyTask).title).toBe('澀谷｜一人友善的日式定食')
+  // DENY（車站候選）清掉：候選沒了，title 照留
   expect(clearStaleCandidate(meal as DailyTask).candidate).toBeUndefined()
+  expect(clearStaleCandidate(meal as DailyTask).title).toBe('麺喜やしま')
+  // 被不喜歡的候選清掉：title 還原成目錄標題（紅隊 round 7 §3 第 9 項的原意）
+  const dislikedMeal={id:'meal',title:'麺喜やしま',minutes:45,kind:'meal',done:false,candidate:{id:'y1',name:'麺喜やしま',address:'渋谷',mapUrl:'https://maps.google.com/?cid=y1',lat:35.66,lng:139.70,userRatingCount:808}}
+  expect(clearStaleCandidate(dislikedMeal as DailyTask,{disliked:['y1'],dislikedKinds:[],area:'澀谷',areaOnly:false}).title).toBe('澀谷｜一人友善的日式定食')
+  // 種類排除清掉：title 也還原
+  const udonMeal={id:'meal',title:'麺処讃岐うどん',minutes:45,kind:'meal',done:false,candidate:{id:'u1',name:'麺処讃岐うどん',address:'渋谷',mapUrl:'https://maps.google.com/?cid=u1',lat:35.66,lng:139.70,userRatingCount:300}}
+  expect(clearStaleCandidate(udonMeal as DailyTask,{disliked:[],dislikedKinds:['udon'],area:'澀谷',areaOnly:false}).title).toBe('澀谷｜一人友善的日式定食')
+  // 指定站的 title 不動
   expect(clearStaleCandidate(specified as DailyTask).title).toBe('我指定的店')
   // catalogTitle 跟伺服器端 CATALOG_TITLES 同步（改一邊要改另一邊）
   expect(catalogTitle('meal')).toBe('澀谷｜一人友善的日式定食')
   expect(catalogTitle('rest')).toBe('散步回家、休息與晚餐')
   expect(catalogTitle('gym')).toBe('FIT-EASY｜80 分鐘力量訓練')
   expect(catalogTitle('fixed-1')).toBeUndefined()
-  // 經 loadDaily 走一遍：meal 的 title 也還原了
+  // 經 loadDaily 走一遍：DENY 的 meal title 照留；被不喜歡的 meal title 還原
   seed([meal],[],[])
+  expect(loadDaily().tasks.find(t=>t.id==='meal')?.title).toBe('麺喜やしま')
+  seed([dislikedMeal],['y1'],[])
   expect(loadDaily().tasks.find(t=>t.id==='meal')?.title).toBe('澀谷｜一人友善的日式定食')
  })
- it('round 8 N3：rest 帶車站候選重進頁面——候選清掉，站還在，title 是目錄標題',()=>{
+ it('round 9：rest 帶車站候選重進頁面——候選清掉，站還在，title 不動（F1a：標題還原只在不喜歡／種類排除時做）',()=>{
   const rest={id:'rest',title:'散步回家',minutes:75,kind:'rest',done:false,candidate:stationCand}
   seed([rest],[],[])
   const out=loadDaily()
   const loadedRest=out.tasks.find(t=>t.id==='rest')!
   expect(loadedRest.candidate).toBeUndefined()
-  expect(loadedRest.title).toBe('散步回家、休息與晚餐')
+  expect(loadedRest.title).toBe('散步回家')
+ })
+})
+describe('round 9 F1b：缺評論數＝未知，不清掉（e2e daily-location.spec.ts:69 迴歸）',()=>{
+ beforeEach(()=>{localStorage.clear()})
+ afterEach(()=>{localStorage.clear()})
+ const seed=(tasks:unknown[],disliked:string[],dislikedKinds:string[])=>{
+  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',mode:'creative',tasks,notes:[],avoid:[],seen:{},disliked,dislikedKinds}))
+ }
+ it('e2e seed 形狀：候選沒有 userRatingCount、沒有 types——loadDaily 後候選與標題都還在（不是被清掉＋換成目錄標題）',()=>{
+  const coffee={id:'coffee',kind:'creative',title:'原本的咖啡店',minutes:60,done:false,candidate:{id:'old1',name:'原本的咖啡店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=old1',lat:35.66,lng:139.70}}
+  seed([coffee],[],[])
+  const out=loadDaily().tasks.find(t=>t.id==='coffee')!
+  expect(out.candidate?.id).toBe('old1')
+  expect(out.title).toBe('原本的咖啡店')
+ })
+ it('評論數欄位存在且 < 50 才清：12 則清掉（title 不動）、120 則留著；gym 不受門檻影響',()=>{
+  const low={id:'meal',title:'新開的小店',minutes:45,kind:'meal',done:false,candidate:{id:'n1',name:'新開的小店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=n1',lat:35.66,lng:139.70,userRatingCount:12}}
+  const ok={id:'coffee',title:'某咖啡店',minutes:60,kind:'creative',done:false,candidate:{id:'c1',name:'某咖啡店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=c1',lat:35.66,lng:139.70,userRatingCount:120}}
+  const gym={id:'gym',title:'FIT-EASY',minutes:80,kind:'gym',done:false,candidate:{id:'g1',name:'FIT-EASY 渋谷店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=g1',lat:35.66,lng:139.70,userRatingCount:12}}
+  seed([low,ok,gym],[],[])
+  const out=loadDaily()
+  expect(out.tasks.find(t=>t.id==='meal')?.candidate).toBeUndefined()
+  expect(out.tasks.find(t=>t.id==='meal')?.title).toBe('新開的小店')
+  expect(out.tasks.find(t=>t.id==='coffee')?.candidate?.id).toBe('c1')
+  expect(out.tasks.find(t=>t.id==='gym')?.candidate?.id).toBe('g1')
+ })
+ it('跨區清掉時 title 也不動（F1a：只有不喜歡／種類排除才還原標題）',()=>{
+  const far={id:'meal',title:'原宿的定食店',minutes:45,kind:'meal',done:false,candidate:{id:'h1',name:'原宿的定食店',address:'原宿',mapUrl:'https://maps.google.com/?cid=h1',lat:35.67,lng:139.70,userRatingCount:200}}
+  seed([far],[],[])
+  const out=loadDaily().tasks.find(t=>t.id==='meal')!
+  expect(out.candidate).toBeUndefined()
+  expect(out.title).toBe('原宿的定食店')
  })
 })
 describe('Daily itinerary controls',()=>{

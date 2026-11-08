@@ -1344,3 +1344,73 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
     }
   })
 })
+
+describe('round 9 F1b／F2：既有候選缺評論數＝未知（保留）、新候選缺評論數＝不派、居酒屋類型', () => {
+  const SHIBUYA = { lat: 35.6595, lng: 139.7005 } // 渋谷駅＝澀谷地區中心
+  type StopOut = { id: string; title?: string; candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }
+  const readStops = async (res: Response) => (await res.json() as { stops: StopOut[] }).stops
+  const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
+  function mockPlaces(places: unknown[]) {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+  }
+  /** 伺服器收到的既有候選是 lat／lng 形狀。 */
+  const cand = (p: ReturnType<typeof place>) => ({
+    id: p.id, name: p.displayName.text, address: p.formattedAddress, mapUrl: p.googleMapsUri,
+    lat: p.location.latitude, lng: p.location.longitude, rating: p.rating,
+    userRatingCount: p.userRatingCount, types: p.types, primaryType: p.primaryType,
+  })
+  it('F1b：既有候選沒有 userRatingCount（舊存檔形狀）→ 保留，不換店、不 422；12 則的對照組照樣換掉', async () => {
+    const shibuyaDrug = place('sundrug-shibuya', 35.6590, 139.7010, {
+      displayName: { text: 'サンドラッグ 渋谷店' }, rating: 4.1, userRatingCount: 200,
+      types: ['drugstore'], primaryType: 'drugstore',
+    })
+    const otherDrug = place('matsukiyo-shibuya', 35.6592, 139.7008, {
+      displayName: { text: 'マツモトキヨシ 渋谷店' }, rating: 4.0, userRatingCount: 180,
+      types: ['drugstore'], primaryType: 'drugstore',
+    })
+    mockPlaces([otherDrug])
+    // 缺欄位的候選：JSON 傳過去時欄位不存在（舊存檔本來就沒存）
+    const noCount = cand(shibuyaDrug) as Record<string, unknown>
+    delete noCount.userRatingCount
+    const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: [{ id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30, candidate: noCount }] }))
+    expect(res.status).toBe(200)
+    expect(stopOf(await readStops(res), 'shopping').candidate?.id).toBe('sundrug-shibuya')
+    // 對照組：欄位存在且 12 則 → 不保留，換成池子裡的另一間
+    mockPlaces([otherDrug])
+    const low = cand(shibuyaDrug); low.userRatingCount = 12
+    const res2 = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: [{ id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30, candidate: low }] }))
+    expect(res2.status).toBe(200)
+    expect(stopOf(await readStops(res2), 'shopping').candidate?.id).toBe('matsukiyo-shibuya')
+  })
+  it('F1b 守衛：新查到的候選沒有 userRatingCount → 不派（venueOk：拿不到＝無法驗證＝不派，那是新派發的門檻，round 9 不動）', async () => {
+    const noCountShop = place('no-count-1', 35.691, 139.701, {
+      displayName: { text: '某定食店' }, rating: 4.5, userRatingCount: undefined,
+      types: ['restaurant'], primaryType: 'restaurant',
+    })
+    mockPlaces([noCountShop])
+    const res = await handler(post({ origin: HERE, stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const meal = stopOf(await readStops(res), 'meal')
+    expect(meal.candidate).toBeUndefined()
+    expect(meal.noCandidate).toBe(true)
+    expect(meal.noCandidateReason).toBe('filtered')
+  })
+  it('F2：鳥貴族（primaryType japanese_izakaya_restaurant）→ izakaya：排除 izakaya 時不選，排除 ramen 時照選', async () => {
+    const torikizoku = place('torikizoku-1', 35.691, 139.701, {
+      displayName: { text: '鳥貴族' }, rating: 4.2, userRatingCount: 300,
+      types: ['japanese_izakaya_restaurant', 'restaurant'], primaryType: 'japanese_izakaya_restaurant',
+    })
+    mockPlaces([torikizoku])
+    const excluded = await handler(post({ origin: HERE, excludeKinds: ['izakaya'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(excluded.status).toBe(200)
+    expect(stopOf(await readStops(excluded), 'meal').candidate).toBeUndefined()
+    mockPlaces([torikizoku])
+    const contrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(contrast.status).toBe(200)
+    expect(stopOf(await readStops(contrast), 'meal').candidate?.id).toBe('torikizoku-1')
+  })
+})

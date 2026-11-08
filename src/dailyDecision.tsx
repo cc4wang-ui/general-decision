@@ -59,24 +59,39 @@ export type StaleContext = { disliked: string[]; dislikedKinds: string[]; area: 
  *   的選擇，照留。
  * - 自動站的候選還要過 DENY（車站／地標）、評論數門檻、地區限制三關，
  *   任一關不過就清掉重找（L1：地區偏好打開後原宿店照留，就是舊版沒重驗地區）。
+ * - 標題還原只在「因為不喜歡／種類排除被清掉」時做（紅隊 round 7 §3 第 9 項
+ *   的原意）：被不喜歡的店名不能留在無候選卡片的標題上。其他原因（DENY、
+ *   評論數、跨區、rest）清候選就好，不動標題——round 8 把標題還原套到所有
+ *   清掉原因，舊存檔候選缺評論數欄位時連標題也被換成目錄標題（round 9 F1：
+ *   e2e daily-location.spec.ts:69 迴歸）。
+ * - 評論數缺欄位＝未知，不清掉：舊存檔候選本來就可能沒有 userRatingCount，
+ *   缺欄位當成 0 會把整條舊行程的候選在載入時全清掉。只在欄位存在且 < 50
+ *   時清。伺服器端 retentionOk 同一規則（新查到的候選是另一條規則 venueOk：
+ *   拿不到＝無法驗證＝不派，那是新派發的門檻，不動）。
  * 清掉時自動站的 place（候選帶來的地名）一起丟掉；指定／固定站的 place 是
  * 使用者輸入的，留著。 */
 export function clearStaleCandidate(t: DailyTask, ctx: StaleContext = { disliked: [], dislikedKinds: [], area: '澀谷', areaOnly: false }): DailyTask {
   if (!t.candidate) return t
-  // 候選被清掉時，title 也還原成目錄標題（跟伺服器端無候選站同一規則，紅隊 round 7
-  // §3 第 9 項）：否則卡片標題還留著被清掉的店名，只顯示「地點尚未確認」（live N5）。
+  // 標題還原只在「因為不喜歡／種類排除被清掉」時做（紅隊 round 7 §3 第 9 項
+  // 的原意）：被不喜歡的店名不能留在無候選卡片的標題上。其他原因清候選就好，
+  // 不動標題（round 9 F1a：round 8 把標題還原套到所有清掉原因，DENY／評論數／
+  // 跨區／rest 也換標題，舊存檔的行程標題被洗成目錄標題）。
   // 指定／固定站走 clearedKeepPlace，title 是使用者自己寫的，不動。
   const cleared = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, title: catalogTitle(t.id) ?? t.title }
+  const clearedKeepTitle = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
   const clearedKeepPlace = { ...t, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
   if (ctx.disliked.includes(t.candidate.id)) return t.locked || t.custom || t.specified ? clearedKeepPlace : cleared
   const kind = kindOfCandidate(t.candidate)
   if (kind && ctx.dislikedKinds.includes(kind)) return t.locked || t.custom || t.specified ? clearedKeepPlace : cleared
   if (t.locked || t.custom || t.specified) return t
-  if (t.kind === 'rest') return cleared
+  if (t.kind === 'rest') return clearedKeepTitle
   if (t.done) return t
-  if (isDeniedCandidate(t.candidate)) return cleared
-  if (t.id !== 'gym' && t.kind !== 'gym' && (t.candidate.userRatingCount ?? 0) < MIN_REVIEWS) return cleared
-  if (ctx.areaOnly && !withinArea(ctx.area, t.candidate)) return cleared
+  if (isDeniedCandidate(t.candidate)) return clearedKeepTitle
+  // 評論數缺欄位＝未知，不清掉（round 9 F1b）：舊存檔候選本來就可能沒有
+  // userRatingCount（Places 回應不一定有），缺欄位當成 0 會把整條舊行程的候選
+  // 在載入時全清掉。只在欄位存在且 < 50 時清。伺服器端 retentionOk 同一規則。
+  if (t.id !== 'gym' && t.kind !== 'gym' && t.candidate.userRatingCount !== undefined && t.candidate.userRatingCount < MIN_REVIEWS) return clearedKeepTitle
+  if (ctx.areaOnly && !withinArea(ctx.area, t.candidate)) return clearedKeepTitle
   return t
 }
 /** 無候選站的顯示文字：按原因給不同的下一步（area 時寫明地區偏好是原因）。 */

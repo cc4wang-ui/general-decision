@@ -25,6 +25,7 @@ export const KIND_LABELS: Record<string, string> = {
   cafe: '咖啡',
   tonkatsu: '炸豬排',
   yakitori: '串燒',
+  izakaya: '居酒屋',
   noodle: '麵食',
   chinese: '中餐',
   pizza: '披薩',
@@ -95,6 +96,14 @@ export const KIND_LABELS: Record<string, string> = {
  * spanish／thai／turkish／vietnamese 等）與服務形式（fast_food_restaurant、
  * buffet／family／fine_dining／food_court、meal_delivery／meal_takeaway、
  * 酒吧類 bar／pub／wine_bar 等）刻意不收，見 tests/unit/placeKind.test.ts 的守衛測試。
+ * Round 9（F2）再對照同一官方頁面（2026-11-08 實查）補四個：coffee_roastery／
+ * cat_cafe／dog_cafe → cafe（咖啡變體）、japanese_izakaya_restaurant → izakaya
+ * （居酒屋，在日本很常見的新種類鍵，標籤「居酒屋」）。服務形式 cafeteria／diner／
+ * bistro 刻意不收（與 fast_food／buffet／food_court 同一政策：形式不是菜）。
+ * pizza_delivery 也刻意不收（外送服務形式，與 meal_delivery／meal_takeaway 同類），
+ * 但誠實更正：它確實在官方 Table A 裡（2026-11-08 實查頁面上有 `pizza_delivery`），
+ * round 8 測試報告「pizza_delivery 也不在表裡」的說法是錯的——不在種類表是設計
+ * 決定，不是表裡沒有。
  */
 const TYPE_KINDS: Record<string, string> = {
   ramen_restaurant: 'ramen',
@@ -108,6 +117,10 @@ const TYPE_KINDS: Record<string, string> = {
   cafe: 'cafe',
   coffee_shop: 'cafe',
   coffee_stand: 'cafe',
+  coffee_roastery: 'cafe',
+  cat_cafe: 'cafe',
+  dog_cafe: 'cafe',
+  japanese_izakaya_restaurant: 'izakaya',
   bakery: 'bakery',
   pizza_restaurant: 'pizza',
   hamburger_restaurant: 'hamburger',
