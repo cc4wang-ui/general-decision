@@ -2,8 +2,10 @@ import { useState } from 'react'
 import './dailyDecision.css'
 import { PlacePhoto } from './PlacePhoto.tsx'
 import { getLocation, type GeoReason } from './api.ts'
+import { markNeverAgain } from './placeMem.ts'
+import { kindLabel, kindOfCandidate } from './placeKind.ts'
 
-export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean}; eta?:string;departure?:string;travelMin?:number;conflict?:string }
+export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string }
 export type DailyState = {
   day: string; area: string; currentPlace: string; mode: 'creative'|'practical'
   tasks: DailyTask[]; notes: string[]; avoid: string[]
@@ -11,19 +13,36 @@ export type DailyState = {
   useHere?: boolean
   /** 目前行程是用哪個出發地排的（originKey）。出發地換了，自動挑的店要在新出發地附近重找。 */
   routedFrom?: string
+  /** 每站換掉過的 place_id（今天）。shuffle 時一起送去排除，否則排序固定、只排除當下一間，永遠在前兩名來回跳。 */
+  seen?: Record<string, string[]>
+  /** 按過「不喜歡這間店」的 place_id。跨天保留，跟核心班長 app 共用同一份 placeMem 記憶（markNeverAgain）。 */
+  disliked?: string[]
+  /** 按過「不要這類」的種類鍵（例如 'udon'）。跨天保留；生成與 shuffle 都排除。 */
+  dislikedKinds?: string[]
 }
 const KEY = 'decide.daily.v1'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
   day: dayInTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
-  tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '以澀谷為生活基地，避免不必要跨區', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: []
+  tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '以澀谷為生活基地，避免不必要跨區', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: [],
+  seen: {}, disliked: [], dislikedKinds: [],
 })
+/** seen 只留今天：換天任務重排，昨天換掉的店不再擋。 */
+const sanitizeSeen = (v: unknown): Record<string, string[]> => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  const out: Record<string, string[]> = {}
+  for (const [k, ids] of Object.entries(v as Record<string, unknown>)) {
+    if (Array.isArray(ids)) out[k] = ids.filter((x): x is string => typeof x === 'string').slice(-20)
+  }
+  return out
+}
+const sanitizeIds = (v: unknown, max: number): string[] => Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string'))].slice(0, max) : []
 export function loadDaily(): DailyState {
   const fresh = defaults()
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || 'null') as Partial<DailyState> | null
     if (!raw || !Array.isArray(raw.notes) || !Array.isArray(raw.tasks)) return fresh
-    return { ...fresh, ...raw, day: fresh.day, tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || !!t.candidate?.id)) : [], notes: raw.notes.slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [] }
+    return { ...fresh, ...raw, day: fresh.day, tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || !!t.candidate?.id)) : [], notes: raw.notes.slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked: sanitizeIds(raw.disliked, 100), dislikedKinds: sanitizeIds(raw.dislikedKinds, 20) }
   } catch { return fresh }
 }
 export function saveDaily(s: DailyState): void { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch { /* private mode */ } }
@@ -66,47 +85,6 @@ export const GEO_FAIL_TEXT: Record<GeoReason, string> = {
   ok: '沒有拿到座標', denied: '你沒有允許定位', unsupported: '這個瀏覽器不能定位',
   timeout: '定位逾時（可能在地下或室內）', unavailable: '收不到定位訊號',
 }
-const choices: Record<string, { title: string; place: string; detail: string }[]> = {
- gym: [
- { title:'FIT-EASY｜力量訓練',place:'FIT-EASY 澀谷（固定健身房）',detail:'80 分鐘；熱身 10 分鐘、主訓練 60 分鐘、收操 10 分鐘。以當天恢復狀況決定肌群。'},
- { title:'FIT-EASY｜恢復訓練',place:'FIT-EASY 澀谷（固定健身房）',detail:'60 分鐘；低強度有氧、活動度與核心。'},
- { title:'FIT-EASY｜全身訓練',place:'FIT-EASY 澀谷（固定健身房）',detail:'75 分鐘；深蹲／推／拉各 3–4 組，避免連續兩天重複高強度肌群。'}
- ],
- meal:[
- {title:'日式定食午餐',place:'澀谷站周邊',detail:'45 分鐘；選擇有主菜、米飯、蔬菜的定食，實際店名與營業狀態待確認。'},
- {title:'個人涮涮鍋',place:'澀谷站周邊',detail:'60 分鐘；蛋白質優先，實際店名與座位待確認。'},
- {title:'蕎麥麵與小菜',place:'澀谷站周邊',detail:'45 分鐘；清爽午餐，實際店名與營業狀態待確認。'}
- ],
- creative:[
- {title:'當代藝術探索',place:'澀谷／表參道',detail:'65 分鐘；找當日開放的展覽或藝廊，入場條件與票券需確認。'},
- {title:'日本 IP／設計商店觀察',place:'澀谷 PARCO 周邊',detail:'60 分鐘；觀察 IP 商品、陳列與客群，實際活動需確認。'},
- {title:'城市攝影散步',place:'宮下公園周邊',detail:'60 分鐘；拍攝 5 個設計細節，不依賴展覽開放時間。'}
- ],
- coffee:[
- {title:'安靜咖啡與閱讀',place:'澀谷／富ヶ谷',detail:'60 分鐘；閱讀 30 分鐘，記錄 3 個觀察；座位與筆電規範需確認。'},
- {title:'手沖咖啡巡禮',place:'富ヶ谷',detail:'60 分鐘；試一種未喝過的豆子，店家營業需確認。'},
- {title:'甜點與短篇閱讀',place:'代官山',detail:'60 分鐘；不處理工作，店家營業需確認。'}
- ],
- shopping:[
- {title:'運動與生活用品採買',place:'澀谷站周邊',detail:'55 分鐘；長袖訓練衣、單水肌酸或生活用品；現場庫存需確認。'},
- {title:'藥妝店採買',place:'宮下公園／澀谷站周邊',detail:'40 分鐘；詢問純クレアチン モノハイドレート；不可把 BCAA 當替代品，庫存需確認。'},
- {title:'設計雜貨探索',place:'澀谷 PARCO 周邊',detail:'50 分鐘；只買確實需要的物品，營業需確認。'}
- ],
- rest:[
- {title:'回家休息與晚餐',place:'澀谷住處周邊',detail:'75 分鐘；休息、洗澡、吃晚餐。'},
- {title:'傍晚慢走與晚餐',place:'澀谷住處周邊',detail:'75 分鐘；散步後吃飯，避免無必要轉乘。'},
- {title:'居家放鬆',place:'澀谷住處',detail:'75 分鐘；晚餐與閱讀，不安排額外工作。'}
- ]
-}
-export function shuffleTask(s: DailyState, id: string): DailyState {
- return { ...s, tasks:s.tasks.map(t=>{
-  if(t.id!==id || t.done || t.locked) return t
-  const options=choices[id]
-  if(!options?.length) return t
-  const next=((t.variant ?? -1)+1)%options.length
-  return {...t,...options[next],variant:next}
- }) }
-}
 export function addFixedTask(s: DailyState, title: string, place: string, start: string, minutes: number): DailyState {
  if(!title.trim() || !place.trim() || !/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !Number.isFinite(minutes) || minutes<5 || minutes>720) return s
  const task:DailyTask={id:'fixed-'+Date.now()+'-'+s.tasks.length,title:title.trim().slice(0,100),place:place.trim().slice(0,120),start,minutes,kind:'rest',done:false,locked:true,custom:true,detail:'既有固定安排：不會被重排或洗牌。'}
@@ -121,6 +99,21 @@ export function mapsNavigationUrl(place:{id:string;lat:number;lng:number}):strin
  url.searchParams.set('dir_action','navigate')
  return url.toString()
 }
+/**
+ * 把剛被換掉的店記進 seen：下一次 shuffle 還要排除它，否則排序固定、
+ * 每次只排除當下一間，永遠在前兩名來回跳。同一間重複記只留一筆。
+ */
+export function withSeen(s: DailyState, stopId: string, placeId: string): DailyState {
+  const prev = s.seen?.[stopId] ?? []
+  if (prev.includes(placeId)) return s
+  return { ...s, seen: { ...(s.seen ?? {}), [stopId]: [...prev, placeId].slice(-20) } }
+}
+/** shuffle 時送給伺服器的排除清單：不喜歡的店優先，其次這站換掉過的，再來是其他站目前的候選。 */
+export function excludeFor(s: DailyState, shuffleId: string): string[] {
+  const others = s.tasks.filter(t => t.id !== shuffleId).map(t => t.candidate?.id).filter((x): x is string => !!x)
+  return [...new Set([...(s.disliked ?? []), ...((s.seen ?? {})[shuffleId] ?? []), ...others])].slice(0, 100)
+}
+
 export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [state,setState] = useState(loadDaily)
   const [feedback,setFeedback] = useState('')
@@ -146,13 +139,16 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       if(!geo.loc){setStatus('無法使用目前位置：'+GEO_FAIL_TEXT[geo.reason]+'。原行程已保留；可按「改用輸入地點」輸入車站或地址。');setBusy(null);return}
       here=geo.loc
     }
-    const proposed=shuffle ? s : routeProposal(s)
+    let proposed=shuffle ? s : routeProposal(s)
+    // shuffle 先把被換掉的那間記進 seen：這次請求就要排除它，否則下一輪它又回來。
+    const replacedId=shuffle?proposed.tasks.find(t=>t.id===shuffle)?.candidate?.id:undefined
+    if(shuffle&&replacedId)proposed=withSeen(proposed,shuffle,replacedId)
     setStatus('正在搜尋真實店家並優化路線…')
     try {
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),stops:proposed.tasks,shuffle,exclude:shuffle?proposed.tasks.filter(t=>t.id!==shuffle).map(t=>t.candidate?.id).filter(Boolean):[]})})
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),stops:proposed.tasks,shuffle,exclude:shuffle?excludeFor(proposed,shuffle):[...(proposed.disliked??[])],excludeKinds:proposed.dislikedKinds??[]})})
       const data=await response.json()
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
-      change(old=>({...old,tasks:data.stops,...(shuffle?{}:{routedFrom:originKey(s)})}))
+      change(old=>({...old,tasks:data.stops,seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
       setRouteKm(data.routeVerified?data.distanceKm:null)
       setTravelMin(data.routeVerified?data.travelMinutes:null)
       setConflicts(data.conflicts??[])
@@ -169,6 +165,24 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     if(!v) return
     change(s=>({ ...s, notes:[...s.notes,v].slice(-20) }))
     setFeedback('')
+  }
+  /** 「不喜歡這間店」：記進 disliked（跨天保留）＋共用核心班長 app 的 placeMem 記憶，然後立刻換一間。 */
+  const dislikeStop = (t: DailyTask) => {
+    const id=t.candidate?.id
+    if(!id||busy!==null)return
+    void markNeverAgain(id, Date.now(), 'eat')
+    const next=withSeen({ ...state, disliked:[...new Set([...(state.disliked??[]),id])].slice(0,100) }, t.id, id)
+    change(()=>next)
+    void searchRoute(t.id, next)
+  }
+  /** 「不要這類」：記下種類鍵（例如 'udon'），生成與 shuffle 都排除同一類。 */
+  const dislikeKind = (t: DailyTask) => {
+    const kind=t.candidate?kindOfCandidate(t.candidate):undefined
+    const id=t.candidate?.id
+    if(!kind||!id||busy!==null)return
+    const next=withSeen({ ...state, dislikedKinds:[...new Set([...(state.dislikedKinds??[]),kind])].slice(0,20) }, t.id, id)
+    change(()=>next)
+    void searchRoute(t.id, next)
   }
   const completed=state.tasks.filter(t=>t.done).length
   return <section className="screen dd" data-screen="daily-decision">
@@ -236,13 +250,15 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                   <strong>⌖ {t.candidate.address}</strong>
                   <span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{t.candidate.openNow===true?'Google 顯示目前營業中':t.candidate.openNow===false?'Google 顯示目前未營業':'營業狀態未確認'} · Google Places</span>
                   <a className="dd-place-link" href={t.candidate.mapUrl} target="_blank" rel="noopener noreferrer">Google Maps 店家詳情 ↗</a>
-                </div> : <div className="dd-place-unresolved" role="status">⚠ 地點尚未確認。請搜尋行程後再導航。</div>}
+                </div> : t.kind==='rest' ? <div className="dd-place-meta"><span>散步回家，不用找店家。</span></div> : <div className="dd-place-unresolved" role="status">⚠ 地點尚未確認。請搜尋行程後再導航。</div>}
                 {t.eta&&<p className="dd-eta">{t.eta} 抵達｜{t.departure} 離開｜步行 {t.travelMin} 分鐘</p>}
                 {t.conflict&&<p className="dd-stop-conflict" role="alert">⚠ {t.conflict}</p>}
                 <p className="dd-description">{t.detail||'預計停留 '+t.minutes+' 分鐘；請出發前確認店家資訊。'}</p>
                 <div className="dd-actions">
                   {t.candidate && <a className="dd-navigate" href={mapsNavigationUrl(t.candidate)} target="_blank" rel="noopener noreferrer" aria-label={'使用 Google Maps 導航至 '+t.candidate.name}>↗ Google Maps 導航</a>}
-                  {!t.done&&!t.locked&&!t.specified&&<button disabled={busy!==null} onClick={()=>{void searchRoute(t.id)}}>{busy===t.id?'找替代地點中…':'↻ 換這一站'}</button>}
+                  {!t.done&&!t.locked&&!t.specified&&t.kind!=='rest'&&<button disabled={busy!==null} onClick={()=>{void searchRoute(t.id)}}>{busy===t.id?'找替代地點中…':'↻ 換這一站'}</button>}
+                  {t.candidate&&!t.done&&!t.locked&&<button className="dd-muted" disabled={busy!==null} onClick={()=>dislikeStop(t)}>不喜歡這間店</button>}
+                  {t.candidate&&!t.done&&!t.locked&&kindOfCandidate(t.candidate)&&<button className="dd-muted" disabled={busy!==null} onClick={()=>dislikeKind(t)}>不要「{kindLabel(kindOfCandidate(t.candidate)!)}」這類</button>}
                 </div>
                 <div className="dd-actions dd-actions-secondary">
                   <label className="dd-done"><input type="checkbox" checked={t.done} onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done:e.target.checked}:x)}))}/><span>{t.done?'已完成':'標記完成'}</span></label>

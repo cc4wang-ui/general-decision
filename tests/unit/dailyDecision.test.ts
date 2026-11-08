@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDaily, replanDaily, shuffleTask, addFixedTask, mapsNavigationUrl, originKey, routeProposal, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
+import { buildDaily, replanDaily, withSeen, excludeFor, addFixedTask, mapsNavigationUrl, originKey, routeProposal, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
 
 const state = (): DailyState => ({ day:'2026-11-03', area:'澀谷', currentPlace:'宮下公園', mode:'creative', tasks:[], notes:[], avoid:[] })
 
@@ -22,24 +22,32 @@ describe('Daily Decision replan',()=>{
   })
 })
 
-describe('Daily itinerary controls',()=>{
- it('shuffles only one stop and retains another stop',()=>{
-  const initial={...state(),tasks:buildDaily(state())}
-  const changed=shuffleTask(initial,'meal')
-  expect(changed.tasks.find(t=>t.id==='meal')?.title).not.toBe(initial.tasks.find(t=>t.id==='meal')?.title)
-  expect(changed.tasks.find(t=>t.id==='gym')).toEqual(initial.tasks.find(t=>t.id==='gym'))
+describe('shuffle 排除清單（seen／disliked）',()=>{
+ const cand=(id:string)=>({id,name:id,address:'渋谷',mapUrl:'https://maps.google.com/?cid='+id,lat:35.66,lng:139.70})
+ it('withSeen：換掉的店記進該站，同一間重複記只留一筆',()=>{
+  const s={...state(),tasks:buildDaily(state())}
+  const once=withSeen(s,'meal','m1')
+  expect(once.seen?.meal).toEqual(['m1'])
+  expect(withSeen(once,'meal','m1').seen?.meal).toEqual(['m1'])
+  expect(withSeen(once,'meal','m2').seen?.meal).toEqual(['m1','m2'])
  })
+ it('excludeFor：不喜歡的店優先，其次該站換掉過的，再來是其他站目前的候選',()=>{
+  const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
+  const s={...state(),tasks,disliked:['d1'],seen:{meal:['m1','m2']}}
+  expect(excludeFor(s,'meal')).toEqual(['d1','m1','m2','c-gym','c-creative','c-coffee','c-shopping','c-rest'])
+ })
+})
+describe('Daily itinerary controls',()=>{
  it('preserves user-defined place after replanning',()=>{
   const initial={...state(),tasks:buildDaily(state()).map(t=>t.id==='coffee'?{...t,place:'代官山'}:t)}
   expect(replanDaily(initial).tasks.find(t=>t.id==='coffee')?.place).toBe('代官山')
  })
- it('keeps fixed existing commitments across replan and shuffle',()=>{
+ it('keeps fixed existing commitments across replan',()=>{
   const withFixed=addFixedTask(state(),'與朋友見面','吉祥寺','15:00',60)
   const fixed=withFixed.tasks[0]
   expect(fixed.locked).toBe(true)
   const result=replanDaily(withFixed)
   expect(result.tasks.find(t=>t.id===fixed.id)).toEqual(fixed)
-  expect(shuffleTask(result,fixed.id).tasks.find(t=>t.id===fixed.id)).toEqual(fixed)
  })
  it('rejects incomplete fixed commitments',()=>{
   expect(addFixedTask(state(),'','吉祥寺','15:00',60).tasks).toHaveLength(0)
