@@ -51,8 +51,8 @@ describe('「不要這類」按鈕只在認得出種類時出現', () => {
     const dislike = screen.getByText('不喜歡這間店')
     expect(dislike.getAttribute('title')).toBe('只排除這一間店（無法判斷種類）')
   })
-  it('讃岐うどん まるや（認得出是烏龍麵）：出現「不要『烏龍麵』這類」按鈕', async () => {
-    seed(cand('maruya-1', '讃岐うどん まるや'))
+  it('丸亀製麺 渋谷店（品牌認得出是烏龍麵）：出現「不要『烏龍麵』這類」按鈕', async () => {
+    seed(cand('marugame-1', '丸亀製麺 渋谷店'))
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     expect(screen.getByText('不要「烏龍麵」這類')).toBeTruthy()
@@ -190,8 +190,15 @@ describe('無候選站顯示（紅隊 round 6 L1／L2，round 7）', () => {
     fireEvent.click(screen.getByText('清除「不喜歡」的紀錄'))
     await waitFor(() => expect(screen.getByText('目前沒有「不喜歡」的紀錄。')).toBeTruthy())
   })
-  it('round 8 A：麺処讃岐うどん配 noodle_shop，顯示「不要『烏龍麵』這類」——不是「不要『麵食』這類」（紅隊 round 7 A 的 UI 陷阱）', async () => {
+  it('round 8 A（round 14 更正）：麺処讃岐うどん配 noodle_shop，顯示「不要『麵食』這類」——店名不再判烏龍麵，泛用 noodle 是唯一種類（紅隊 round 7 A 的 UI 陷阱 round 14 起不存在）', async () => {
     seed(cand('udon-noodle', '麺処讃岐うどん', 'noodle_shop', ['noodle_shop', 'restaurant']))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.getByText('不要「麵食」這類')).toBeTruthy()
+    expect(screen.queryByText('不要「烏龍麵」這類')).toBeNull()
+  })
+  it('round 14：丸亀製麺配 noodle_shop，顯示「不要『烏龍麵』這類」——品牌勝過泛用 noodle', async () => {
+    seed(cand('marugame-noodle', '丸亀製麺 渋谷店', 'noodle_shop', ['noodle_shop', 'restaurant']))
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     expect(screen.getByText('不要「烏龍麵」這類')).toBeTruthy()

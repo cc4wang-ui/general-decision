@@ -25,6 +25,11 @@ const lowReviewShop = place('new-shop', 35.6905, 139.701, {
   types: ['restaurant'], primaryType: 'restaurant',
 })
 const udonShop = place('udon-1', 35.691, 139.701, {
+  displayName: { text: '丸亀製麺 渋谷店' }, rating: 4.8, userRatingCount: 300,
+  types: ['restaurant'], primaryType: 'restaurant',
+})
+/** round 14：店名不再判——「烏龍麵專門店」這個名字本身不再是烏龍麵。 */
+const udonNameOnlyShop = place('udon-name-1', 35.691, 139.701, {
   displayName: { text: '烏龍麵專門店' }, rating: 4.8, userRatingCount: 300,
   types: ['restaurant'], primaryType: 'restaurant',
 })
@@ -251,13 +256,30 @@ describe('種類級排除（dislikedKinds）', () => {
     vi.stubGlobal('fetch', f)
     return { f, calls }
   }
-  it('dislikedKinds 含 udon：店名有烏龍麵的店永遠不被選', async () => {
+  /** 池子只有一家店時選中才是確定的：兩家都合格時隨機挑，斷言第一家會不穩定。 */
+  function mockSingle(first: unknown) {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [first] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f }
+  }
+  it('dislikedKinds 含 udon：丸亀製麺（品牌表）永遠不被選', async () => {
     const g = mockKind(udonShop)
     void g
     const res = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('ok1')
+  })
+  it('dislikedKinds 含 udon（round 14）：「烏龍麵專門店」這個名字本身不再是烏龍麵——排除 udon 時照選（漏判），擋它只能靠單店排除', async () => {
+    const g = mockSingle(udonNameOnlyShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('udon-name-1')
   })
   it('dislikedKinds 含 ramen（歸一化鍵）：primaryType 是拉麵的店不被選', async () => {
     const g = mockKind(ramenShop)
@@ -362,14 +384,6 @@ describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
     vi.stubGlobal('fetch', f)
     return { f }
   }
-  function mockKind(first: unknown) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
-      return new Response(JSON.stringify({ places: [first, validShop('ok1', 0)] }), { status: 200 })
-    })
-    vi.stubGlobal('fetch', f)
-    return { f }
-  }
   it("excludeKinds ['udon']：池子只有麺処ほん田（拉麵店）時要選中它，不能 422", async () => {
     const g = mockSingle(hondaShop)
     void g
@@ -378,21 +392,21 @@ describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('honda-1')
   })
-  it("excludeKinds ['sushi']：スシロー不被選（片假名スシ要認得到）", async () => {
-    const g = mockKind(sushiroShop)
+  it("excludeKinds ['sushi']（round 14 更正）：スシロー round 14 起是漏判——排除 sushi 時照選（「スシ」不再判壽司）", async () => {
+    const g = mockSingle(sushiroShop)
     void g
     const res = await handler(post({ origin: HERE, excludeKinds: ['sushi'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
-    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+    expect(data.stops[0]!.candidate?.id).toBe('sushiro-1')
   })
-  it("excludeKinds ['tonkatsu']：とんかつ和幸不被選", async () => {
-    const g = mockKind(wakohShop)
+  it("excludeKinds ['tonkatsu']（round 14 更正）：とんかつ和幸 round 14 起是漏判——排除 tonkatsu 時照選（「とんかつ」不再判炸豬排）", async () => {
+    const g = mockSingle(wakohShop)
     void g
     const res = await handler(post({ origin: HERE, excludeKinds: ['tonkatsu'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
-    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+    expect(data.stops[0]!.candidate?.id).toBe('wakoh-1')
   })
 })
 
@@ -414,17 +428,13 @@ describe('種類判斷修正（紅隊 round 3 Finding B：中華そば）', () =
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('chuka-soba-1')
   })
-  it("excludeKinds ['ramen']：中華そば 青葉被選走時，對照店要能補上（種類判 ramen 才有排除效果）", async () => {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
-      return new Response(JSON.stringify({ places: [chukaSobaShop, validShop('ok1', 0)] }), { status: 200 })
-    })
-    vi.stubGlobal('fetch', f)
-    void f
+  it("excludeKinds ['ramen']（round 14 更正）：中華そば 青葉 round 14 起是漏判——排除 ramen 時照選（「中華そば」不再判拉麵）", async () => {
+    const g = mockSingle(chukaSobaShop)
+    void g
     const res = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
-    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+    expect(data.stops[0]!.candidate?.id).toBe('chuka-soba-1')
   })
 })
 
@@ -519,14 +529,6 @@ describe('種類判斷修正（紅隊 round 4 Finding 1／2／3）', () => {
     vi.stubGlobal('fetch', f)
     return { f }
   }
-  function mockKind(first: unknown) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
-      return new Response(JSON.stringify({ places: [first, validShop('ok1', 0)] }), { status: 200 })
-    })
-    vi.stubGlobal('fetch', f)
-    return { f }
-  }
   const mealStop = [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }]
   it("excludeKinds ['udon']：池子只有らぁ麺 飯田商店（拉麵店）時要選中它，不能 422", async () => {
     const g = mockSingle(iidaShop)
@@ -584,13 +586,13 @@ describe('種類判斷修正（紅隊 round 4 Finding 1／2／3）', () => {
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('tadokoro-1')
   })
-  it("excludeKinds ['yakitori']：やきとり大吉不被選（串燒關鍵字要認得到）", async () => {
-    const g = mockKind(daikichiShop)
+  it("excludeKinds ['yakitori']（round 14 更正）：やきとり大吉 round 14 起是漏判——排除 yakitori 時照選（「やきとり」不再判串燒）", async () => {
+    const g = mockSingle(daikichiShop)
     void g
     const res = await handler(post({ origin: HERE, excludeKinds: ['yakitori'], stops: mealStop }))
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
-    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+    expect(data.stops[0]!.candidate?.id).toBe('daikichi-1')
   })
   it("excludeKinds ['soba']：手打ち蕎麥 さくら round 13 起不被種類排除（繁體蕎麥也不判，漏判）", async () => {
     const g = mockSingle(sakuraSobaShop)
@@ -682,14 +684,12 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
   const nagomiyaShop = shop('nagomiya-1', '炭火焼き鳥 池袋 和み屋')
   const saitoShop = shop('saito-1', '鮨 さいとう')
   const renoirShop = shop('renoir-1', '喫茶室ルノアール')
-  it("F1：らあめん花月嵐是拉麵——excludeKinds ['ramen'] → 200 無候選；['udon'] → 200 選中", async () => {
+  it("F1（round 14 更正）：らあめん花月嵐 round 14 起是漏判——['ramen'] → 200 照選；['udon'] → 200 也照選（「らあめん」不再判拉麵）", async () => {
     mockSingle(kaenShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(bad.status).toBe(200)
-    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
-    expect(badData.stops[0]!.candidate).toBeUndefined()
-    expect(badData.stops[0]!.noCandidate).toBe(true)
-    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
+    const badData = await bad.json() as { stops: { candidate?: { id: string } }[] }
+    expect(badData.stops[0]!.candidate?.id).toBe('kaen-1')
     mockSingle(kaenShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -734,7 +734,7 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(badData.stops[0]!.noCandidate).toBe(true)
     expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F4：らー麺 大芽是拉麵——['udon'] → 200 選中；['ramen'] → 200 無候選", async () => {
+  it("F4（round 14 更正）：らー麺 大芽 round 14 起是漏判——['udon'] → 200 照選；['ramen'] → 200 也照選（「らー麺」不再判拉麵）", async () => {
     mockSingle(oomeShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -743,10 +743,8 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     mockSingle(oomeShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(bad.status).toBe(200)
-    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
-    expect(badData.stops[0]!.candidate).toBeUndefined()
-    expect(badData.stops[0]!.noCandidate).toBe(true)
-    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
+    const badData = await bad.json() as { stops: { candidate?: { id: string } }[] }
+    expect(badData.stops[0]!.candidate?.id).toBe('oome-1')
   })
   it("F4：麺食堂88是拉麵——['udon'] → 200 選中；['ramen'] → 200 無候選", async () => {
     mockSingle(shokudo88Shop)
@@ -762,7 +760,7 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     expect(badData.stops[0]!.noCandidate).toBe(true)
     expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
   })
-  it("F4：ら～麺あけどや是拉麵——['udon'] → 200 選中；['ramen'] → 200 無候選", async () => {
+  it("F4（round 14 更正）：ら～麺あけどや round 14 起是漏判——['udon'] → 200 照選；['ramen'] → 200 也照選（「ら～麺」不再判拉麵）", async () => {
     mockSingle(akedoyaShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: mealStop }))
     expect(good.status).toBe(200)
@@ -771,10 +769,8 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     mockSingle(akedoyaShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(bad.status).toBe(200)
-    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
-    expect(badData.stops[0]!.candidate).toBeUndefined()
-    expect(badData.stops[0]!.noCandidate).toBe(true)
-    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
+    const badData = await bad.json() as { stops: { candidate?: { id: string } }[] }
+    expect(badData.stops[0]!.candidate?.id).toBe('akedoya-1')
   })
   it("F6（round 13 更正）：麺処、そば志ん、 round 13 起是漏判——['ramen'] → 200 選中；['soba'] → 200 也選中（店名裡的「そば」不再判蕎麥麵）", async () => {
     mockSingle(sobaShinShop)
@@ -788,56 +784,48 @@ describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表�
     const alsoData = await alsoGood.json() as { stops: { candidate?: { id: string } }[] }
     expect(alsoData.stops[0]!.candidate?.id).toBe('sobashin-1')
   })
-  it("F2：やき鳥 宮川是串燒——['yakitori'] → 200 無候選；['ramen'] → 200 選中", async () => {
+  it("F2（round 14 更正）：やき鳥 宮川 round 14 起是漏判——['yakitori'] → 200 照選；['ramen'] → 200 也照選（「やき鳥」不再判串燒）", async () => {
     mockSingle(miyagawaShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['yakitori'], stops: mealStop }))
     expect(bad.status).toBe(200)
-    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
-    expect(badData.stops[0]!.candidate).toBeUndefined()
-    expect(badData.stops[0]!.noCandidate).toBe(true)
-    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
+    const badData = await bad.json() as { stops: { candidate?: { id: string } }[] }
+    expect(badData.stops[0]!.candidate?.id).toBe('miyagawa-1')
     mockSingle(miyagawaShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(good.status).toBe(200)
     const data = await good.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('miyagawa-1')
   })
-  it("F2：炭火焼き鳥 池袋 和み屋是串燒——['yakitori'] → 200 無候選；['ramen'] → 200 選中", async () => {
+  it("F2（round 14 更正）：炭火焼き鳥 池袋 和み屋 round 14 起是漏判——['yakitori'] → 200 照選；['ramen'] → 200 也照選（「焼き鳥」不再判串燒）", async () => {
     mockSingle(nagomiyaShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['yakitori'], stops: mealStop }))
     expect(bad.status).toBe(200)
-    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
-    expect(badData.stops[0]!.candidate).toBeUndefined()
-    expect(badData.stops[0]!.noCandidate).toBe(true)
-    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
+    const badData = await bad.json() as { stops: { candidate?: { id: string } }[] }
+    expect(badData.stops[0]!.candidate?.id).toBe('nagomiya-1')
     mockSingle(nagomiyaShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(good.status).toBe(200)
     const data = await good.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('nagomiya-1')
   })
-  it("F5：鮨 さいとう是壽司——['sushi'] → 200 無候選；['ramen'] → 200 選中", async () => {
+  it("F5（round 14 更正）：鮨 さいとう round 14 起是漏判——['sushi'] → 200 照選；['ramen'] → 200 也照選（「鮨」不再判壽司）", async () => {
     mockSingle(saitoShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['sushi'], stops: mealStop }))
     expect(bad.status).toBe(200)
-    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
-    expect(badData.stops[0]!.candidate).toBeUndefined()
-    expect(badData.stops[0]!.noCandidate).toBe(true)
-    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
+    const badData = await bad.json() as { stops: { candidate?: { id: string } }[] }
+    expect(badData.stops[0]!.candidate?.id).toBe('saito-1')
     mockSingle(saitoShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: mealStop }))
     expect(good.status).toBe(200)
     const data = await good.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('saito-1')
   })
-  it("F5：喫茶室ルノアール是咖啡——咖啡站 ['cafe'] → 200 無候選；['ramen'] → 200 選中", async () => {
+  it("F5（round 14 更正）：喫茶室ルノアール round 14 起是漏判——咖啡站 ['cafe'] → 200 照選；['ramen'] → 200 也照選（「喫茶」不再判咖啡）", async () => {
     mockSingle(renoirShop)
     const bad = await handler(post({ origin: HERE, excludeKinds: ['cafe'], stops: coffeeStop }))
     expect(bad.status).toBe(200)
-    const badData = await bad.json() as { stops: { candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }[] }
-    expect(badData.stops[0]!.candidate).toBeUndefined()
-    expect(badData.stops[0]!.noCandidate).toBe(true)
-    expect(badData.stops[0]!.noCandidateReason).toBe('filtered')
+    const badData = await bad.json() as { stops: { candidate?: { id: string } }[] }
+    expect(badData.stops[0]!.candidate?.id).toBe('renoir-1')
     mockSingle(renoirShop)
     const good = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: coffeeStop }))
     expect(good.status).toBe(200)
@@ -1040,9 +1028,9 @@ describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）',
     expect(stop.candidate?.id).toBe('matsukiyo-shibuya')
   })
   it('L1：既有候選的種類在 excludeKinds 裡 → 不保留，換成別的店', async () => {
-    const maruyaCandidate = { id: 'maruya-1', name: '讃岐うどん まるや', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=maruya-1', lat: 35.6590, lng: 139.7010, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' }
+    const marugameCandidate = { id: 'maruya-1', name: '丸亀製麺 渋谷店', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=maruya-1', lat: 35.6590, lng: 139.7010, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' }
     mockPlaces([validShop('ok1', 0)])
-    const res = await handler(post({ origin: SHIBUYA, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: maruyaCandidate }] }))
+    const res = await handler(post({ origin: SHIBUYA, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: marugameCandidate }] }))
     expect(res.status).toBe(200)
     const stop = stopOf(await readStops(res), 'meal')
     expect(stop.candidate?.id).toBe('ok1')
@@ -1308,7 +1296,7 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
     expect(noodleMeal.candidate).toBeUndefined()
     expect(noodleMeal.noCandidate).toBe(true)
   })
-  it('A：麺処讃岐うどん配 noodle_shop，排除 udon 時不選；排除 ramen 時照選', async () => {
+  it('A（round 14 更正）：麺処讃岐うどん配 noodle_shop round 14 起是泛用 noodle——排除 noodle 時不選；排除 udon／ramen 時照選', async () => {
     const udonNoodle = place('udon-noodle', 35.691, 139.701, {
       displayName: { text: '麺処讃岐うどん' }, rating: 4.2, userRatingCount: 300,
       types: ['noodle_shop', 'restaurant'], primaryType: 'noodle_shop',
@@ -1318,12 +1306,15 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
       return new Response(JSON.stringify({ places: [udonNoodle] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
-    const excluded = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    const excluded = await handler(post({ origin: HERE, excludeKinds: ['noodle'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(excluded.status).toBe(200)
     expect(stopOf(await readStops(excluded), 'meal').candidate).toBeUndefined()
-    const contrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    const contrast = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(contrast.status).toBe(200)
     expect(stopOf(await readStops(contrast), 'meal').candidate?.id).toBe('udon-noodle')
+    const contrast2 = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(contrast2.status).toBe(200)
+    expect(stopOf(await readStops(contrast2), 'meal').candidate?.id).toBe('udon-noodle')
   })
   it('B（round 13 更正）：RAMEN_SOBA 補的 5 間配 noodle_shop round 13 起都是漏判（店名無訊號、泛用 noodle）——排除 soba 時照選、排除 ramen 時照選、排除 noodle 時不選', async () => {
     const names = ['煮干しそば', '銀座鴨そば 九代目けいすけ', '塩そば専門店 桑ばら', '塩そば 一榮', 'SOBA HOUSE 金色不如帰']
@@ -1553,24 +1544,24 @@ describe('round 10：R9-K1 同一請求內防重複（本請求已挑出的店�
     expect(nitenExcluded.status).toBe(200)
     expect(stopOf(await readStops(nitenExcluded), 'meal').candidate?.id).toBe('niten-1')
   })
-  it('B3 伺服器雙向：煮干中華ソバ イチカワ（片假名ソバ），排除 ramen 時不選；排除 soba 時照選', async () => {
+  it('B3（round 14 更正）：煮干中華ソバ イチカワ round 14 起是漏判——排除 ramen 時照選；排除 soba 時也照選（片假名正規化層隨店名路徑刪掉）', async () => {
     const ichikawa = place('ichikawa-1', 35.691, 139.701, { displayName: { text: '煮干中華ソバ イチカワ' }, rating: 4.3, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
     mockPool([ichikawa])
     const excluded = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(excluded.status).toBe(200)
-    expect(stopOf(await readStops(excluded), 'meal').candidate).toBeUndefined()
+    expect(stopOf(await readStops(excluded), 'meal').candidate?.id).toBe('ichikawa-1')
     mockPool([ichikawa])
     const contrast = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(contrast.status).toBe(200)
     expect(stopOf(await readStops(contrast), 'meal').candidate?.id).toBe('ichikawa-1')
   })
-  it('B4 伺服器雙向：串鳥排除 yakitori 時不選、排除 ramen 時照選；やきにくガッッツ排除 yakiniku 時不選、排除 ramen 時照選', async () => {
+  it('B4（round 14 更正）：串鳥／やきにくガッッツ round 14 起是漏判——串鳥排除 yakitori 時照選、排除 ramen 時也照選；やきにくガッッツ排除 yakiniku 時照選、排除 ramen 時也照選（「串鳥」「やきにく」不再判種類）', async () => {
     const kushitori = place('kushitori-1', 35.691, 139.701, { displayName: { text: '串鳥' }, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
     const yakiniku = place('yakiniku-1', 35.691, 139.701, { displayName: { text: 'やきにくガッッツ' }, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
     mockPool([kushitori])
     const kExcluded = await handler(post({ origin: HERE, excludeKinds: ['yakitori'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(kExcluded.status).toBe(200)
-    expect(stopOf(await readStops(kExcluded), 'meal').candidate).toBeUndefined()
+    expect(stopOf(await readStops(kExcluded), 'meal').candidate?.id).toBe('kushitori-1')
     mockPool([kushitori])
     const kContrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(kContrast.status).toBe(200)
@@ -1578,7 +1569,7 @@ describe('round 10：R9-K1 同一請求內防重複（本請求已挑出的店�
     mockPool([yakiniku])
     const yExcluded = await handler(post({ origin: HERE, excludeKinds: ['yakiniku'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(yExcluded.status).toBe(200)
-    expect(stopOf(await readStops(yExcluded), 'meal').candidate).toBeUndefined()
+    expect(stopOf(await readStops(yExcluded), 'meal').candidate?.id).toBe('yakiniku-1')
     mockPool([yakiniku])
     const yContrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
     expect(yContrast.status).toBe(200)
@@ -1737,7 +1728,7 @@ describe('round 11：壁畫地標拒絕／完整重新生成隨機化／seen 送
       prevIds = ids
     }
   })
-  it('品牌別名表伺服器雙向：8 個品牌排除所屬種類時不選、排除別種時照選', async () => {
+  it('品牌別名表伺服器雙向（round 14：7 個品牌，白木屋已刪）：排除所屬種類時不選、排除別種時照選', async () => {
     const cases: Array<[string, string, string, string]> = [
       ['丸亀製麺', 'marugame-1', 'udon', 'ramen'],
       ['かつや 渋谷道玄坂店', 'katsuya-1', 'tonkatsu', 'ramen'],
@@ -1746,7 +1737,6 @@ describe('round 11：壁畫地標拒絕／完整重新生成隨機化／seen 送
       ['一蘭', 'ichiran-1', 'ramen', 'udon'],
       ['磯丸水産', 'isomaru-1', 'izakaya', 'ramen'],
       ['魚民', 'uotami-1', 'izakaya', 'ramen'],
-      ['白木屋', 'shirakiya-1', 'izakaya', 'ramen'],
     ]
     for (const [name, id, excludedKind, contrastKind] of cases) {
       const shop = place(id, 35.691, 139.701, { displayName: { text: name }, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
@@ -1760,7 +1750,7 @@ describe('round 11：壁畫地標拒絕／完整重新生成隨機化／seen 送
       expect(stopOf(await readStops(contrast), 'meal').candidate?.id, name).toBe(id)
     }
   })
-  it('N1／N2／N4／N5／N6／N7 伺服器雙向：各新店名排除所屬種類時不選、排除別種時照選', async () => {
+  it('N1／N2／N4／N5／N6／N7（round 14 更正）：各新店名 round 14 起是漏判——排除所屬種類時照選、排除別種時也照選（店名不再判種類）', async () => {
     const cases: Array<[string, string, string, string]> = [
       ['きしめん 住よし', 'kishimen-1', 'udon', 'ramen'],
       ['ほうとう不動', 'hoto-1', 'udon', 'ramen'],
@@ -1774,7 +1764,7 @@ describe('round 11：壁畫地標拒絕／完整重新生成隨機化／seen 送
       mockPool([shop])
       const excluded = await handler(post({ origin: HERE, excludeKinds: [excludedKind], stops: mealStop }))
       expect(excluded.status, name).toBe(200)
-      expect(stopOf(await readStops(excluded), 'meal').candidate, name).toBeUndefined()
+      expect(stopOf(await readStops(excluded), 'meal').candidate?.id, name).toBe(id)
       mockPool([shop])
       const contrast = await handler(post({ origin: HERE, excludeKinds: [contrastKind], stops: mealStop }))
       expect(contrast.status, name).toBe(200)
@@ -1835,15 +1825,15 @@ describe('round 13：回歸 20x（架構重構後種類排除仍有效）', () =
     }
     expect(hit).toBe(true)
   })
-  it('excludeKinds 四種各 20x：丸亀製麺（udon）、川上庵（soba）、焼肉トラジ 渋谷店（yakiniku）、鳥貴族（izakaya）各 20 次絕不被選', async () => {
-    const cases: Array<[string, string, string]> = [
-      ['丸亀製麺', 'marugame-1', 'udon'],
-      ['川上庵', 'kawakamian-1', 'soba'],
-      ['焼肉トラジ 渋谷店', 'toraji-1', 'yakiniku'],
-      ['鳥貴族', 'torikizoku-1', 'izakaya'],
+  it('excludeKinds 四種各 20x（round 14 更正）：丸亀製麺（udon，品牌）、川上庵（soba，品牌）、焼肉トラジ 渋谷店（yakiniku，改用類型——店名「焼肉」不再判）、鳥貴族（izakaya，品牌）各 20 次絕不被選', async () => {
+    const cases: Array<[string, string, string, string]> = [
+      ['丸亀製麺', 'marugame-1', 'udon', 'restaurant'],
+      ['川上庵', 'kawakamian-1', 'soba', 'restaurant'],
+      ['焼肉トラジ 渋谷店', 'toraji-1', 'yakiniku', 'yakiniku_restaurant'],
+      ['鳥貴族', 'torikizoku-1', 'izakaya', 'restaurant'],
     ]
-    for (const [name, id, kind] of cases) {
-      const target = place(id, 35.691, 139.701, { displayName: { text: name }, rating: 5.0, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
+    for (const [name, id, kind, primaryType] of cases) {
+      const target = place(id, 35.691, 139.701, { displayName: { text: name }, rating: 5.0, userRatingCount: 300, types: [primaryType, 'restaurant'], primaryType })
       const filler = place('filler-' + id, 35.692, 139.702, { displayName: { text: '對照食堂' }, rating: 4.5, userRatingCount: 120, types: ['restaurant'], primaryType: 'restaurant' })
       mockPool([target, filler])
       for (let i = 0; i < 20; i++) {

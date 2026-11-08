@@ -183,8 +183,8 @@ describe('loadDaily：上限留最新、rest 殘留清除（紅隊 §3.3／§3.4
   // 被不喜歡的候選清掉：title 還原成目錄標題（紅隊 round 7 §3 第 9 項的原意）
   const dislikedMeal={id:'meal',title:'麺喜やしま',minutes:45,kind:'meal',done:false,candidate:{id:'y1',name:'麺喜やしま',address:'渋谷',mapUrl:'https://maps.google.com/?cid=y1',lat:35.66,lng:139.70,userRatingCount:808}}
   expect(clearStaleCandidate(dislikedMeal as DailyTask,{disliked:['y1'],dislikedKinds:[],area:'澀谷',areaOnly:false}).title).toBe('澀谷｜一人友善的日式定食')
-  // 種類排除清掉：title 也還原
-  const udonMeal={id:'meal',title:'麺処讃岐うどん',minutes:45,kind:'meal',done:false,candidate:{id:'u1',name:'麺処讃岐うどん',address:'渋谷',mapUrl:'https://maps.google.com/?cid=u1',lat:35.66,lng:139.70,userRatingCount:300}}
+  // 種類排除清掉：title 也還原（品牌判出 udon）
+  const udonMeal={id:'meal',title:'丸亀製麺 渋谷店',minutes:45,kind:'meal',done:false,candidate:{id:'u1',name:'丸亀製麺 渋谷店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=u1',lat:35.66,lng:139.70,userRatingCount:300}}
   expect(clearStaleCandidate(udonMeal as DailyTask,{disliked:[],dislikedKinds:['udon'],area:'澀谷',areaOnly:false}).title).toBe('澀谷｜一人友善的日式定食')
   // 指定站的 title 不動
   expect(clearStaleCandidate(specified as DailyTask).title).toBe('我指定的店')
@@ -395,7 +395,7 @@ describe('loadDaily：既有候選重驗（round 7 L1／L2）', () => {
     expect(out.tasks.find((t) => t.id === 'meal')?.candidate).toBeUndefined()
   })
   it('既有候選的種類在 dislikedKinds 裡：自動站清掉；固定安排的站也清掉（種類排除對所有站生效）', () => {
-    const maruyaCand = { id: 'maruya-1', name: '讃岐うどん まるや', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=maruya-1', lat: 35.6590, lng: 139.7010, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' }
+    const maruyaCand = { id: 'marugame-1', name: '丸亀製麺 渋谷店', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=marugame-1', lat: 35.6590, lng: 139.7010, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' }
     const fixedMeal = { id: 'fixed-meal', title: '午餐約會', minutes: 60, kind: 'meal', done: false, locked: true, custom: true, candidate: maruyaCand }
     seed([task('meal', maruyaCand), fixedMeal], [], ['udon'])
     const out = loadDaily()
