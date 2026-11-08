@@ -9,7 +9,10 @@
 //   done           回報完成；該細類 a += 1
 //   closed         店關了：這家 24 小時內不再出現；不動細類
 //   not_this_kind  今天不想吃這類：細類 b += 0.5；不動店
-//   never_again    這家不要再來：90 天；第 2 次 → 永久
+//   never_again    這家不要再來（核心 app 直接按）：90 天；第 2 次 → 永久
+//   daily_dislike  今日行程「不喜歡這間店」：90 天；第 2 次 → 永久；跟 never_again 分開記
+//                  （round 10，R9-F7-leak：兩邊共用一筆紀錄但次數與封鎖期各自算；
+//                  clearDislike 只清今日行程這邊，核心 app 的封鎖不動）
 //   repeat         又是這家（Round 4）：14 天不再出現；不動細類、不算「不要再來」次數
 //   price          價格不對（Round 4）：不動記憶，只在這次操作排除（app.tsx excluded）
 //   fav            列入愛店 / 取消
@@ -50,9 +53,17 @@ const readCuisine = async (): Promise<CuisineStats> => (await get<CuisineStats>(
 /** 這家店最近一次事件（shown／done）的時間；沒有事件 = 0。 */
 const lastEventAt = (e: PlaceMemEntry): number => Math.max(e.shown[0] ?? 0, e.done[0] ?? 0)
 
-/** 仍在封鎖期（永久，或截止時間在未來）。 */
-export function isBlocked(e: Pick<PlaceMemEntry, 'dislikeUntil'>, now: number): boolean {
-  return e.dislikeUntil === 'forever' || (typeof e.dislikeUntil === 'number' && e.dislikeUntil > now)
+/** 仍在封鎖期（永久，或截止時間在未來）。核心 app 與今日行程的封鎖分開記
+ * （round 10，R9-F7-leak）：任一邊還在封鎖期就算封鎖。 */
+export function isBlocked(e: Pick<PlaceMemEntry, 'dislikeUntil' | 'dailyDislikeUntil'>, now: number): boolean {
+  const blocked = (v: number | 'forever' | undefined) => v === 'forever' || (typeof v === 'number' && v > now)
+  return blocked(e.dislikeUntil) || blocked(e.dailyDislikeUntil)
+}
+
+/** 兩邊封鎖期的較久者（永久優先）：memSummary 的 x 欄位。 */
+const effectiveBlock = (e: PlaceMemEntry): number | 'forever' => {
+  if (e.dislikeUntil === 'forever' || e.dailyDislikeUntil === 'forever') return 'forever'
+  return Math.max(e.dislikeUntil ?? 0, e.dailyDislikeUntil ?? 0)
 }
 
 /** 超過上限時，清掉最舊且不受保護（愛店、封鎖中）的店。 */
@@ -146,13 +157,98 @@ export async function markNotThisKind(cuisine: string | undefined): Promise<void
   await mutateCuisine((c) => { const [a, b] = c[cuisine] ?? [1, 1]; c[cuisine] = [a, b + 0.5] })
 }
 
-/** 這家不要再來：90 天；第 2 次標記 → 'forever'。 */
+/** 這家不要再來（核心 app 直接按的）：90 天；第 2 次標記 → 'forever'。 */
 export async function markNeverAgain(id: string, now: number, module: MemModule = 'eat'): Promise<void> {
   await mutate(now, (store) => {
     const e = entryOf(store, id, module)
     e.dislikes += 1
     e.dislikeUntil = e.dislikes >= 2 ? 'forever' : Math.max(typeof e.dislikeUntil === 'number' ? e.dislikeUntil : 0, now + NEVER_AGAIN_MS)
   })
+}
+
+/** 今日行程「不喜歡這間店」（round 10，R9-F7-leak）：90 天；第 2 次標記 → 'forever'。
+ * 跟核心 app 的 markNeverAgain 分開記（dailyDislikes／dailyDislikeUntil）：兩邊
+ * 共用一筆紀錄，但次數與封鎖期各自算——今日行程按兩次才永久，核心 app 按兩次
+ * 才永久，兩邊各按一次是 90 天不是永久。clearDislike 只清這邊的，核心 app 的
+ * 封鎖不受影響（舊版共用 dislikeUntil／dislikes，清掉一邊就把另一邊的封鎖也清掉了）。 */
+export async function markDailyDislike(id: string, now: number, module: MemModule = 'eat'): Promise<void> {
+  await mutate(now, (store) => {
+    const e = entryOf(store, id, module)
+    e.dailyDislikes = (e.dailyDislikes ?? 0) + 1
+    e.dailyDislikeUntil = e.dailyDislikes >= 2 ? 'forever' : Math.max(typeof e.dailyDislikeUntil === 'number' ? e.dailyDislikeUntil : 0, now + NEVER_AGAIN_MS)
+  })
+}
+
+/** 舊紀錄移轉（round 11，紅隊 round 10 R10-F2c）：分來源之前（round 10 之前）
+ * 今日行程的「不喜歡」寫在共用欄位（dislikeUntil／dislikes），沒有 daily 欄位。
+ * 呼叫端（clearDisliked）保證這個 id 在 state.disliked 裡——只有 dislikeStop 會把
+ * id 加進那個清單，而分來源之前 dislikeStop 寫的就是共用欄位——所以舊紀錄的封鎖
+ * 來自今日行程。
+ * - dislikes <= 1：這一次按壓一定是今日行程按的（核心 app 按的不會進 state.disliked，
+ *   再按一次會讓 dislikes 變 2）——沒有核心封鎖可刪，MOVE：共用封鎖抄到 daily 欄位
+ *   後刪掉共用欄位；之後 clearDislike 只清 daily 側，整筆封鎖就清掉了。
+ *   （跟紅隊 round 10 規格的字面 COPY 不同：字面 COPY 會讓清除按鈕回報成功、店卻因為
+ *   殘留的共用封鎖繼續被擋——清除按了等於沒按。MOVE 只在「只有一次按壓、且那一次
+ *   一定是今日行程」這個可證明的情況下刪共用欄位，不會刪到核心封鎖。）
+ * - dislikes >= 2：至少一次今日行程、至少另一次可能是核心 app——分不出來，COPY：
+ *   共用封鎖抄到 daily 欄位（dailyDislikes 保守記 1，不從模糊資料製造「永久」），
+ *   共用欄位不動；之後清掉 daily 側，共用封鎖還在，店可能繼續被擋——clearDislike
+ *   回報 sharedRemains，UI 要說清楚。
+ * 冪等：已有 daily 欄位就不動；沒有共用封鎖也不動。移轉只在清除路徑呼叫（不在載入時
+ * 跑：loadDaily 是同步的、placeMem 是非同步 IndexedDB，載入時移轉會跟第一次清除競速；
+ * 而 daily 欄位唯一的消費者就是今日行程的清除——在 clearDislike 之前移轉，同一支
+ * mutate 序列化裡完成，原子又冪等。dislikes <= 1 的共用封鎖一定是 90 天時效（第 2 次
+ * 才永久），不會有「沒移轉就永遠卡住」的永久封鎖。 */
+export async function migrateDailyDislike(id: string, now: number): Promise<void> {
+  await mutate(now, (store) => {
+    const e = store[id]
+    if (!e) return
+    if (e.dailyDislikes !== undefined || e.dailyDislikeUntil !== undefined) return
+    if (e.dislikeUntil === undefined && (e.dislikes ?? 0) === 0) return
+    if ((e.dislikes ?? 0) <= 1) {
+      // MOVE：只有一次按壓，一定是今日行程的。
+      if (e.dislikeUntil !== undefined) e.dailyDislikeUntil = e.dislikeUntil
+      e.dailyDislikes = 1
+      delete e.dislikeUntil
+      e.dislikes = 0
+      return
+    }
+    // COPY：分不出來，共用欄位不動。
+    if (e.dislikeUntil !== undefined) e.dailyDislikeUntil = e.dislikeUntil
+    e.dailyDislikes = 1
+  })
+}
+
+/** 解除一間店的「不要再來」封鎖（round 8：今日行程「清除『不喜歡』的紀錄」用；
+ * round 10 改成分來源，R9-F7-leak；round 11 改寫，R10-F2）。
+ * 只清今日行程這邊的封鎖（dailyDislikeUntil）與不要再來次數（dailyDislikes 歸零，
+ * 下次再按從 90 天重新算，不會因為之前按過一次就直接永久）；核心 app 直接按
+ * 「不要再來」的封鎖（dislikeUntil／dislikes）不動。shown／done／愛店／品牌鍵／
+ * 細類鍵都不動。沒有這家店的紀錄時什麼都不做。
+ * 舊紀錄（round 10，R10-F2a）：沒有 daily 欄位時，共用欄位一律不動——沒有 daily
+ * 欄位就不能證明這個封鎖來自今日行程（分來源之後只在核心 app 按過的紀錄也是這個
+ * 形狀）。舊版「照舊版清掉共用欄位」的分支是錯的：它會把核心 app 的封鎖也清掉
+ * （紅隊 round 10 R10-F2：連按兩次的永久封鎖也被刪掉）。要清舊紀錄的今日行程封鎖，
+ * 先走 migrateDailyDislike（只對 state.disliked 裡的 id 呼叫，見 clearDisliked），
+ * 移轉過的紀錄一定有 daily 欄位，走下面的 daily 分支。
+ * 回傳 sharedRemains：清完 daily 側之後，共用側若還在封鎖期，店還是被擋——呼叫端
+ * 要照這個回報說清楚（清除按鈕不能回報成功、店卻繼續被擋而不說）。 */
+export async function clearDislike(id: string): Promise<{ sharedRemains: boolean }> {
+  let sharedRemains = false
+  await mutate(Date.now(), (store) => {
+    const e = store[id]
+    if (!e) return
+    if (e.dailyDislikes === undefined && e.dailyDislikeUntil === undefined) {
+      // 舊紀錄且沒經過移轉：共用欄位不動（R10-F2a）。但回報要誠實：共用側若還在封鎖期，
+      // 店還是被擋，呼叫端要照 sharedRemains 說清楚——「沒清掉」不是「清掉了」。
+      sharedRemains = isBlocked(e, Date.now())
+      return
+    }
+    delete e.dailyDislikeUntil
+    e.dailyDislikes = 0
+    sharedRemains = isBlocked(e, Date.now())
+  })
+  return { sharedRemains }
 }
 
 /** 列入愛店／取消。 */
@@ -198,11 +294,22 @@ export async function memSummary(module: MemModule, now: number, limit = 200): P
     const s: PlaceMemSummary = {
       id: e.id, sh: e.shown.slice(0, SUMMARY_EVENTS), dn: e.done.slice(0, SUMMARY_EVENTS), dc: e.doneCount ?? e.done.length,
     }
-    if (isBlocked(e, now)) s.x = e.dislikeUntil as number | 'forever'
+    if (isBlocked(e, now)) s.x = effectiveBlock(e)
     if (e.fav) s.fav = true
     if (e.brand) s.b = e.brand
     return s
   })
+}
+
+/**
+ * 今日行程用：仍在封鎖期的 place_id（不要再來 90 天／第 2 次永久、店關了 24 小時、
+ * 又是這家 14 天）。生成／shuffle 前讀它，併進排除清單：核心班長 app 按的
+ * 「不要再來」才會影響今日行程；清掉 localStorage 也不會讓店回來。
+ * 模組不分 eat／rest：同一個 place_id，哪邊封鎖都算不要再來。
+ */
+export async function blockedPlaceIds(now: number): Promise<string[]> {
+  const all = await allMem()
+  return all.filter((e) => isBlocked(e, now)).map((e) => e.id)
 }
 
 /**
@@ -262,7 +369,7 @@ const newestFirst = (list: number[]): number[] => [...new Set(list)].sort((a, b)
 /** 驗一家店；回傳整理過的紀錄（只抄已知欄位，檔案裡多塞的欄位——例如店名——不會進記憶），或壞掉的欄位名。 */
 function readEntry(v: unknown): PlaceMemEntry | string {
   if (!isObj(v)) return '不是一筆紀錄'
-  const { id, module, shown, done, dislikes, doneCount, dislikeUntil, fav, brand, cuisine } = v
+  const { id, module, shown, done, dislikes, doneCount, dislikeUntil, dailyDislikeUntil, dailyDislikes, fav, brand, cuisine } = v
   if (!isKey(id, 300)) return 'id'
   if (module !== 'eat' && module !== 'rest') return 'module'
   if (!isTimes(shown)) return 'shown'
@@ -270,12 +377,16 @@ function readEntry(v: unknown): PlaceMemEntry | string {
   if (!isCount(dislikes)) return 'dislikes'
   if (doneCount !== undefined && !isCount(doneCount)) return 'doneCount'
   if (dislikeUntil !== undefined && dislikeUntil !== 'forever' && !isTime(dislikeUntil)) return 'dislikeUntil'
+  if (dailyDislikeUntil !== undefined && dailyDislikeUntil !== 'forever' && !isTime(dailyDislikeUntil)) return 'dailyDislikeUntil'
+  if (dailyDislikes !== undefined && !isCount(dailyDislikes)) return 'dailyDislikes'
   if (fav !== undefined && typeof fav !== 'boolean') return 'fav'
   if (brand !== undefined && !isKey(brand, 100)) return 'brand'
   if (cuisine !== undefined && !isKey(cuisine, 100)) return 'cuisine'
   const e: PlaceMemEntry = { id, module, shown: newestFirst(shown), done: newestFirst(done), dislikes }
   if (isCount(doneCount)) e.doneCount = doneCount
   if (dislikeUntil === 'forever' || isTime(dislikeUntil)) e.dislikeUntil = dislikeUntil
+  if (dailyDislikeUntil === 'forever' || isTime(dailyDislikeUntil)) e.dailyDislikeUntil = dailyDislikeUntil
+  if (isCount(dailyDislikes)) e.dailyDislikes = dailyDislikes
   if (fav === true) e.fav = true
   if (isKey(brand, 100)) e.brand = brand
   if (isKey(cuisine, 100)) e.cuisine = cuisine
@@ -354,6 +465,11 @@ export function mergeEntry(cur: PlaceMemEntry, inc: PlaceMemEntry): PlaceMemEntr
   }
   if (cur.dislikeUntil === 'forever' || inc.dislikeUntil === 'forever') out.dislikeUntil = 'forever'
   else if (cur.dislikeUntil !== undefined || inc.dislikeUntil !== undefined) out.dislikeUntil = Math.max(cur.dislikeUntil ?? 0, inc.dislikeUntil ?? 0)
+  // 今日行程的封鎖也一樣合併（round 10，分來源）：永久優先，否則取較久的；次數取大的。
+  // 兩邊都沒有 daily 欄位時不寫——舊匯出檔的 shape 不變。
+  if (cur.dailyDislikeUntil === 'forever' || inc.dailyDislikeUntil === 'forever') out.dailyDislikeUntil = 'forever'
+  else if (cur.dailyDislikeUntil !== undefined || inc.dailyDislikeUntil !== undefined) out.dailyDislikeUntil = Math.max(cur.dailyDislikeUntil ?? 0, inc.dailyDislikeUntil ?? 0)
+  if (cur.dailyDislikes !== undefined || inc.dailyDislikes !== undefined) out.dailyDislikes = Math.max(cur.dailyDislikes ?? 0, inc.dailyDislikes ?? 0)
   if (cur.fav || inc.fav) out.fav = true
   const brand = newer.brand ?? older.brand
   if (brand) out.brand = brand

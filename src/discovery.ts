@@ -67,7 +67,10 @@ export type CuisineGroup = (typeof CUISINE_GROUPS)[number]
 const TYPE_GROUP: Record<string, CuisineGroup> = {
   ramen_restaurant: 'ramen',
   japanese_restaurant: 'jp', sushi_restaurant: 'jp', japanese_izakaya_restaurant: 'jp', yakiniku_restaurant: 'jp',
-  yakitori_restaurant: 'jp', tonkatsu_restaurant: 'jp', japanese_curry_restaurant: 'jp', udon_noodle_restaurant: 'jp', soba_noodle_shop: 'jp',
+  yakitori_restaurant: 'jp', tonkatsu_restaurant: 'jp', japanese_curry_restaurant: 'jp',
+  // 註：烏龍麵／蕎麥麵專用類型不在 Google Table A（round 7 刪掉；那是 Business
+  // Profile 分類，不是 Places 類型）。真實的烏龍麵／蕎麥麵店在 Places 回的是
+  // noodle_shop／japanese_restaurant，上面已有。
   taiwanese_restaurant: 'tw',
   chinese_restaurant: 'cn', dim_sum_restaurant: 'cn', cantonese_restaurant: 'cn',
   korean_restaurant: 'kr', korean_barbecue_restaurant: 'kr',
