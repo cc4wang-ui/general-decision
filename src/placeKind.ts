@@ -66,6 +66,11 @@ export function normalizeKind(kind: string): string {
  */
 const NAME_KINDS: Array<[RegExp, string]> = [
   [/烏龍麵|うどん|udon|讃岐|さぬき|手打ち麺/i, 'udon'],
+  // 中華そば是拉麵的傳統名稱（小麥麵＋醬油湯），不是蕎麥麵：名字裡的「そば」
+  // 會命中下一條蕎麥麵正則，所以這條必須放在蕎麥麵之前先判（紅隊 round 3
+  // Finding B：中華そば 青葉被誤判成 soba，按「不要蕎麥麵」會把拉麵店擋到 422）。
+  // 異體字「中華蕎麦」同理。類型優先於店名，primaryType 明確時不受影響。
+  [/中華そば|中華蕎麦/i, 'ramen'],
   [/蕎麥麵|蕎麦|そば|soba/i, 'soba'],
   [/拉麵|拉麺|らーめん|ラーメン|ramen/i, 'ramen'],
   [/壽司|すし|スシ|寿司|sushi/i, 'sushi'],

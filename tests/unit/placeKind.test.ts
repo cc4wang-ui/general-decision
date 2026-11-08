@@ -70,6 +70,20 @@ describe('kindOfCandidate：漏掉的關鍵字（紅隊 round 2 Finding 2）', (
   })
 })
 
+describe('kindOfCandidate：中華そば是拉麵（紅隊 round 3 Finding B）', () => {
+  it('中華そば 青葉（拉麵店）→ ramen：名字裡的「そば」不能算蕎麥麵', () => {
+    expect(kindOfCandidate(cand('中華そば 青葉'))).toBe('ramen')
+  })
+  it('中華蕎麦（異體字）→ ramen', () => {
+    expect(kindOfCandidate(cand('中華蕎麦 喜多方'))).toBe('ramen')
+  })
+  it('守衛沒有誤傷既有案例：麺喜やしま還是 udon、藪蕎麦還是 soba、麺処ほん田還是 undefined', () => {
+    expect(kindOfCandidate(cand('麺喜やしま'))).toBe('udon')
+    expect(kindOfCandidate(cand('藪蕎麦'))).toBe('soba')
+    expect(kindOfCandidate(cand('麺処ほん田'))).toBeUndefined()
+  })
+})
+
 describe('kindOfCandidate：已知限制——名字完全無訊號的店', () => {
   it('鳥貴族（串燒連鎖）→ undefined：名字無關鍵字，店名啟發式無解，以類型為準', () => {
     expect(kindOfCandidate(cand('鳥貴族'))).toBeUndefined()

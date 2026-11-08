@@ -327,6 +327,11 @@ const wakohShop = place('wakoh-1', 35.691, 139.701, {
   displayName: { text: 'とんかつ和幸' }, rating: 4.1, userRatingCount: 500,
   types: ['restaurant'], primaryType: 'restaurant',
 })
+/** 真實店名 mock（紅隊 round 3 Finding B）：中華そば 青葉是拉麵店，名字裡的「そば」不能算蕎麥麵。 */
+const chukaSobaShop = place('chuka-soba-1', 35.691, 139.701, {
+  displayName: { text: '中華そば 青葉' }, rating: 4.3, userRatingCount: 400,
+  types: ['restaurant'], primaryType: 'restaurant',
+})
 
 describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
   /** 池子裡只有一家店：被排除就 422，選中才是沒被誤判。 */
@@ -372,6 +377,38 @@ describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
   })
 })
 
+describe('種類判斷修正（紅隊 round 3 Finding B：中華そば）', () => {
+  /** 池子裡只有一家店：被排除就 422，選中才是沒被誤判。 */
+  function mockSingle(first: unknown) {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [first] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f }
+  }
+  it("excludeKinds ['soba']：池子只有中華そば 青葉（拉麵店）時要選中它，不能 422", async () => {
+    const g = mockSingle(chukaSobaShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('chuka-soba-1')
+  })
+  it("excludeKinds ['ramen']：中華そば 青葉被選走時，對照店要能補上（種類判 ramen 才有排除效果）", async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [chukaSobaShop, validShop('ok1', 0)] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    void f
+    const res = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+  })
+})
+
 describe('舊版殘留候選重驗（紅隊 round 2 Finding 4）', () => {
   const stationCandidate = {
     id: 'shibuya-station', name: '渋谷駅', address: '渋谷駅地下 1F',
@@ -394,5 +431,19 @@ describe('舊版殘留候選重驗（紅隊 round 2 Finding 4）', () => {
     expect(res.status).toBe(200)
     const data = await res.json() as { stops: { candidate?: { id: string } }[] }
     expect(data.stops[0]!.candidate?.id).toBe('shibuya-station')
+  })
+  it('meal 站帶渋谷駅候選、shuffle 目標是 coffee：meal 一樣重找，不保留車站候選（紅隊 round 3 Finding A）', async () => {
+    const g = mockGoogleSinglePage()
+    const res = await handler(post({ origin: HERE, shuffle: 'coffee', stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, place: '渋谷駅地下 1F', candidate: stationCandidate },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60 },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { id: string; candidate?: { id: string } }[] }
+    const meal = data.stops.find((s) => s.id === 'meal')
+    expect(meal?.candidate?.id).not.toBe('shibuya-station')
+    expect(['m1', 'm2', 'm3', 'm4', 'm5']).toContain(meal?.candidate?.id)
+    // meal 走通用定食查詢重找（不是車站地址），coffee 照常查。
+    expect(g.places().map((c) => String(c.body.textQuery))).toEqual(['Japanese set meal restaurant', 'quiet specialty coffee cafe'])
   })
 })

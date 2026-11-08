@@ -98,8 +98,13 @@ async function handler(req:Request):Promise<Response>{
    const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
    const stale=auto&&!!s.candidate&&isDeniedCandidate(s.candidate)
    const stop=stale?{...s,candidate:undefined,place:undefined}:s
-   if(stop.candidate && (!shuffle || s.id!==shuffle)){result.push(s);continue}
-   if(shuffle&&s.id!==shuffle){result.push(s);continue}
+   // 殘留候選清掉後推清過的 stop（不是原始的 s）。第一分支在 stop.candidate
+   // 存在時才走，那時 stale 一定是 false、stop 就是 s，行為不變，只是寫法統一。
+   if(stop.candidate && (!shuffle || s.id!==shuffle)){result.push(stop);continue}
+   // shuffle 別站時原樣保留其他站——但殘留候選的站不走這條：它要掉下去重找，
+   // 否則清掉的車站候選會被原樣推回去（紅隊 round 3 Finding A）。只推 stop
+   // 不夠：推了沒候選的 stop，下游 unresolved 檢查會整單 422，還是沒有重找。
+   if(shuffle&&s.id!==shuffle&&!stale){result.push(stop);continue}
    // Explicitly named or fixed locations are resolved, never replaced by another business.
    const preserve=s.done||s.locked||s.custom
    const named=stop.place&&stop.place!== '澀谷站周邊'&&!stop.place.includes('周邊')&&!stop.place.includes('／')&&!stop.place.includes('（')
