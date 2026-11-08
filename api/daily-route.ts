@@ -174,14 +174,30 @@ async function handler(req:Request):Promise<Response>{
    center={lat:origins[0].lat,lng:origins[0].lng};origin=origins[0]
   }
   const result:Stop[]=[]
+  /**
+   * 本請求已挑出的店（round 10，紅隊 round 9 R9-K1）：`others` 是請求開始時的
+   * 快照，只防「請求前已存在」的重複——迴圈內新挑的店、以及保留下來的既有候選，
+   * 要即時加進這份集合，後面站的 eligible 過濾同時排除它。否則同一請求內兩站
+   * 同時重找會挑到同一家店（meal shuffle＋coffee 候選被排除，兩站池子都只有
+   * 同一間 `dup-1` → 回應裡兩站的 candidate 都是 `dup-1`；完整重新生成連
+   * `others` 都不送，防重複機制完全缺席——地區偏好開啟後兩站舊候選都在地區外，
+   * 一起重找就是現實觸發條件）。
+   * 注意：不能直接拿 `others` 當這份集合——others 含其他站「自己的」現任候選
+   * （othersFor 送的是除了被換那站以外所有站的候選），保留重驗時自己的候選也
+   * 在裡面，會把全部站都判成不保留（round 8 K1 的反面）。所以 `picked` 從空集
+   * 合開始，只在迴圈內累積：保留的站加進去、新挑的站加進去。
+   */
+  const picked = new Set<string>()
   for(const s of stops){
    // 「散步回家」不查店：只是一段文字提醒。舊資料裡殘留的車站候選也在這裡清掉。
    if(isTextOnlyRest(s)){result.push({...s,candidate:undefined});continue}
    // 既有候選先重驗（round 7，L1／L2）：通過才保留；不通過就清掉重找，不再原樣推回。
    // 規則見 retentionOk：id／種類排除對所有站生效，DENY／評論／地區只對自動站。
+   // round 10：已經被本請求前面站挑走（或保留）的店不能再保留——否則同一家店
+   // 出現在行程兩站（R9-K1：兩站舊候選本來就是同一間，或前面站剛挑了這間）。
    const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
-   const retained=!!s.candidate&&retentionOk(s.candidate,s,{excluded,excludeKinds,areaPref})
-   if(retained&&(!shuffle||s.id!==shuffle)){result.push(s);continue}
+   const retained=!!s.candidate&&!picked.has(s.candidate.id)&&retentionOk(s.candidate,s,{excluded,excludeKinds,areaPref})
+   if(retained&&(!shuffle||s.id!==shuffle)){picked.add(s.candidate!.id);result.push(s);continue}
    // 候選沒通過重驗（或本來就沒有、或是要換的站）：清掉再重找。自動站的 place
    // 是候選帶來的地名，一起丟掉；指定／固定站的 place 是使用者輸入的，留著
    // （重找失敗時該站顯示無候選，地點文字還在）。
@@ -206,10 +222,12 @@ async function handler(req:Request):Promise<Response>{
     sawAny=sawAny||found.places.length>0
     // 翻頁時也要記錄「有店回來但被地區擋掉」：那是無候選的原因（area），不是「什麼都沒有」（empty）。
     if(areaPref&&found.places.some(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&!areaOk(p,s,areaPref)))sawAreaBlocked=true
-    // eligible 過濾：exclude（使用者不要的店）＋others（其他站現任候選，防重複）。
+    // eligible 過濾：exclude（使用者不要的店）＋others（其他站現任候選，防重複）
+    // ＋picked（本請求前面站已經挑走／保留的店，round 10 R9-K1：同一請求內
+    // 後處理的站不能再挑同一間）。
     // others 只在這裡用，絕對不進 retentionOk（round 8 K1：否則單站 shuffle
     // 會連帶清掉其他站的候選）。
-    eligible=found.places.filter(p=>!excluded.includes(p.id)&&!others.includes(p.id)&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
+    eligible=found.places.filter(p=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
     if(eligible.length||!found.nextPageToken)break
     pageToken=found.nextPageToken
    }
@@ -226,6 +244,8 @@ async function handler(req:Request):Promise<Response>{
    // 每次 shuffle 排除掉已出現的，本來就會往下走；隨機是為了每天開局不永遠是同一間。
    const top=ranked.slice(0,5)
    const selected=top[randomIndex(top.length)]!
+   // 本請求已挑出：後面站的 eligible 過濾與保留重驗都要排除這間（round 10 R9-K1）。
+   picked.add(selected.id)
    result.push({...stop,title:preserve?stop.title:selected.name,place:selected.address,candidate:selected,noCandidate:undefined,noCandidateReason:undefined})
   }
   const ordered=order(result,center)

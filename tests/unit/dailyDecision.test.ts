@@ -447,3 +447,71 @@ describe('排除清單截斷通知（round 7）', () => {
     expect(excludeFor(s, 'meal', ['p1'])).toEqual(excludeForInfo(s, 'meal', ['p1']).list)
   })
 })
+
+describe('round 10：R9-F1a-load——載入時清掉候選要說原因（不是只留舊店名）', () => {
+  beforeEach(() => { localStorage.clear() })
+  afterEach(() => { localStorage.clear() })
+  const stationCand = { id: 'shibuya-station', name: '渋谷駅', address: '渋谷駅地下 1F', mapUrl: 'https://maps.google.com/?cid=shibuya-station', lat: 35.6595, lng: 139.7005, rating: 4.2, userRatingCount: 9000, types: ['transit_station', 'train_station'], primaryType: 'transit_station' }
+  const harajukuCand = { id: 'sugi-harajuku', name: 'スギ薬局 原宿店', address: '原宿', mapUrl: 'https://maps.google.com/?cid=sugi-harajuku', lat: 35.6704, lng: 139.7030, rating: 4.0, userRatingCount: 150, types: ['drugstore'], primaryType: 'drugstore' }
+  const seed = (tasks: unknown[], disliked: string[] = [], dislikedKinds: string[] = [], extra: Record<string, unknown> = {}) => {
+    localStorage.setItem(KEY, JSON.stringify({ day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', mode: 'creative', tasks, notes: [], avoid: [], seen: {}, disliked, dislikedKinds, ...extra }))
+  }
+  it('DENY 清掉：候選沒了、title 照留（round 9 F1a 不動），但該站標成 noCandidate 原因 denied（不再只剩舊店名加一句「地點尚未確認」）', () => {
+    const meal = { id: 'meal', title: '麺喜やしま', minutes: 45, kind: 'meal', done: false, place: '渋谷駅地下 1F', candidate: stationCand }
+    const out = clearStaleCandidate(meal as DailyTask)
+    expect(out.candidate).toBeUndefined()
+    expect(out.title).toBe('麺喜やしま')
+    expect(out.noCandidate).toBe(true)
+    expect(out.noCandidateReason).toBe('denied')
+  })
+  it('評論數 12 則清掉：noCandidate 原因 filtered、title 照留', () => {
+    const lowCand = { id: 'sundrug-shibuya', name: 'サンドラッグ 渋谷店', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=sundrug-shibuya', lat: 35.6590, lng: 139.7010, rating: 4.1, userRatingCount: 12, types: ['drugstore'], primaryType: 'drugstore' }
+    const shopping = { id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, candidate: lowCand }
+    const out = clearStaleCandidate(shopping as DailyTask, { disliked: [], dislikedKinds: [], area: '澀谷', areaOnly: false })
+    expect(out.candidate).toBeUndefined()
+    expect(out.title).toBe('藥局')
+    expect(out.noCandidate).toBe(true)
+    expect(out.noCandidateReason).toBe('filtered')
+  })
+  it('跨區清掉：noCandidate 原因 area、title 照留', () => {
+    const shopping = { id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, candidate: harajukuCand }
+    const out = clearStaleCandidate(shopping as DailyTask, { disliked: [], dislikedKinds: [], area: '澀谷', areaOnly: true })
+    expect(out.candidate).toBeUndefined()
+    expect(out.title).toBe('藥局')
+    expect(out.noCandidate).toBe(true)
+    expect(out.noCandidateReason).toBe('area')
+  })
+  it('rest 帶車站候選：候選清掉、不標 noCandidate（rest 是純文字站，顯示「散步回家，不用找店家。」就好）', () => {
+    const rest = { id: 'rest', title: '散步回家', minutes: 75, kind: 'rest', done: false, candidate: stationCand }
+    const out = clearStaleCandidate(rest as DailyTask)
+    expect(out.candidate).toBeUndefined()
+    expect(out.title).toBe('散步回家')
+    expect(out.noCandidate).toBeUndefined()
+  })
+  it('被不喜歡清掉：title 照還原成目錄標題、不標 noCandidate——F1a 的範圍不動（原因在伺服器端已經是無候選卡片，標題還原是該路徑的行為）', () => {
+    const dislikedMeal = { id: 'meal', title: '麺喜やしま', minutes: 45, kind: 'meal', done: false, candidate: { id: 'y1', name: '麺喜やしま', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=y1', lat: 35.66, lng: 139.70, userRatingCount: 808 } }
+    const out = clearStaleCandidate(dislikedMeal as DailyTask, { disliked: ['y1'], dislikedKinds: [], area: '澀谷', areaOnly: false })
+    expect(out.candidate).toBeUndefined()
+    expect(out.title).toBe('澀谷｜一人友善的日式定食')
+    expect(out.noCandidate).toBeUndefined()
+  })
+  it('noCandidateText：denied 原因寫明是車站或地標、叫使用者按「換這一站」', () => {
+    const t = { id: 'meal', title: '麺喜やしま', minutes: 45, kind: 'meal' as const, done: false, noCandidate: true, noCandidateReason: 'denied' as const }
+    expect(noCandidateText(t, '澀谷')).toContain('車站或地標')
+    expect(noCandidateText(t, '澀谷')).toContain('換這一站')
+  })
+  it('經 loadDaily 走一遍：DENY 的 meal 載入後就是 noCandidate denied、title 照留；跨區的 shopping 載入後是 noCandidate area', () => {
+    const meal = { id: 'meal', title: '麺喜やしま', minutes: 45, kind: 'meal', done: false, place: '渋谷駅地下 1F', candidate: stationCand }
+    const shopping = { id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, candidate: harajukuCand }
+    seed([meal, shopping])
+    const out = loadDaily()
+    const loadedMeal = out.tasks.find((t) => t.id === 'meal')!
+    expect(loadedMeal.candidate).toBeUndefined()
+    expect(loadedMeal.title).toBe('麺喜やしま')
+    expect(loadedMeal.noCandidate).toBe(true)
+    expect(loadedMeal.noCandidateReason).toBe('denied')
+    const loadedShopping = out.tasks.find((t) => t.id === 'shopping')!
+    expect(loadedShopping.noCandidate).toBe(true)
+    expect(loadedShopping.noCandidateReason).toBe('area')
+  })
+})

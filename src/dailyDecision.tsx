@@ -2,12 +2,12 @@ import { useState } from 'react'
 import './dailyDecision.css'
 import { PlacePhoto } from './PlacePhoto.tsx'
 import { getLocation, type GeoReason } from './api.ts'
-import { blockedPlaceIds, clearDislike, markNeverAgain } from './placeMem.ts'
+import { blockedPlaceIds, clearDislike, markDailyDislike } from './placeMem.ts'
 import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
 import { isDeniedCandidate, MIN_REVIEWS } from './venueCheck.ts'
 import { AREA_NAMES, withinArea } from './areas.ts'
 
-export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty' }
+export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied' }
 export type DailyState = {
   day: string; area: string; currentPlace: string; mode: 'creative'|'practical'
   tasks: DailyTask[]; notes: string[]; avoid: string[]
@@ -19,7 +19,7 @@ export type DailyState = {
   routedFrom?: string
   /** 每站換掉過的 place_id（今天）。shuffle 時一起送去排除，否則排序固定、只排除當下一間，永遠在前兩名來回跳。 */
   seen?: Record<string, string[]>
-  /** 按過「不喜歡這間店」的 place_id。跨天保留；同時寫進核心班長 app 的 placeMem 記憶（markNeverAgain），生成／shuffle 前也會把 placeMem 的封鎖清單讀回來併進排除清單。 */
+  /** 按過「不喜歡這間店」的 place_id。跨天保留；同時寫進核心班長 app 的 placeMem 記憶（markDailyDislike，round 10 起跟核心 app 的「不要再來」分來源記），生成／shuffle 前也會把 placeMem 的封鎖清單讀回來併進排除清單。 */
   disliked?: string[]
   /** 按過「不要這類」的種類鍵（例如 'udon'）。跨天保留；生成與 shuffle 都排除。 */
   dislikedKinds?: string[]
@@ -64,6 +64,12 @@ export type StaleContext = { disliked: string[]; dislikedKinds: string[]; area: 
  *   評論數、跨區、rest）清候選就好，不動標題——round 8 把標題還原套到所有
  *   清掉原因，舊存檔候選缺評論數欄位時連標題也被換成目錄標題（round 9 F1：
  *   e2e daily-location.spec.ts:69 迴歸）。
+ * - 但「不動標題」不代表「不說原因」（round 10，紅隊 round 9 R9-F1a-load）：
+ *   DENY／評論數／跨區清掉時，該站標成 noCandidate 並帶原因，卡片顯示原因
+ *   與對應控制（地區連結／清除按鈕），而不是只留舊店名加一句「地點尚未確認」。
+ *   標題本身照留（round 9 F1a 的範圍不動），原因寫在卡片內文。rest 例外：
+ *   rest 是純文字站，清掉殘留候選後照樣顯示「散步回家，不用找店家。」，
+ *   不標 noCandidate。
  * - 評論數缺欄位＝未知，不清掉：舊存檔候選本來就可能沒有 userRatingCount，
  *   缺欄位當成 0 會把整條舊行程的候選在載入時全清掉。只在欄位存在且 < 50
  *   時清。伺服器端 retentionOk 同一規則（新查到的候選是另一條規則 venueOk：
@@ -86,18 +92,22 @@ export function clearStaleCandidate(t: DailyTask, ctx: StaleContext = { disliked
   if (t.locked || t.custom || t.specified) return t
   if (t.kind === 'rest') return clearedKeepTitle
   if (t.done) return t
-  if (isDeniedCandidate(t.candidate)) return clearedKeepTitle
+  // round 10（R9-F1a-load）：DENY／評論數／跨區清掉時，標題照留（round 9 F1a），
+  // 但該站要標成 noCandidate 並帶原因——否則卡片只剩舊店名加一句「地點尚未確認」，
+  // 使用者不知道為什麼、也沒有地區連結／清除按鈕（live round 7 N5 的模式回歸）。
+  if (isDeniedCandidate(t.candidate)) return { ...clearedKeepTitle, noCandidate: true, noCandidateReason: 'denied' }
   // 評論數缺欄位＝未知，不清掉（round 9 F1b）：舊存檔候選本來就可能沒有
   // userRatingCount（Places 回應不一定有），缺欄位當成 0 會把整條舊行程的候選
   // 在載入時全清掉。只在欄位存在且 < 50 時清。伺服器端 retentionOk 同一規則。
-  if (t.id !== 'gym' && t.kind !== 'gym' && t.candidate.userRatingCount !== undefined && t.candidate.userRatingCount < MIN_REVIEWS) return clearedKeepTitle
-  if (ctx.areaOnly && !withinArea(ctx.area, t.candidate)) return clearedKeepTitle
+  if (t.id !== 'gym' && t.kind !== 'gym' && t.candidate.userRatingCount !== undefined && t.candidate.userRatingCount < MIN_REVIEWS) return { ...clearedKeepTitle, noCandidate: true, noCandidateReason: 'filtered' }
+  if (ctx.areaOnly && !withinArea(ctx.area, t.candidate)) return { ...clearedKeepTitle, noCandidate: true, noCandidateReason: 'area' }
   return t
 }
 /** 無候選站的顯示文字：按原因給不同的下一步（area 時寫明地區偏好是原因）。 */
 export function noCandidateText(t: DailyTask, area: string): string {
   if (t.noCandidateReason === 'area') return `這一站沒有符合條件的店家。地區偏好（${area}，1 公里內）可能擋住了附近的店：關掉「只在這一帶找店」或改選其他地區再試。`
   if (t.noCandidateReason === 'filtered') return '這一站沒有符合條件的店家：符合的店都被排除了（不喜歡／種類／評論數）。清除「不喜歡」的紀錄或放寬條件再試。'
+  if (t.noCandidateReason === 'denied') return '這一站之前選的地點是車站或地標，不是可拜訪的店家。請按「換這一站」重新搜尋。'
   return '這一站找不到店家。換個出發地或條件再試。'
 }
 export function loadDaily(): DailyState {
@@ -300,11 +310,11 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     change(s=>({ ...s, notes:[...s.notes,v].slice(-20) }))
     setFeedback('')
   }
-  /** 「不喜歡這間店」：記進 disliked（跨天保留）＋共用核心班長 app 的 placeMem 記憶，然後立刻換一間。 */
+  /** 「不喜歡這間店」：記進 disliked（跨天保留）＋共用核心班長 app 的 placeMem 記憶（round 10 起用 markDailyDislike，跟核心 app 的「不要再來」分來源記——兩邊各按一次是 90 天不是永久；清掉今日行程的紀錄也不會連核心 app 的封鎖一起清掉），然後立刻換一間。 */
   const dislikeStop = (t: DailyTask) => {
     const id=t.candidate?.id
     if(!id||busy!==null)return
-    void markNeverAgain(id, Date.now(), 'eat')
+    void markDailyDislike(id, Date.now())
     const prev=state.disliked??[]
     // 上限留最新的 100 家：滿了就移除最舊的一家，並明確提示，不要靜默丟掉剛按的「不喜歡」。
     const capped=[...new Set([...prev,id])].slice(-100)
@@ -328,17 +338,24 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
    * 紀錄——不加控制，文案說「清除『不喜歡』的紀錄」是死路；只改文案（例如「等
    * 100 家滿了自動移除最舊的」）雖然是真的行為，但使用者當下還是卡著。
    * 清掉今日行程的 disliked／dislikedKinds，同時解除 placeMem 裡這些店的封鎖
-   * （只清封鎖，不動 shown／done／愛店）；核心班長 app 裡直接按「不要再來」的
-   * 店不在這份清單裡，不會被一起清掉。清完使用者要按「換這一站」或「重新產生」
-   * 才會重找——這裡只清紀錄，不自動重搜。
+   * （只清封鎖，不動 shown／done／愛店）。round 10 起 placeMem 分來源記
+   * （R9-F7-leak）：清掉的是今日行程這邊的封鎖，核心班長 app 裡直接按
+   * 「不要再來」的封鎖不動——分來源之前的舊紀錄沒有 daily 欄位，照舊版行為
+   * 清掉共用欄位（見 placeMem.ts clearDislike 的過渡註解）。清完使用者要按
+   * 「換這一站」或「重新產生」才會重找——這裡只清紀錄，不自動重搜。
+   * placeMem 寫入失敗時不要先報成功（round 10，R9-clear-swallow）：失敗時本地
+   * 清單不動、顯示寫入失敗，使用者可以再按一次；成功時才清清單、顯示確認。
    */
   const clearDisliked = () => {
     const ids = state.disliked ?? []
     const kinds = state.dislikedKinds ?? []
     if (!ids.length && !kinds.length) { setNotice('目前沒有「不喜歡」的紀錄。'); return }
-    void Promise.all(ids.map((id) => clearDislike(id))).catch(() => {})
-    change((s) => ({ ...s, disliked: [], dislikedKinds: [] }))
-    setNotice(`已清除 ${ids.length} 家「不喜歡」的店${kinds.length ? `與 ${kinds.length} 種「不要這類」` : ''}，可以重新搜尋。`)
+    void Promise.all(ids.map((id) => clearDislike(id))).then(() => {
+      change((s) => ({ ...s, disliked: [], dislikedKinds: [] }))
+      setNotice(`已清除 ${ids.length} 家「不喜歡」的店${kinds.length ? `與 ${kinds.length} 種「不要這類」` : ''}，可以重新搜尋。`)
+    }).catch(() => {
+      setNotice('清除失敗：無法寫入封鎖紀錄，「不喜歡」的店還在，請再試一次。')
+    })
   }
   const completed=state.tasks.filter(t=>t.done).length
   return <section className="screen dd" data-screen="daily-decision">

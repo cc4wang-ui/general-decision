@@ -70,7 +70,14 @@ export interface PlaceMemEntry {
   done: number[] // ≤ 10，新的在前
   doneCount?: number // 累計完成次數（done 只留 10 筆）；舊資料沒有這欄就用 done.length
   dislikeUntil?: number | 'forever'
-  dislikes: number // never_again 次數；第 2 次 → forever
+  dislikes: number // never_again 次數；第 2 次 → forever（核心 app「不要再來」的次數）
+  /** 今日行程「不喜歡這間店」的封鎖（round 10，R9-F7-leak：跟核心 app 分來源記）。
+   * 舊版兩邊共用 dislikeUntil／dislikes：今日行程清掉「不喜歡」時，核心 app
+   * 直接按「不要再來」的封鎖也被一起清掉。分開之後兩邊次數與封鎖期各自算——
+   * 今日行程按兩次才永久，核心 app 按兩次才永久，兩邊各按一次是 90 天不是永久。
+   * 分來源之前的舊紀錄沒有這兩個欄位（見 placeMem.ts clearDislike 的過渡註解）。 */
+  dailyDislikeUntil?: number | 'forever'
+  dailyDislikes?: number // 今日行程「不喜歡」次數；第 2 次 → forever
   fav?: boolean
   brand?: string // 我方品牌鍵
   cuisine?: string // 細類鍵（src/discovery.ts cuisineOf）

@@ -388,3 +388,46 @@ describe('round 9 F2：TYPE_KINDS 補最後 4 個官方 Table A 類型（coffee_
     expect(kindOfCandidate(cand('ピザ宅配', 'pizza_delivery', ['pizza_delivery']))).toBeUndefined()
   })
 })
+
+describe('round 10：紅隊 round 9 B1～B4（新店名變體＋片假名正規化＋つけそば消歧義）', () => {
+  it('B1：えびそば／鯛そば是拉麵——えびそば一幻、えびそば緋彩、鯛そば・茶漬 磯LABO（紅隊 round 9 B1，皆真實拉麵店）', () => {
+    for (const name of ['えびそば一幻', 'えびそば緋彩', '鯛そば・茶漬 磯LABO']) {
+      expect(kindOfCandidate(cand(name)), name).toBe('ramen')
+    }
+    // 海老そば也是拉麵寫法（同一標記的漢字形）
+    expect(kindOfCandidate(cand('海老そば 一幻'))).toBe('ramen')
+  })
+  it('B1 控制組：えびすそば（盛岡蕎麥麵店，「えびす」不是「えびそば」）照樣是 soba；よもだそば、手打蕎麦ふじや照樣是 soba', () => {
+    expect(kindOfCandidate(cand('えびすそば'))).toBe('soba')
+    expect(kindOfCandidate(cand('よもだそば'))).toBe('soba')
+    expect(kindOfCandidate(cand('手打蕎麦ふじや'))).toBe('soba')
+  })
+  it('B2：つけそば／つけ蕎麦靠字體消歧義——平假名つけそば是拉麵，漢字つけ蕎麦是蕎麥麵（紅隊 round 9 B2；跟鴨そば／鴨蕎麦同一原則）', () => {
+    // 拉麵：平假名つけそば（つけそば 弐天、つけそば神田勝本、つけそば 周，皆真實拉麵店）
+    for (const name of ['つけそば 弐天', 'つけそば神田勝本', 'つけそば 周']) {
+      expect(kindOfCandidate(cand(name)), name).toBe('ramen')
+    }
+    // 蕎麥麵：漢字つけ蕎麦（つけ蕎麦 安土、つけ蕎麦 周庵，皆真實蕎麥麵店）
+    for (const name of ['つけ蕎麦 安土', 'つけ蕎麦 周庵']) {
+      expect(kindOfCandidate(cand(name)), name).toBe('soba')
+    }
+    // つけ麺（沾麵）不動，還是拉麵
+    expect(kindOfCandidate(cand('つけ麺 さなだ'))).toBe('ramen')
+  })
+  it('B3：片假名ソバ／ウドン／サヌキ在 normalizeName 統一轉平假名——煮干中華ソバ イチカワ（真實拉麵店）是拉麵', () => {
+    expect(kindOfCandidate(cand('煮干中華ソバ イチカワ'))).toBe('ramen')
+    // 正規化是結構性修法：四條正則一次全覆蓋。片假名ウドン／サヌキ也一樣（沒有找到真實片假名店名，用合成名測正規化本身）
+    expect(kindOfCandidate(cand('テストウドン'))).toBe('udon')
+    expect(kindOfCandidate(cand('テストサヌキ'))).toBe('udon')
+    expect(kindOfCandidate(cand('塩ソバ テスト'))).toBe('ramen')
+  })
+  it('B4：串鳥是串燒、やきにく是燒肉——串鳥、やきにくガッッツ、京やきにく れんぞう、やきにく やん（紅隊 round 9 B4，皆真實店名）', () => {
+    expect(kindOfCandidate(cand('串鳥'))).toBe('yakitori')
+    for (const name of ['やきにくガッッツ', '京やきにく れんぞう', 'やきにく やん']) {
+      expect(kindOfCandidate(cand(name)), name).toBe('yakiniku')
+    }
+    // 既有的焼肉／やきとり寫法不受影響
+    expect(kindOfCandidate(cand('叙々苑', 'yakiniku_restaurant', ['yakiniku_restaurant']))).toBe('yakiniku')
+    expect(kindOfCandidate(cand('やきとり大吉'))).toBe('yakitori')
+  })
+})

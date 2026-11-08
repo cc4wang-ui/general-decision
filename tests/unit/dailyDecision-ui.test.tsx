@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../src/placeMem.ts', () => ({
   blockedPlaceIds: async () => Array.from({ length: 150 }, (_, i) => 'p' + i),
   markNeverAgain: async () => {},
-  clearDislike: async () => {},
+  markDailyDislike: async () => {},
+  clearDislike: vi.fn(async () => {}),
 }))
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { DailyDecision } from '../../src/dailyDecision.tsx'
@@ -215,5 +216,41 @@ describe('排除清單截斷通知（round 7）', () => {
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.click(screen.getByTestId('daily-generate'))
     await waitFor(() => expect(screen.getByText(/排除清單已滿（上限 200）：50 個/)).toBeTruthy())
+  })
+})
+
+describe('round 10：F1a-load（載入清掉的車站候選要說原因）＋ clear-swallow（清除失敗要報錯）', () => {
+  const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
+  it('F1a-load：舊存檔的 meal 帶車站候選，載入後卡片顯示 denied 原因（車站或地標），不是只留舊店名', async () => {
+    const stationCand = { id: 'shibuya-station', name: '渋谷駅', address: '渋谷駅地下 1F', mapUrl: 'https://maps.google.com/?cid=shibuya-station', lat: 35.6595, lng: 139.7005, rating: 4.2, userRatingCount: 9000, types: ['transit_station', 'train_station'], primaryType: 'transit_station' }
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', mode: 'creative',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, place: '渋谷駅地下 1F', candidate: stationCand }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.getByText(/這一站之前選的地點是車站或地標/)).toBeTruthy()
+    expect(screen.getByText(/請按「換這一站」重新搜尋/)).toBeTruthy()
+    // 標題照留（round 9 F1a），但卡片不再「只剩舊店名加一句地點尚未確認」
+    expect(screen.getByText('↻ 換這一站')).toBeTruthy()
+  })
+  it('clear-swallow：placeMem 寫入失敗時顯示失敗、不報成功，localStorage 的 disliked 不動（可以再按一次）', async () => {
+    const { clearDislike } = await import('../../src/placeMem.ts')
+    vi.mocked(clearDislike).mockRejectedValueOnce(new Error('IndexedDB 寫入失敗'))
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      tasks: [{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'filtered' }],
+      notes: [], avoid: [], seen: {}, disliked: ['d1', 'd2'], dislikedKinds: ['udon'],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByText('清除「不喜歡」的紀錄'))
+    await waitFor(() => expect(screen.getByText(/清除失敗：無法寫入封鎖紀錄/)).toBeTruthy())
+    expect(screen.queryByText(/已清除 2 家/)).toBeNull()
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { disliked: string[]; dislikedKinds: string[] }
+    expect(saved.disliked).toEqual(['d1', 'd2'])
+    expect(saved.dislikedKinds).toEqual(['udon'])
   })
 })

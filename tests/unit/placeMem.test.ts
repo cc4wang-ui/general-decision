@@ -11,8 +11,8 @@ vi.mock('idb-keyval', () => ({
 
 const {
   CLOSED_MS, KEEP_EVENTS, NEVER_AGAIN_MS, MAX_ENTRIES, REPEAT_MS,
-  allMem, blockedPlaceIds, clearDislike, clearPlaceMem, cuisineStats, discoveryStats, getMem, markClosed, markDone, markNeverAgain,
-  markNotThisKind, markRepeat, markShown, memSummary, setFav,
+  allMem, blockedPlaceIds, clearDislike, clearPlaceMem, cuisineStats, discoveryStats, getMem, markClosed, markDailyDislike, markDone, markNeverAgain,
+  markNotThisKind, markRepeat, markShown, memSummary, mergeEntry, setFav,
 } = await import('../../src/placeMem.ts')
 
 const DAY = 24 * 3600 * 1000
@@ -316,5 +316,71 @@ describe('clearDislike：解除一間店的「不要再來」封鎖（round 8，
   it('沒有這家店的紀錄時什麼都不做、不報錯', async () => {
     await clearDislike('no-such-place')
     expect(await allMem()).toEqual([])
+  })
+})
+
+describe('round 10：今日行程「不喜歡」跟核心 app「不要再來」分來源記（R9-F7-leak）', () => {
+  it('兩邊都按過：清掉今日行程的封鎖，核心 app 的封鎖還在（舊版會一起清掉）', async () => {
+    await markNeverAgain('p1', T0)
+    await markDailyDislike('p1', T0)
+    expect((await blockedPlaceIds(T0 + DAY))).toContain('p1')
+    await clearDislike('p1')
+    const e = (await getMem('p1'))!
+    expect(e.dailyDislikeUntil).toBeUndefined()
+    expect(e.dailyDislikes).toBe(0)
+    expect(e.dislikeUntil).toBe(T0 + NEVER_AGAIN_MS) // 核心 app 的封鎖不動
+    expect(e.dislikes).toBe(1)
+    expect((await blockedPlaceIds(T0 + DAY))).toContain('p1')
+  })
+  it('只有今日行程按過：clearDislike 清掉它，之後不再封鎖', async () => {
+    await markDailyDislike('p1', T0)
+    expect((await blockedPlaceIds(T0 + DAY))).toContain('p1')
+    await clearDislike('p1')
+    expect((await blockedPlaceIds(T0 + DAY))).not.toContain('p1')
+  })
+  it('今日行程按兩次 → 永久；清掉之後再按一次是 90 天不是永久（次數歸零了）', async () => {
+    await markDailyDislike('p1', T0)
+    await markDailyDislike('p1', T0 + DAY)
+    expect((await getMem('p1'))!.dailyDislikeUntil).toBe('forever')
+    await clearDislike('p1')
+    await markDailyDislike('p1', T0 + 2 * DAY)
+    expect((await getMem('p1'))!.dailyDislikeUntil).toBe(T0 + 2 * DAY + NEVER_AGAIN_MS)
+  })
+  it('兩邊各按一次是 90 天不是永久（次數分開算）', async () => {
+    await markNeverAgain('p1', T0)
+    await markDailyDislike('p1', T0)
+    const e = (await getMem('p1'))!
+    expect(e.dislikes).toBe(1)
+    expect(e.dailyDislikes).toBe(1)
+    expect(e.dislikeUntil).toBe(T0 + NEVER_AGAIN_MS)
+    expect(e.dailyDislikeUntil).toBe(T0 + NEVER_AGAIN_MS)
+  })
+  it('memSummary 的 x 取兩邊封鎖期較久者（永久優先）', async () => {
+    await markNeverAgain('p1', T0)
+    await markDailyDislike('p1', T0 + 10 * DAY)
+    const [row] = await memSummary('eat', T0 + 11 * DAY)
+    expect(row.x).toBe(T0 + 10 * DAY + NEVER_AGAIN_MS)
+  })
+  it('過渡（grandfathering）：分來源之前的舊紀錄沒有 daily 欄位，clearDislike 照舊版清掉共用欄位（否則舊的「不喜歡」永遠清不掉）。注意：沒有 daily 欄位的紀錄分不出是「分來源之前的舊紀錄」還是「分來源之後只在核心 app 按過的」——後者在 UI 上不會被誤傷，因為 clearDislike 只會對今日行程 disliked 清單裡的 id 呼叫，而那份清單只收今日行程按過的店（按過就有 daily 欄位）。', async () => {
+    await markNeverAgain('p1', T0) // 舊版寫法：只有共用欄位，沒有 daily 欄位
+    const before = (await getMem('p1'))!
+    expect(before.dailyDislikes).toBeUndefined()
+    expect(before.dailyDislikeUntil).toBeUndefined()
+    await clearDislike('p1')
+    const e = (await getMem('p1'))!
+    expect(e.dislikeUntil).toBeUndefined()
+    expect(e.dislikes).toBe(0)
+    expect((await blockedPlaceIds(T0 + DAY))).not.toContain('p1')
+  })
+  it('mergeEntry 合併 daily 欄位：永久優先，否則取較久者；次數取大的；兩邊都沒有 daily 欄位時不寫', async () => {
+    const base = { id: 'p1', module: 'eat' as const, shown: [T0], done: [], dislikes: 0 }
+    const a = mergeEntry({ ...base, dailyDislikeUntil: T0 + 10 * DAY, dailyDislikes: 1 }, { ...base, dailyDislikeUntil: T0 + 20 * DAY, dailyDislikes: 2 })
+    expect(a.dailyDislikeUntil).toBe(T0 + 20 * DAY)
+    expect(a.dailyDislikes).toBe(2)
+    const b = mergeEntry({ ...base, dailyDislikeUntil: 'forever' as const, dailyDislikes: 2 }, { ...base, dailyDislikeUntil: T0 + 20 * DAY, dailyDislikes: 1 })
+    expect(b.dailyDislikeUntil).toBe('forever')
+    const c = mergeEntry({ ...base, dislikeUntil: T0 + 5 * DAY }, { ...base })
+    expect('dailyDislikeUntil' in c).toBe(false)
+    expect('dailyDislikes' in c).toBe(false)
   })
 })

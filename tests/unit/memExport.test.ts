@@ -57,8 +57,9 @@ describe('匯出格式', () => {
     expect(f.places.find((e) => e.id === 'p2')?.fav).toBe(true)
     expect(f.cuisine).toEqual({ fast: [2, 1], ramen: [1, 1.5] })
     // 只允許這幾個欄位：沒有 name、rating、lat 之類的 Google 內容
+    // （round 10：dailyDislikeUntil／dailyDislikes 是我們自己的封鎖欄位，不是 Google 內容）
     const keys = new Set(f.places.flatMap((e) => Object.keys(e)))
-    for (const k of keys) expect(['id', 'module', 'shown', 'done', 'doneCount', 'dislikes', 'dislikeUntil', 'fav', 'brand', 'cuisine']).toContain(k)
+    for (const k of keys) expect(['id', 'module', 'shown', 'done', 'doneCount', 'dislikes', 'dislikeUntil', 'dailyDislikeUntil', 'dailyDislikes', 'fav', 'brand', 'cuisine']).toContain(k)
   })
 
   it('沒有記憶也匯得出空檔', async () => {

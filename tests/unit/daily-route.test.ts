@@ -1414,3 +1414,160 @@ describe('round 9 F1b／F2：既有候選缺評論數＝未知（保留）、新
     expect(stopOf(await readStops(contrast), 'meal').candidate?.id).toBe('torikizoku-1')
   })
 })
+
+describe('round 10：R9-K1 同一請求內防重複（本請求已挑出的店）＋ B1／B2／B3／B4 伺服器雙向', () => {
+  const SHIBUYA = { lat: 35.6595, lng: 139.7005 } // 渋谷駅＝澀谷地區中心
+  type StopOut = { id: string; title?: string; candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }
+  const readStops = async (res: Response) => (await res.json() as { stops: StopOut[] }).stops
+  const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
+  /** 伺服器收到的既有候選是 lat／lng 形狀。 */
+  const cand = (p: ReturnType<typeof place>) => ({
+    id: p.id, name: p.displayName.text, address: p.formattedAddress, mapUrl: p.googleMapsUri,
+    lat: p.location.latitude, lng: p.location.longitude, rating: p.rating,
+    userRatingCount: p.userRatingCount, types: p.types, primaryType: p.primaryType,
+  })
+  /** 不論查詢都回同一池子（同一家店會出現在別站的查詢結果裡，live round 7 就有前例）。 */
+  function mockPool(places: unknown[]) {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+  }
+  it('R9-K1：兩站同時重找、池子只有同一間店 → 只有一站拿到它，另一站無候選，絕不重複（紅隊 round 9 的證明案例）', async () => {
+    const dup = place('dup-1', 35.691, 139.701, { displayName: { text: 'dup食堂' }, rating: 4.5, userRatingCount: 120, types: ['restaurant'], primaryType: 'restaurant' })
+    const oldMeal = validShop('old-meal', 0)
+    const oldCoffee = validShop('old-coffee', 0)
+    mockPool([dup])
+    // 兩站的現任候選都在 exclude 裡（被不喜歡），所以兩站都要重找；完整重新生成不帶 others
+    const res = await handler(post({ origin: HERE, exclude: ['old-meal', 'old-coffee'], stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: cand(oldMeal) },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60, candidate: cand(oldCoffee) },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    const got = stops.filter((s) => s.candidate?.id === 'dup-1')
+    expect(got).toHaveLength(1)
+    expect(stops.filter((s) => s.candidate).map((s) => s.candidate!.id)).toEqual(['dup-1'])
+    const noCand = stops.find((s) => s.noCandidate)
+    expect(noCand).toBeTruthy()
+    expect(noCand!.candidate).toBeUndefined()
+  })
+  it('R9-K1：順序反過來也一樣——coffee 先處理拿到店，meal 變無候選（picked 是迴圈內累積，不是請求前快照）', async () => {
+    const dup = place('dup-1', 35.691, 139.701, { displayName: { text: 'dup食堂' }, rating: 4.5, userRatingCount: 120, types: ['restaurant'], primaryType: 'restaurant' })
+    const oldMeal = validShop('old-meal', 0)
+    const oldCoffee = validShop('old-coffee', 0)
+    mockPool([dup])
+    const res = await handler(post({ origin: HERE, exclude: ['old-meal', 'old-coffee'], stops: [
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60, candidate: cand(oldCoffee) },
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: cand(oldMeal) },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    expect(stops.filter((s) => s.candidate?.id === 'dup-1')).toHaveLength(1)
+    expect(stopOf(stops, 'coffee').candidate?.id).toBe('dup-1')
+    expect(stopOf(stops, 'meal').noCandidate).toBe(true)
+  })
+  it('R9-K1：兩站舊候選本來就是同一間 → 第一站留著，第二站重找（池子只有它就變無候選，不重複）', async () => {
+    const dup = place('dup-1', 35.691, 139.701, { displayName: { text: 'dup食堂' }, rating: 4.5, userRatingCount: 120, types: ['restaurant'], primaryType: 'restaurant' })
+    mockPool([dup])
+    const res = await handler(post({ origin: HERE, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: cand(dup) },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60, candidate: cand(dup) },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    expect(stops.filter((s) => s.candidate?.id === 'dup-1')).toHaveLength(1)
+    expect(stopOf(stops, 'meal').candidate?.id).toBe('dup-1')
+    expect(stopOf(stops, 'coffee').noCandidate).toBe(true)
+  })
+  it('R9-K1：地區開啟後完整重新生成、兩站舊候選都在地區外一起重找、池子只有一間區內店 → 不重複（現實觸發條件）', async () => {
+    const inArea = place('in-area-1', 35.6590, 139.7010, { displayName: { text: '區內食堂' }, rating: 4.5, userRatingCount: 120, types: ['restaurant'], primaryType: 'restaurant' })
+    const harajukuMeal = place('old-meal-h', 35.6704, 139.7030, { displayName: { text: '原宿定食' }, rating: 4.5, userRatingCount: 120, types: ['restaurant'], primaryType: 'restaurant' })
+    const harajukuShop = place('old-shop-h', 35.6704, 139.7030, { displayName: { text: '原宿藥局' }, rating: 4.5, userRatingCount: 120, types: ['drugstore'], primaryType: 'drugstore' })
+    mockPool([inArea])
+    const res = await handler(post({ origin: SHIBUYA, area: '澀谷', areaOnly: true, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: cand(harajukuMeal) },
+      { id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30, candidate: cand(harajukuShop) },
+    ] }))
+    expect(res.status).toBe(200)
+    const stops = await readStops(res)
+    expect(stops.filter((s) => s.candidate?.id === 'in-area-1')).toHaveLength(1)
+    expect(stops.filter((s) => s.noCandidate)).toHaveLength(1)
+  })
+  it('R9-K1 20x：兩站同時重找、池子只有一間店，重跑 20 次每次都不重複', async () => {
+    const dup = place('dup-1', 35.691, 139.701, { displayName: { text: 'dup食堂' }, rating: 4.5, userRatingCount: 120, types: ['restaurant'], primaryType: 'restaurant' })
+    const oldMeal = validShop('old-meal', 0)
+    const oldCoffee = validShop('old-coffee', 0)
+    for (let i = 0; i < 20; i++) {
+      mockPool([dup])
+      const res = await handler(post({ origin: HERE, exclude: ['old-meal', 'old-coffee'], stops: [
+        { id: 'meal', kind: 'meal', title: '定食', minutes: 45, candidate: cand(oldMeal) },
+        { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60, candidate: cand(oldCoffee) },
+      ] }))
+      expect(res.status, `第 ${i + 1} 次`).toBe(200)
+      const stops = await readStops(res)
+      const ids = stops.filter((s) => s.candidate).map((s) => s.candidate!.id)
+      expect(new Set(ids).size, `第 ${i + 1} 次`).toBe(ids.length)
+      expect(ids, `第 ${i + 1} 次`).toEqual(['dup-1'])
+    }
+  })
+  it('B1 伺服器雙向：えびそば一幻配 noodle_shop，排除 soba 時照選（是拉麵）；排除 ramen 時不選', async () => {
+    const ebi = place('ebi-1', 35.691, 139.701, { displayName: { text: 'えびそば一幻' }, rating: 4.3, userRatingCount: 300, types: ['noodle_shop', 'restaurant'], primaryType: 'noodle_shop' })
+    mockPool([ebi])
+    const asRamen = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(asRamen.status).toBe(200)
+    expect(stopOf(await readStops(asRamen), 'meal').candidate?.id).toBe('ebi-1')
+    mockPool([ebi])
+    const notSoba = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(notSoba.status).toBe(200)
+    expect(stopOf(await readStops(notSoba), 'meal').candidate).toBeUndefined()
+  })
+  it('B2 伺服器雙向：つけ蕎麦 安土配 restaurant，排除 soba 時不選（是蕎麥麵）；排除 ramen 時照選——跟つけそば 弐天反向', async () => {
+    const azuchi = place('azuchi-1', 35.691, 139.701, { displayName: { text: 'つけ蕎麦 安土' }, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
+    const niten = place('niten-1', 35.691, 139.701, { displayName: { text: 'つけそば 弐天' }, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
+    mockPool([azuchi])
+    const excluded = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(excluded.status).toBe(200)
+    expect(stopOf(await readStops(excluded), 'meal').candidate).toBeUndefined()
+    mockPool([azuchi])
+    const contrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(contrast.status).toBe(200)
+    expect(stopOf(await readStops(contrast), 'meal').candidate?.id).toBe('azuchi-1')
+    mockPool([niten])
+    const nitenExcluded = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(nitenExcluded.status).toBe(200)
+    expect(stopOf(await readStops(nitenExcluded), 'meal').candidate).toBeUndefined()
+  })
+  it('B3 伺服器雙向：煮干中華ソバ イチカワ（片假名ソバ），排除 ramen 時不選；排除 soba 時照選', async () => {
+    const ichikawa = place('ichikawa-1', 35.691, 139.701, { displayName: { text: '煮干中華ソバ イチカワ' }, rating: 4.3, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
+    mockPool([ichikawa])
+    const excluded = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(excluded.status).toBe(200)
+    expect(stopOf(await readStops(excluded), 'meal').candidate).toBeUndefined()
+    mockPool([ichikawa])
+    const contrast = await handler(post({ origin: HERE, excludeKinds: ['soba'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(contrast.status).toBe(200)
+    expect(stopOf(await readStops(contrast), 'meal').candidate?.id).toBe('ichikawa-1')
+  })
+  it('B4 伺服器雙向：串鳥排除 yakitori 時不選、排除 ramen 時照選；やきにくガッッツ排除 yakiniku 時不選、排除 ramen 時照選', async () => {
+    const kushitori = place('kushitori-1', 35.691, 139.701, { displayName: { text: '串鳥' }, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
+    const yakiniku = place('yakiniku-1', 35.691, 139.701, { displayName: { text: 'やきにくガッッツ' }, rating: 4.2, userRatingCount: 300, types: ['restaurant'], primaryType: 'restaurant' })
+    mockPool([kushitori])
+    const kExcluded = await handler(post({ origin: HERE, excludeKinds: ['yakitori'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(kExcluded.status).toBe(200)
+    expect(stopOf(await readStops(kExcluded), 'meal').candidate).toBeUndefined()
+    mockPool([kushitori])
+    const kContrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(kContrast.status).toBe(200)
+    expect(stopOf(await readStops(kContrast), 'meal').candidate?.id).toBe('kushitori-1')
+    mockPool([yakiniku])
+    const yExcluded = await handler(post({ origin: HERE, excludeKinds: ['yakiniku'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(yExcluded.status).toBe(200)
+    expect(stopOf(await readStops(yExcluded), 'meal').candidate).toBeUndefined()
+    mockPool([yakiniku])
+    const yContrast = await handler(post({ origin: HERE, excludeKinds: ['ramen'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(yContrast.status).toBe(200)
+    expect(stopOf(await readStops(yContrast), 'meal').candidate?.id).toBe('yakiniku-1')
+  })
+})
