@@ -4,6 +4,7 @@ import { PlacePhoto } from './PlacePhoto.tsx'
 import { getLocation, type GeoReason } from './api.ts'
 import { blockedPlaceIds, markNeverAgain } from './placeMem.ts'
 import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
+import { isDeniedCandidate } from './venueCheck.ts'
 
 export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string }
 export type DailyState = {
@@ -37,17 +38,24 @@ const sanitizeSeen = (v: unknown): Record<string, string[]> => {
   return out
 }
 const sanitizeIds = (v: unknown, max: number): string[] => Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string'))].slice(-max) : []
-/** 舊版存的 rest 候選（例如澀谷站）：rest 現在是純文字站，讀到就清掉，否則當天內畫面還顯示車站。固定安排／指定地點的 rest 不動（它們的地點是使用者的選擇）。 */
-const clearStaleRest = (t: DailyTask): DailyTask =>
-  t.kind === 'rest' && !t.locked && !t.custom && !t.specified && t.candidate
-    ? { ...t, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
-    : t
+/** 舊版殘留的候選清掉，否則當天內畫面還顯示車站。rest 現在是純文字站，讀到候選就清掉；
+ * 其他站也一樣：自動挑的站帶了車站／地標候選就清掉（伺服器端也會重驗，這裡是第一道）。
+ * 固定安排／指定地點的站不動（它們的地點是使用者的選擇）。車站本來就不是可拜訪的店家，
+ * 候選是錯誤資料，已完成與否都清。 */
+const clearStaleCandidate = (t: DailyTask): DailyTask => {
+  if (t.locked || t.custom || t.specified || !t.candidate) return t
+  if (t.kind === 'rest' || isDeniedCandidate(t.candidate))
+    // place 也是從這個候選派生的地址（不是使用者輸入的）：一起清掉，否則下次生成
+    // 伺服器會拿車站地址當查詢字串。
+    return { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
+  return t
+}
 export function loadDaily(): DailyState {
   const fresh = defaults()
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || 'null') as Partial<DailyState> | null
     if (!raw || !Array.isArray(raw.notes) || !Array.isArray(raw.tasks)) return fresh
-    return { ...fresh, ...raw, day: fresh.day, tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || !!t.candidate?.id)).map(clearStaleRest) : [], notes: raw.notes.slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked: sanitizeIds(raw.disliked, 100), dislikedKinds: [...new Set(sanitizeIds(raw.dislikedKinds, 20).map(normalizeKind))] }
+    return { ...fresh, ...raw, day: fresh.day, tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || !!t.candidate?.id)).map(clearStaleCandidate) : [], notes: raw.notes.slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked: sanitizeIds(raw.disliked, 100), dislikedKinds: [...new Set(sanitizeIds(raw.dislikedKinds, 20).map(normalizeKind))] }
   } catch { return fresh }
 }
 export function saveDaily(s: DailyState): void { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch { /* private mode */ } }
@@ -113,16 +121,19 @@ export function withSeen(s: DailyState, stopId: string, placeId: string): DailyS
   if (prev.includes(placeId)) return s
   return { ...s, seen: { ...(s.seen ?? {}), [stopId]: [...prev, placeId].slice(-20) } }
 }
-/** 送給伺服器的排除清單上限（跟 api/daily-route.ts 同步）：不喜歡 100＋每站換掉過的 20，剛好 120；其他站現任候選只能用剩下的額度。 */
-const EXCLUDE_LIMIT = 120
-/** 合併排除清單：去重、留前 120。呼叫端按優先順序排好再傳進來，截掉的是排在後面的。 */
+/** 送給伺服器的排除清單上限（跟 api/daily-route.ts 同步）：不喜歡 100＋placeMem 封鎖
+ * （理論上無上限，實際是使用者明確按過「不要再來」的店）＋每站換掉過的 20＋其他站
+ * 現任候選。200 蓋得住實際最大值（100＋30＋20＋8＝158 還有餘裕）；截斷時封鎖排最前，
+ * 讓明確設的時效排除最後才被截。 */
+const EXCLUDE_LIMIT = 200
+/** 合併排除清單：去重、留前 200。呼叫端按優先順序排好再傳進來，截掉的是排在後面的。 */
 export function mergeExclude(...lists: string[][]): string[] {
   return [...new Set(lists.flat())].slice(0, EXCLUDE_LIMIT)
 }
-/** shuffle 時送給伺服器的排除清單：不喜歡的店 → placeMem 封鎖 → 該站換掉過的 → 其他站目前的候選。截斷時先保前兩者，再保換掉過的，最後才截其他站候選。 */
+/** shuffle 時送給伺服器的排除清單：placeMem 封鎖 → 不喜歡的店 → 該站換掉過的 → 其他站目前的候選。截斷時先保前兩者（都是使用者明確不要的店），再保換掉過的，最後才截其他站候選。封鎖排第一的理由：日常流程按的「不喜歡」同時寫進 placeMem，兩份高度重疊；封鎖期內的 id 是明確的時效排除，不能被靜默截掉。 */
 export function excludeFor(s: DailyState, shuffleId: string, memBlocked: string[] = []): string[] {
   const others = s.tasks.filter(t => t.id !== shuffleId).map(t => t.candidate?.id).filter((x): x is string => !!x)
-  return mergeExclude(s.disliked ?? [], memBlocked, (s.seen ?? {})[shuffleId] ?? [], others)
+  return mergeExclude(memBlocked, s.disliked ?? [], (s.seen ?? {})[shuffleId] ?? [], others)
 }
 
 export function DailyDecision({ onBack }: { onBack: () => void }) {
@@ -161,7 +172,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     let memBlocked: string[] = []
     try { memBlocked = await blockedPlaceIds(Date.now()) } catch { memBlocked = [] }
     try {
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),stops:proposed.tasks,shuffle,exclude:shuffle?excludeFor(proposed,shuffle,memBlocked):mergeExclude(proposed.disliked??[],memBlocked),excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind)})})
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),stops:proposed.tasks,shuffle,exclude:shuffle?excludeFor(proposed,shuffle,memBlocked):mergeExclude(memBlocked,proposed.disliked??[]),excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind)})})
       const data=await response.json()
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       change(old=>({...old,tasks:data.stops,seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))

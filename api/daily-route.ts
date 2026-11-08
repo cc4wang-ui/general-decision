@@ -1,5 +1,6 @@
 import { travelMatrix, scheduleRoute, validPoint } from '../src/dailyRouting.ts'
 import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
+import { isDeniedCandidate } from '../src/venueCheck.ts'
 // Daily Decision: real Google Places results and approximate geographic route ordering.
 // Does not claim live traffic, transit ETAs, reservations or confirmed stock.
 export const config = { runtime:'nodejs' }
@@ -12,10 +13,6 @@ type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;don
 const queries:Record<string,string>={gym:'FIT-EASY Shibuya Sakura Stage',meal:'Japanese set meal restaurant',creative:'art gallery exhibition',coffee:'quiet specialty coffee cafe',shopping:'sports goods drugstore'}
 /** 每一站的 Places includedType（Table A）。沒有這一層，通用查詢字串回什麼全憑 Google 相關度，車站／地標／商場都會混進來。 */
 const includedTypes:Record<string,string>={gym:'gym',meal:'restaurant',creative:'art_gallery',coffee:'cafe',shopping:'drugstore'}
-/** primaryType 在這裡面的，一律不是可拜訪的店家。 */
-const DENY_PRIMARY=new Set(['transit_station','train_station','subway_station','bus_station','tourist_attraction','shopping_mall','department_store','lodging','hospital','university','school','place_of_worship','church','mosque','synagogue','hindu_temple','city_hall','courthouse','embassy','police','fire_station','post_office','atm','bank','gas_station','parking','airport'])
-/** types 陣列裡出現任一個，就不是店家（車站／地標即使 primaryType 不是，也擋）。 */
-const DENY_ANY=new Set(['transit_station','train_station','subway_station','bus_station','tourist_attraction'])
 /** 使用者開的條件：評論數 50 則以上才派。userRatingCount 拿不到＝無法驗證＝不派。 */
 const MIN_REVIEWS=50
 const dist=(a:Coord,b:Coord)=>{const rad=Math.PI/180,dLat=(b.lat-a.lat)*rad,dLon=(b.lng-a.lng)*rad,v=Math.sin(dLat/2)**2+Math.cos(a.lat*rad)*Math.cos(b.lat*rad)*Math.sin(dLon/2)**2;return 12742*Math.asin(Math.sqrt(v))}
@@ -49,8 +46,7 @@ function venueOk(p:Candidate,s:Stop,excludeKinds:string[]):boolean{
  if(excludeKinds.length){const k=kindOfCandidate(p);if(k&&excludeKinds.includes(k))return false}
  const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
  if(!auto)return true
- if(p.primaryType&&DENY_PRIMARY.has(p.primaryType))return false
- if(p.types.some(t=>DENY_ANY.has(t)))return false
+ if(isDeniedCandidate(p))return false
  // 固定健身房 FIT-EASY 是使用者指定的店，不是探索發現：不套評論數門檻（類型 gym 照樣過濾）。
  if(s.id!=='gym'&&s.kind!=='gym'&&(p.userRatingCount??0)<MIN_REVIEWS)return false
  return true
@@ -81,8 +77,8 @@ async function handler(req:Request):Promise<Response>{
  if(!gps&&!location)return respond({error:'location_required',message:'請先指定出發地。'},400)
  const list=Array.isArray(input.stops)?input.stops.slice(0,9):[]
  const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,specified:x.specified===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate:x.candidate&&typeof x.candidate==='object'&&typeof x.candidate.id==='string'&&Number.isFinite(x.candidate.lat)&&Number.isFinite(x.candidate.lng)?x.candidate:undefined}))
- const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,120):[]
- // 排除清單上限 120（跟前端 mergeExclude 同步）：不喜歡 100＋每站換掉過的 20；舊版種類鍵（'ramen_restaurant'）先轉新鍵，舊的不喜歡才不會失效。
+ const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,200):[]
+ // 排除清單上限 200（跟前端 mergeExclude 同步）：不喜歡 100＋placeMem 封鎖＋每站換掉過的 20＋其他站候選；舊版種類鍵（'ramen_restaurant'）先轉新鍵，舊的不喜歡才不會失效。
  const excludeKinds=Array.isArray(input.excludeKinds)?[...new Set(input.excludeKinds.filter(x=>typeof x==='string').map(normalizeKind))].slice(0,20):[]
  try{
   let origin:Record<string,unknown>,center:Coord
@@ -97,15 +93,20 @@ async function handler(req:Request):Promise<Response>{
   for(const s of stops){
    // 「散步回家」不查店：只是一段文字提醒。舊資料裡殘留的車站候選也在這裡清掉。
    if(isTextOnlyRest(s)){result.push({...s,candidate:undefined});continue}
-   if(s.candidate && (!shuffle || s.id!==shuffle)){result.push(s);continue}
+   // 舊版殘留的非店家候選（車站／地標）：自動挑的站才重驗，候選與它帶來的地名一起丟掉，
+   // 往下走正常重找；使用者指定／固定／已完成的地點是他的選擇，不動。
+   const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
+   const stale=auto&&!!s.candidate&&isDeniedCandidate(s.candidate)
+   const stop=stale?{...s,candidate:undefined,place:undefined}:s
+   if(stop.candidate && (!shuffle || s.id!==shuffle)){result.push(s);continue}
    if(shuffle&&s.id!==shuffle){result.push(s);continue}
    // Explicitly named or fixed locations are resolved, never replaced by another business.
    const preserve=s.done||s.locked||s.custom
-   const named=s.place&&s.place!== '澀谷站周邊'&&!s.place.includes('周邊')&&!s.place.includes('／')&&!s.place.includes('（')
-   const q=s.specified?s.place:(preserve||(named&&shuffle!==s.id)?s.place:queries[s.id]??queries[s.kind]??s.title)
+   const named=stop.place&&stop.place!== '澀谷站周邊'&&!stop.place.includes('周邊')&&!stop.place.includes('／')&&!stop.place.includes('（')
+   const q=s.specified?stop.place:(preserve||(named&&shuffle!==s.id)?stop.place:queries[stop.id]??queries[stop.kind]??stop.title)
    if(!q){result.push(s);continue}
    // 自動挑店才送 includedType：指定／固定地點的類型由使用者決定，不由系統收窄。
-   const stopType=preserve||s.specified?undefined:(includedTypes[s.id]??includedTypes[s.kind])
+   const stopType=preserve||s.specified?undefined:(includedTypes[stop.id]??includedTypes[stop.kind])
    // 目前位置模式沒有地名可附加：只靠 locationBias（中心＝目前位置）找附近的店。
    const queryText=q+(preserve||s.specified||!location?'':' '+location)
    // 排除清單一長就可能一頁翻完都沒得選：eligible 為空時用 pageToken 往下一頁翻，最多 3 頁。
@@ -113,7 +114,7 @@ async function handler(req:Request):Promise<Response>{
    let pageToken:string|undefined
    for(let page=0;page<3;page++){
     const found=await search(key,queryText,center,20,{includedType:stopType,pageToken})
-    eligible=found.places.filter(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&(preserve||shuffle!==s.id||p.id!==s.candidate?.id))
+    eligible=found.places.filter(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
     if(eligible.length||!found.nextPageToken)break
     pageToken=found.nextPageToken
    }

@@ -52,29 +52,42 @@ export function normalizeKind(kind: string): string {
  * 店名關鍵字 → kind，依序比對，第一個命中者勝。
  * 烏龍麵／蕎麥麵沒有對應的 Places 類型，只能靠名字認：讃岐／さぬき／手打ち麺是
  * 烏龍麵店常用的限定詞；蕎麥麵補簡體「蕎麦」（藪蕎麦這類店名才認得到）。
- * 最後一條是最弱訊號，放最後：前面都沒命中才看。麺喜やしま這種店名只有一個
- * 「麺」字，沒有讃岐／うどん可認；麺屋（拉麵店常用，如麺屋武蔵）與つけ麺除外，
- * 避免誤傷拉麵店。殘留風險：麺処是烏龍麵／蕎麥麵／拉麵店都會用的名字（例如拉麵
- * 店「麺処ほん田」），沒有其他關鍵字時會被算成烏龍麵；認不出種類時 UI 只給單店
- * 排除，不假裝種類排除有生效。
+ * 壽司補片假名「スシ」（スシロー）；炸豬排補「とんかつ／トンカツ」（とんかつ和幸）。
+ * 最後一條是最弱訊號（只有一個「麺」字，如麺喜やしま），不放在這張表裡，
+ * 而是在 kindOfCandidate 末尾加拉麵守衛後才看：店名含麺処／麺や／担々麺／
+ * 中華麺／冷麺時不判為烏龍麵（紅隊 round 2：麺処ほん田／麺や七彩／担々麺／
+ * 中華麺都是拉麵／中華麵；守衛只擋弱訊號，前面已有明確關鍵字命中時不受影響，
+ * 例如「麺処讃岐うどん」照樣是烏龍麵）。麺屋（拉麵店常用，如麺屋武蔵）與
+ * つけ麺本來就不在弱訊號裡。
+ *
+ * 已知限制：名字完全沒有關鍵字的店（鳥貴族／川上庵／一蘭），店名啟發式無解，
+ * 回 undefined——以 Google 的 primaryType／types 為準；認不出種類時 UI 只給
+ * 單店排除，不假裝種類排除有生效。
  */
 const NAME_KINDS: Array<[RegExp, string]> = [
   [/烏龍麵|うどん|udon|讃岐|さぬき|手打ち麺/i, 'udon'],
   [/蕎麥麵|蕎麦|そば|soba/i, 'soba'],
   [/拉麵|拉麺|らーめん|ラーメン|ramen/i, 'ramen'],
-  [/壽司|すし|寿司|sushi/i, 'sushi'],
+  [/壽司|すし|スシ|寿司|sushi/i, 'sushi'],
   [/燒肉|焼肉|yakiniku/i, 'yakiniku'],
   [/咖哩|カレー|curry/i, 'curry'],
+  [/とんかつ|トンカツ/i, 'tonkatsu'],
   [/麵包|ベーカリー|パン屋|bakery/i, 'bakery'],
   [/咖啡|カフェ|珈琲|cafe|coffee/i, 'cafe'],
-  [/麺処|(?<!つけ)麺(?!屋)/, 'udon'],
 ]
+
+/** 拉麵標記：弱「麺」訊號的守衛。店名含這些詞，弱訊號不判為烏龍麵。 */
+const RAMEN_GUARD = /麺処|麺や|担々麺|中華麺|冷麺/
+/** 最弱訊號：只有一個「麺」字、前面沒有明確關鍵字時才用（麺喜やしま）。 */
+const WEAK_UDON = /麺処|(?<!つけ)麺(?!屋)/
 
 export function kindOfCandidate(c: { name?: string; types?: string[]; primaryType?: string }): string | undefined {
   if (c.primaryType && TYPE_KINDS[c.primaryType]) return TYPE_KINDS[c.primaryType]
   for (const t of c.types ?? []) if (TYPE_KINDS[t]) return TYPE_KINDS[t]
   const name = c.name ?? ''
   for (const [re, kind] of NAME_KINDS) if (re.test(name)) return kind
+  // 最弱訊號放最後：前面都沒命中才看，且有拉麵標記時不用（見上方守衛說明）。
+  if (WEAK_UDON.test(name) && !RAMEN_GUARD.test(name)) return 'udon'
   return undefined
 }
 

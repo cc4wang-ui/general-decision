@@ -39,22 +39,35 @@ describe('shuffle 排除清單（seen／disliked）',()=>{
   const s={...state(),tasks,disliked:['d1'],seen:{meal:['m1','m2']}}
   expect(excludeFor(s,'meal')).toEqual(['d1','m1','m2','c-gym','c-creative','c-coffee','c-shopping','c-rest'])
  })
- it('excludeFor：placeMem 封鎖排在不喜歡的店之後、換掉過的之前',()=>{
+ it('excludeFor：placeMem 封鎖排在最前，再來是不喜歡的店、該站換掉過的、其他站目前的候選',()=>{
   const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
   const s={...state(),tasks,disliked:['d1'],seen:{meal:['m1']}}
-  expect(excludeFor(s,'meal',['p1','p2'])).toEqual(['d1','p1','p2','m1','c-gym','c-creative','c-coffee','c-shopping','c-rest'])
+  expect(excludeFor(s,'meal',['p1','p2'])).toEqual(['p1','p2','d1','m1','c-gym','c-creative','c-coffee','c-shopping','c-rest'])
  })
- it('excludeFor：截斷時先保不喜歡的店與換掉過的，最後才截其他站候選',()=>{
-  const disliked=Array.from({length:115},(_,i)=>'d'+i)
+ it('excludeFor：不喜歡 100＋placeMem 封鎖 30（不重疊）→ 30 家封鎖全在排除清單裡',()=>{
+  const disliked=Array.from({length:100},(_,i)=>'d'+i)
+  const blocked=Array.from({length:30},(_,i)=>'m'+i)
   const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
-  const s={...state(),tasks,disliked,seen:{meal:['m1','m2','m3','m4','m5']}}
-  const out=excludeFor(s,'meal')
-  expect(out).toHaveLength(120)
-  expect(out.slice(0,115)).toEqual(disliked)
-  expect(out.slice(115)).toEqual(['m1','m2','m3','m4','m5'])
+  const s={...state(),tasks,disliked,seen:{meal:['s1','s2','s3','s4','s5']}}
+  const out=excludeFor(s,'meal',blocked)
+  expect(out).toHaveLength(140)
+  expect(blocked.every(id=>out.includes(id))).toBe(true)
+  expect(out.slice(0,30)).toEqual(blocked)
+  expect(out.slice(30,130)).toEqual(disliked)
+ })
+ it('excludeFor：截斷時先保 placeMem 封鎖與不喜歡的店，最後才截換掉過的與其他站候選',()=>{
+  const blocked=Array.from({length:100},(_,i)=>'p'+i)
+  const disliked=Array.from({length:100},(_,i)=>'d'+i)
+  const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
+  const s={...state(),tasks,disliked,seen:{meal:Array.from({length:20},(_,i)=>'s'+i)}}
+  const out=excludeFor(s,'meal',blocked)
+  expect(out).toHaveLength(200)
+  expect(out.slice(0,100)).toEqual(blocked)
+  expect(out.slice(100,200)).toEqual(disliked)
+  expect(out).not.toContain('s0')
   expect(out).not.toContain('c-gym')
  })
- it('excludeFor：不喜歡滿 100＋換掉過 5＋其他站 5，全都塞得下（上限 120），一個都不截',()=>{
+ it('excludeFor：不喜歡滿 100＋換掉過 5＋其他站 5，全都塞得下（上限 200），一個都不截',()=>{
   const disliked=Array.from({length:100},(_,i)=>'d'+i)
   const tasks=buildDaily(state()).map(t=>({...t,candidate:cand('c-'+t.id)}))
   const s={...state(),tasks,disliked,seen:{meal:['m1','m2','m3','m4','m5']}}
@@ -67,11 +80,19 @@ describe('shuffle 排除清單（seen／disliked）',()=>{
 })
 
 describe('mergeExclude：合併排除清單',()=>{
- it('去重、保順序、上限 120',()=>{
+ it('去重、保順序、上限 200',()=>{
   expect(mergeExclude(['a','b'],['b','c'])).toEqual(['a','b','c'])
-  const big=Array.from({length:130},(_,i)=>'x'+i)
-  expect(mergeExclude(big)).toHaveLength(120)
-  expect(mergeExclude(big)[119]).toBe('x119')
+  const big=Array.from({length:210},(_,i)=>'x'+i)
+  expect(mergeExclude(big)).toHaveLength(200)
+  expect(mergeExclude(big)[199]).toBe('x199')
+ })
+ it('生成路徑：placeMem 封鎖 30＋不喜歡 100，全都塞得下，一家都不截',()=>{
+  const blocked=Array.from({length:30},(_,i)=>'m'+i)
+  const disliked=Array.from({length:100},(_,i)=>'d'+i)
+  const out=mergeExclude(blocked,disliked)
+  expect(out).toHaveLength(130)
+  expect(blocked.every(id=>out.includes(id))).toBe(true)
+  expect(disliked.every(id=>out.includes(id))).toBe(true)
  })
 })
 
@@ -110,6 +131,29 @@ describe('loadDaily：上限留最新、rest 殘留清除（紅隊 §3.3／§3.4
   const fixed={id:'fixed-1',title:'與朋友見面',minutes:60,kind:'rest',done:false,locked:true,custom:true,candidate:{id:'c1',name:'某咖啡店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=c1',lat:35.66,lng:139.70}}
   seed([fixed],[],[])
   expect(loadDaily().tasks.find(t=>t.id==='fixed-1')?.candidate?.id).toBe('c1')
+ })
+ it('當天 meal 任務帶車站候選：候選與路線資訊清掉（紅隊 round 2 Finding 4）；固定安排的 meal 候選不動',()=>{
+  const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:false,place:'渋谷駅地下 1F',candidate:stationCand,eta:'12:00 抵達',departure:'11:30 離開',travelMin:30,conflict:'時間衝突'}
+  const fixedMeal={id:'fixed-meal',title:'午餐約會',minutes:60,kind:'meal',done:false,locked:true,custom:true,candidate:stationCand}
+  seed([meal,fixedMeal],[],[])
+  const out=loadDaily()
+  const loadedMeal=out.tasks.find(t=>t.id==='meal')!
+  expect(loadedMeal.candidate).toBeUndefined()
+  expect(loadedMeal.place).toBeUndefined()
+  expect(loadedMeal.eta).toBeUndefined()
+  expect(loadedMeal.departure).toBeUndefined()
+  expect(loadedMeal.travelMin).toBeUndefined()
+  expect(loadedMeal.conflict).toBeUndefined()
+  expect(out.tasks.find(t=>t.id==='fixed-meal')?.candidate?.id).toBe('shibuya-station')
+ })
+ it('當天 meal 任務帶地標候選：同樣清掉；一般餐廳候選不動',()=>{
+  const landmarkCand={id:'landmark-1',name:'澀谷十字路口',address:'渋谷',mapUrl:'https://maps.google.com/?cid=landmark-1',lat:35.6595,lng:139.7005,rating:4.5,userRatingCount:5000,types:['tourist_attraction'],primaryType:'tourist_attraction'}
+  const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:false,candidate:landmarkCand}
+  const coffee={id:'coffee',title:'咖啡',minutes:60,kind:'creative',done:false,candidate:{id:'c1',name:'某咖啡店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=c1',lat:35.66,lng:139.70,types:['cafe'],primaryType:'cafe'}}
+  seed([meal,coffee],[],[])
+  const out=loadDaily()
+  expect(out.tasks.find(t=>t.id==='meal')?.candidate).toBeUndefined()
+  expect(out.tasks.find(t=>t.id==='coffee')?.candidate?.id).toBe('c1')
  })
 })
 describe('Daily itinerary controls',()=>{

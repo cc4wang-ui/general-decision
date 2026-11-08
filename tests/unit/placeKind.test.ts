@@ -31,6 +31,57 @@ describe('kindOfCandidate：真實店名', () => {
   })
 })
 
+describe('kindOfCandidate：弱「麺」訊號守衛（紅隊 round 2 Finding 1）', () => {
+  it('麺処ほん田（拉麵店）→ undefined：名字帶麺処，弱訊號不判烏龍麵', () => {
+    expect(kindOfCandidate(cand('麺処ほん田'))).toBeUndefined()
+  })
+  it('麺や七彩（拉麵店）→ undefined：名字帶麺や，弱訊號不判烏龍麵', () => {
+    expect(kindOfCandidate(cand('麺や七彩'))).toBeUndefined()
+  })
+  it('担々麺専門店（擔擔麵）→ undefined', () => {
+    expect(kindOfCandidate(cand('担々麺専門店'))).toBeUndefined()
+  })
+  it('中華麺店 → undefined：名字只有中華麺，弱訊號不判烏龍麵', () => {
+    expect(kindOfCandidate(cand('中華麺店'))).toBeUndefined()
+  })
+  it('冷麺専門店 → undefined：冷麵不是烏龍麵', () => {
+    expect(kindOfCandidate(cand('冷麺専門店'))).toBeUndefined()
+  })
+  it('麺処讃岐うどん → udon：前面已有明確關鍵字（讃岐）命中，守衛只擋弱訊號', () => {
+    expect(kindOfCandidate(cand('麺処讃岐うどん'))).toBe('udon')
+  })
+  it('麺喜やしま還是 udon：不含拉麵標記，弱訊號照樣認得出', () => {
+    expect(kindOfCandidate(cand('麺喜やしま'))).toBe('udon')
+  })
+  it('丸亀製麺還是 udon：製麺不在守衛名單裡', () => {
+    expect(kindOfCandidate(cand('丸亀製麺'))).toBe('udon')
+  })
+})
+
+describe('kindOfCandidate：漏掉的關鍵字（紅隊 round 2 Finding 2）', () => {
+  it('スシロー（壽司連鎖）→ sushi：片假名スシ要認得到', () => {
+    expect(kindOfCandidate(cand('スシロー'))).toBe('sushi')
+  })
+  it('とんかつ和幸（炸豬排連鎖）→ tonkatsu', () => {
+    expect(kindOfCandidate(cand('とんかつ和幸'))).toBe('tonkatsu')
+  })
+  it('トンカツ店（片假名）→ tonkatsu', () => {
+    expect(kindOfCandidate(cand('トンカツ専門店'))).toBe('tonkatsu')
+  })
+})
+
+describe('kindOfCandidate：已知限制——名字完全無訊號的店', () => {
+  it('鳥貴族（串燒連鎖）→ undefined：名字無關鍵字，店名啟發式無解，以類型為準', () => {
+    expect(kindOfCandidate(cand('鳥貴族'))).toBeUndefined()
+  })
+  it('川上庵（蕎麥麵）→ undefined：名字無 そば／蕎麦，店名啟發式無解', () => {
+    expect(kindOfCandidate(cand('川上庵'))).toBeUndefined()
+  })
+  it('一蘭（拉麵連鎖）→ undefined：名字無關鍵字，店名啟發式無解', () => {
+    expect(kindOfCandidate(cand('一蘭'))).toBeUndefined()
+  })
+})
+
 describe('kindOfCandidate：Table A 類型歸一化', () => {
   it('japanese_curry_restaurant → curry；tonkatsu_restaurant → tonkatsu；yakitori_restaurant → yakitori', () => {
     expect(kindOfCandidate(cand('咖哩店', 'japanese_curry_restaurant', ['japanese_curry_restaurant']))).toBe('curry')

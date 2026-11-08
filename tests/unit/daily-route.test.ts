@@ -313,3 +313,86 @@ describe('種類級排除（真實店名，紅隊 §3.1）', () => {
     expect(data.stops[0]!.candidate?.id).toBe('ok1')
   })
 })
+
+/** 紅隊 round 2 Finding 1／2／4 的永久測試：用真實店名當 mock。 */
+const hondaShop = place('honda-1', 35.691, 139.701, {
+  displayName: { text: '麺処ほん田' }, rating: 4.5, userRatingCount: 300,
+  types: ['restaurant'], primaryType: 'restaurant',
+})
+const sushiroShop = place('sushiro-1', 35.691, 139.701, {
+  displayName: { text: 'スシロー' }, rating: 4.2, userRatingCount: 800,
+  types: ['restaurant'], primaryType: 'restaurant',
+})
+const wakohShop = place('wakoh-1', 35.691, 139.701, {
+  displayName: { text: 'とんかつ和幸' }, rating: 4.1, userRatingCount: 500,
+  types: ['restaurant'], primaryType: 'restaurant',
+})
+
+describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
+  /** 池子裡只有一家店：被排除就 422，選中才是沒被誤判。 */
+  function mockSingle(first: unknown) {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [first] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f }
+  }
+  function mockKind(first: unknown) {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places: [first, validShop('ok1', 0)] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f }
+  }
+  it("excludeKinds ['udon']：池子只有麺処ほん田（拉麵店）時要選中它，不能 422", async () => {
+    const g = mockSingle(hondaShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['udon'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('honda-1')
+  })
+  it("excludeKinds ['sushi']：スシロー不被選（片假名スシ要認得到）", async () => {
+    const g = mockKind(sushiroShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['sushi'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+  })
+  it("excludeKinds ['tonkatsu']：とんかつ和幸不被選", async () => {
+    const g = mockKind(wakohShop)
+    void g
+    const res = await handler(post({ origin: HERE, excludeKinds: ['tonkatsu'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('ok1')
+  })
+})
+
+describe('舊版殘留候選重驗（紅隊 round 2 Finding 4）', () => {
+  const stationCandidate = {
+    id: 'shibuya-station', name: '渋谷駅', address: '渋谷駅地下 1F',
+    mapUrl: 'https://maps.google.com/?cid=shibuya-station', lat: 35.6595, lng: 139.7005,
+    rating: 4.2, userRatingCount: 9000, types: ['transit_station', 'train_station'], primaryType: 'transit_station',
+  }
+  it('meal 站帶渋谷駅候選、不 shuffle：不保留車站，改用通用查詢重找一間合格店', async () => {
+    const g = mockGoogleSinglePage()
+    const res = await handler(post({ origin: HERE, stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, place: '渋谷駅地下 1F', candidate: stationCandidate }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(['m1', 'm2', 'm3', 'm4', 'm5']).toContain(data.stops[0]!.candidate?.id)
+    // 殘留的地名一起丟掉：查詢是通用定食查詢，不是車站地址。
+    expect(g.places().map((c) => String(c.body.textQuery))).toEqual(['Japanese set meal restaurant'])
+  })
+  it('使用者指定／固定地點的候選不重驗（那是他的選擇）', async () => {
+    const g = mockGoogleSinglePage()
+    void g
+    const res = await handler(post({ origin: HERE, stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, specified: true, place: '渋谷駅', candidate: stationCandidate }] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { stops: { candidate?: { id: string } }[] }
+    expect(data.stops[0]!.candidate?.id).toBe('shibuya-station')
+  })
+})
