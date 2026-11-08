@@ -5,11 +5,14 @@ import { getLocation, type GeoReason } from './api.ts'
 import { blockedPlaceIds, markNeverAgain } from './placeMem.ts'
 import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
 import { isDeniedCandidate } from './venueCheck.ts'
+import { AREA_NAMES } from './areas.ts'
 
 export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string }
 export type DailyState = {
   day: string; area: string; currentPlace: string; mode: 'creative'|'practical'
   tasks: DailyTask[]; notes: string[]; avoid: string[]
+  /** 地區偏好（F7）：只在所選地區中心 1 公里內找店。預設開啟；關掉＝不限區域。 */
+  areaOnly?: boolean
   /** 出發地用目前位置（GPS）。只存這個選擇，不存座標：每次搜尋都重新定位。 */
   useHere?: boolean
   /** 目前行程是用哪個出發地排的（originKey）。出發地換了，自動挑的店要在新出發地附近重找。 */
@@ -22,10 +25,14 @@ export type DailyState = {
   dislikedKinds?: string[]
 }
 const KEY = 'decide.daily.v1'
+/** 舊版自由文字偏好「以澀谷為生活基地，避免不必要跨區」：已被結構化地區偏好
+ * （area＋areaOnly）取代。載入時對應轉換並從 notes 移除，UI 不再把未讀的
+ * 自由文字呈現為「已記住的偏好」（F7）。其他 notes 不動。 */
+const CROSS_AREA_NOTE = '以澀谷為生活基地，避免不必要跨區'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
-  day: dayInTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
-  tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '以澀谷為生活基地，避免不必要跨區', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: [],
+  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', mode: 'creative',
+  tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: [],
   seen: {}, disliked: [], dislikedKinds: [],
 })
 /** seen 只留今天：換天任務重排，昨天換掉的店不再擋。 */
@@ -38,16 +45,16 @@ const sanitizeSeen = (v: unknown): Record<string, string[]> => {
   return out
 }
 const sanitizeIds = (v: unknown, max: number): string[] => Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string'))].slice(-max) : []
-/** 舊版殘留的候選清掉，否則當天內畫面還顯示車站。rest 現在是純文字站，讀到候選就清掉；
- * 其他站也一樣：自動挑的站帶了車站／地標候選就清掉（伺服器端也會重驗，這裡是第一道）。
- * 固定安排／指定地點的站不動（它們的地點是使用者的選擇）。車站本來就不是可拜訪的店家，
- * 候選是錯誤資料，已完成與否都清。 */
+/** 前後端統一規則（item 7）：固定安排／指定地點／已完成站的既有候選是使用者
+ * 的選擇，保留；自動挑的站帶了車站／地標候選才清掉重找。rest 是純文字站，
+ * 從來沒有可拜訪的店家，已完成與否都清掉（伺服器端 isTextOnlyRest 同一規則；
+ * 已完成 rest 不帶候選也不算未解決，否則標記完成後整單 422）。 */
 const clearStaleCandidate = (t: DailyTask): DailyTask => {
   if (t.locked || t.custom || t.specified || !t.candidate) return t
-  if (t.kind === 'rest' || isDeniedCandidate(t.candidate))
-    // place 也是從這個候選派生的地址（不是使用者輸入的）：一起清掉，否則下次生成
-    // 伺服器會拿車站地址當查詢字串。
-    return { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
+  const cleared = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
+  if (t.kind === 'rest') return cleared
+  if (t.done) return t
+  if (isDeniedCandidate(t.candidate)) return cleared
   return t
 }
 export function loadDaily(): DailyState {
@@ -55,7 +62,12 @@ export function loadDaily(): DailyState {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || 'null') as Partial<DailyState> | null
     if (!raw || !Array.isArray(raw.notes) || !Array.isArray(raw.tasks)) return fresh
-    return { ...fresh, ...raw, day: fresh.day, tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || !!t.candidate?.id)).map(clearStaleCandidate) : [], notes: raw.notes.slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked: sanitizeIds(raw.disliked, 100), dislikedKinds: [...new Set(sanitizeIds(raw.dislikedKinds, 20).map(normalizeKind))] }
+    return { ...fresh, ...raw, day: fresh.day,
+      // 地區偏好移轉（F7）：舊資料的跨區自由文字偏好對應成 area='澀谷'＋areaOnly 開啟；
+      // 舊資料沒有 areaOnly 欄位時預設開啟（當時沒有關掉的辦法，開啟才是忠實轉換）。
+      area: typeof raw.area === 'string' && AREA_NAMES.includes(raw.area) ? raw.area : '澀谷',
+      areaOnly: raw.areaOnly === undefined ? true : raw.areaOnly === true,
+      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || !!t.candidate?.id)).map(clearStaleCandidate) : [], notes: raw.notes.filter(n => n !== CROSS_AREA_NOTE).slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked: sanitizeIds(raw.disliked, 100), dislikedKinds: [...new Set(sanitizeIds(raw.dislikedKinds, 20).map(normalizeKind))] }
   } catch { return fresh }
 }
 export function saveDaily(s: DailyState): void { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch { /* private mode */ } }
@@ -167,12 +179,14 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     // shuffle 先把被換掉的那間記進 seen：這次請求就要排除它，否則下一輪它又回來。
     const replacedId=shuffle?proposed.tasks.find(t=>t.id===shuffle)?.candidate?.id:undefined
     if(shuffle&&replacedId)proposed=withSeen(proposed,shuffle,replacedId)
-    setStatus('正在搜尋真實店家並優化路線…')
+    // F8：換單一站時不說成整條路線重找——伺服器只重找那一站，狀態列說清楚。
+    setStatus(shuffle ? '正在找這一站的替代地點…' : '正在搜尋真實店家並優化路線…')
     // placeMem 封鎖清單（核心班長 app 的「不要再來」）：讀不到（無痕模式等）就只用 localStorage，不讓整次搜尋失敗。
     let memBlocked: string[] = []
     try { memBlocked = await blockedPlaceIds(Date.now()) } catch { memBlocked = [] }
     try {
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),stops:proposed.tasks,shuffle,exclude:shuffle?excludeFor(proposed,shuffle,memBlocked):mergeExclude(memBlocked,proposed.disliked??[]),excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind)})})
+      // 地區偏好（F7）真的送往伺服器：area＋areaOnly。搜尋結果會顯示沒有更多選擇。
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:shuffle?excludeFor(proposed,shuffle,memBlocked):mergeExclude(memBlocked,proposed.disliked??[]),excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind)})})
       const data=await response.json()
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       change(old=>({...old,tasks:data.stops,seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
@@ -244,7 +258,15 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
             <button aria-pressed={state.mode==='creative'} onClick={()=>change(s=>replanDaily({...s,mode:'creative'}))}>偵察探索</button>
             <button aria-pressed={state.mode==='practical'} onClick={()=>change(s=>replanDaily({...s,mode:'practical'}))}>效率採買</button>
           </div>
-          <button className="dd-primary" data-testid="daily-generate" disabled={busy!==null} onClick={generate}>{busy?'搜尋中…':state.tasks.length?'↻ 搜尋店家並優化路線':'✦ 搜尋店家並生成路線'}</button>
+          <label htmlFor="daily-area">地區偏好</label>
+          <div className="dd-area">
+            <select id="daily-area" aria-label="地區偏好" value={state.area} disabled={busy!==null} onChange={e=>{change(s=>({...s,area:e.target.value}));clearRoute();setStatus('地區變更，請重新搜尋路線')}}>
+              {AREA_NAMES.map(a=><option key={a} value={a}>{a}</option>)}
+            </select>
+            <label className="dd-area-only"><input type="checkbox" aria-label="只在這一帶找店" checked={state.areaOnly!==false} disabled={busy!==null} onChange={e=>{change(s=>({...s,areaOnly:e.target.checked}));clearRoute();setStatus('地區偏好變更，請重新搜尋路線')}}/><span>只在這一帶找店</span></label>
+          </div>
+          <small>{state.areaOnly!==false?`只找 ${state.area} 中心 1 公里內的店；指定／固定／已完成的地點不受影響。`:'不限區域；任何地區的店都可能出現。'}</small>
+          <button className="dd-primary" data-testid="daily-generate" disabled={busy!==null} onClick={generate}>{busy?(busy==='all'?'搜尋中…':'正在換這一站…'):state.tasks.length?'↻ 搜尋店家並優化路線':'✦ 搜尋店家並生成路線'}</button>
           <p className="dd-live-status" role="status" aria-live="polite">{status||"搜尋將使用 Google Places 與 Google Routes"}</p>
           {notice&&<p className="dd-live-status" role="status" aria-live="polite">{notice}</p>}
           {conflicts.length>0&&<div className="dd-conflicts" role="alert">{conflicts.map((c,i)=><p key={i}>⚠ {c}</p>)}</div>}
@@ -261,10 +283,10 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
             </div>
           </details>
           <details className="dd-details">
-            <summary>＋ 記住我的偏好</summary>
+            <summary>＋ 備註</summary>
             <div className="dd-form">
-              <textarea aria-label="補充偏好" value={feedback} maxLength={160} rows={3} placeholder="例如：不要推薦跨區的咖啡店" onChange={e=>setFeedback(e.target.value)}/>
-              <button className="dd-secondary" onClick={addFeedback} disabled={!feedback.trim()}>儲存偏好</button>
+              <textarea aria-label="補充偏好" value={feedback} maxLength={160} rows={3} placeholder="例如：今天想吃拉麵（僅備註，不影響搜尋）" onChange={e=>setFeedback(e.target.value)}/>
+              <button className="dd-secondary" onClick={addFeedback} disabled={!feedback.trim()}>儲存備註</button>
               <div className="dd-notes">{state.notes.map((n,i)=><p key={i}>· {n}</p>)}</div>
             </div>
           </details>

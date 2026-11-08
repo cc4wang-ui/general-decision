@@ -179,3 +179,63 @@ describe('normalizeKind／kindLabel', () => {
     expect(kindLabel('curry')).toBe('咖哩')
   })
 })
+
+describe('kindOfCandidate：兩層拉麵表（紅隊 round 5 F1／F3／F4／F6，round 6 結構性修復）', () => {
+  it('F1：らあめん花月嵐 → ramen：「らあめん」是第 1 層明確標記（あ 不是連字號，不能靠正規化）', () => {
+    expect(kindOfCandidate(cand('らあめん花月嵐'))).toBe('ramen')
+  })
+  it('F3：つけそば 弐天 → ramen：「つけそば」在第 1 層，名字裡的「そば」不能先算蕎麥麵', () => {
+    expect(kindOfCandidate(cand('つけそば 弐天'))).toBe('ramen')
+  })
+  it('F3：特級鶏蕎麦 龍介 → ramen：「鶏蕎麦」在第 1 層', () => {
+    expect(kindOfCandidate(cand('特級鶏蕎麦 龍介'))).toBe('ramen')
+  })
+  it('F4：手打麺 永吉 → ramen：「手打麺」是第 2 層前綴', () => {
+    expect(kindOfCandidate(cand('手打麺 永吉'))).toBe('ramen')
+  })
+  it('F4：らー麺 大芽 → ramen：正規化後「らー麺」命中第 1 層', () => {
+    expect(kindOfCandidate(cand('らー麺 大芽'))).toBe('ramen')
+  })
+  it('F4：麺食堂88 → ramen：「麺食堂」是第 2 層前綴（沾麵店命名；紅隊清單原樣寫不出它，見 placeKind.ts 說明）', () => {
+    expect(kindOfCandidate(cand('麺食堂88'))).toBe('ramen')
+  })
+  it('F4：ら～麺あけどや → ramen：正規化把「～」折成「ー」，「らー麺」命中第 1 層', () => {
+    expect(kindOfCandidate(cand('ら～麺あけどや'))).toBe('ramen')
+  })
+  it('F4：ら-麺あけどや → ramen：半形連字號也折成「ー」', () => {
+    expect(kindOfCandidate(cand('ら-麺あけどや'))).toBe('ramen')
+  })
+  it('F6：麺処 → soba：名字裡有「そば／蕎麦」時蕎麥麵先於第 2 層前綴（round 5 單一集中表的反向缺陷）', () => {
+    expect(kindOfCandidate(cand('麺処、そば志ん、'))).toBe('soba')
+  })
+  it('F6 守衛：麺処讃岐うどん → udon：明確烏龍麵關鍵字在兩層拉麵表之前', () => {
+    expect(kindOfCandidate(cand('麺処讃岐うどん'))).toBe('udon')
+  })
+  it('守衛：麺喜やしま → udon、藪蕎麦 → soba、中華そば 青葉 → ramen、丸亀製麺 → udon、麺処ほん田 → ramen', () => {
+    expect(kindOfCandidate(cand('麺喜やしま'))).toBe('udon')
+    expect(kindOfCandidate(cand('藪蕎麦'))).toBe('soba')
+    expect(kindOfCandidate(cand('中華そば 青葉'))).toBe('ramen')
+    expect(kindOfCandidate(cand('丸亀製麺'))).toBe('udon')
+    expect(kindOfCandidate(cand('麺処ほん田'))).toBe('ramen')
+  })
+  it('守衛：つけ麺 さなだ、麺屋武蔵、らぁ麺 飯田商店、支那そばや、油そば 東京油組総本店、台湾まぜそば はなび、麺匠 竹虎、麺場 田所商店 → ramen', () => {
+    for (const name of ['つけ麺 さなだ', '麺屋武蔵', 'らぁ麺 飯田商店', '支那そばや', '油そば 東京油組総本店', '台湾まぜそば はなび', '麺匠 竹虎', '麺場 田所商店']) {
+      expect(kindOfCandidate(cand(name))).toBe('ramen')
+    }
+  })
+})
+
+describe('kindOfCandidate：串燒／壽司／咖啡關鍵字補漏（紅隊 round 5 F2／F5）', () => {
+  it('F2：やき鳥 宮川 → yakitori', () => {
+    expect(kindOfCandidate(cand('やき鳥 宮川'))).toBe('yakitori')
+  })
+  it('F2：炭火焼き鳥 池袋 和み屋 → yakitori', () => {
+    expect(kindOfCandidate(cand('炭火焼き鳥 池袋 和み屋'))).toBe('yakitori')
+  })
+  it('F5：鮨 さいとう → sushi', () => {
+    expect(kindOfCandidate(cand('鮨 さいとう'))).toBe('sushi')
+  })
+  it('F5：喫茶室ルノアール → cafe', () => {
+    expect(kindOfCandidate(cand('喫茶室ルノアール'))).toBe('cafe')
+  })
+})

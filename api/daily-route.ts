@@ -1,6 +1,7 @@
 import { travelMatrix, scheduleRoute, validPoint } from '../src/dailyRouting.ts'
 import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
 import { isDeniedCandidate } from '../src/venueCheck.ts'
+import { areaCenter, AREA_RADIUS_M } from '../src/areas.ts'
 // Daily Decision: real Google Places results and approximate geographic route ordering.
 // Does not claim live traffic, transit ETAs, reservations or confirmed stock.
 export const config = { runtime:'nodejs' }
@@ -24,14 +25,14 @@ function randomIndex(n:number):number{
  crypto.getRandomValues(buf)
  return buf[0]!%n
 }
-/** 「散步回家」不是要拜訪的店家：不帶 candidate 的純文字站，不發 Places 查詢、不參與未解決檢查。固定安排／指定地點／已完成的不算。 */
-const isTextOnlyRest=(s:Stop)=>s.id==='rest'&&!s.locked&&!s.custom&&!s.done&&!s.specified
+/** 「散步回家」不是要拜訪的店家：不帶 candidate 的純文字站，不發 Places 查詢、不參與未解決檢查。固定安排／指定地點的不算。已完成也不算——rest 從來沒有可拜訪的店家，已完成與否都不帶候選；否則標記完成後整單 422（item 7：已完成 rest 無候選時，舊版 isTextOnlyRest 排除 done，會被未解決檢查擋下）。 */
+const isTextOnlyRest=(s:Stop)=>s.id==='rest'&&!s.locked&&!s.custom&&!s.specified
 type SearchPage={places:Candidate[];nextPageToken?:string}
-async function search(key:string,q:string,center?:Coord,count=20,opts:{includedType?:string;pageToken?:string}={}):Promise<SearchPage>{
+async function search(key:string,q:string,center?:Coord,count=20,opts:{includedType?:string;pageToken?:string;biasRadiusM?:number}={}):Promise<SearchPage>{
  const body:Record<string,unknown>={textQuery:q,pageSize:count,languageCode:'ja'}
  if(opts.includedType)body.includedType=opts.includedType
  if(opts.pageToken)body.pageToken=opts.pageToken
- if(center)body.locationBias={circle:{center:{latitude:center.lat,longitude:center.lng},radius:3500}}
+ if(center)body.locationBias={circle:{center:{latitude:center.lat,longitude:center.lng},radius:opts.biasRadiusM??3500}}
  const r=await fetch(BASE+'/v1/places:searchText',{method:'POST',headers:{'content-type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':MASK},body:JSON.stringify(body),signal:AbortSignal.timeout(9000)})
  if(!r.ok)throw new Error(r.status===429?'搜尋額度暫時用完':'店家搜尋暫時無法使用')
  const data=await r.json() as {places?:Array<{id?:string;displayName?:{text?:string};formattedAddress?:string;location?:{latitude?:number;longitude?:number};googleMapsUri?:string;currentOpeningHours?:{openNow?:boolean};rating?:number;userRatingCount?:number;types?:string[];primaryType?:string}>;nextPageToken?:string}
@@ -56,6 +57,18 @@ function venueOk(p:Candidate,s:Stop,excludeKinds:string[]):boolean{
  // 固定健身房 FIT-EASY 是使用者指定的店，不是探索發現：不套評論數門檻（類型 gym 照樣過濾）。
  if(s.id!=='gym'&&s.kind!=='gym'&&(p.userRatingCount??0)<MIN_REVIEWS)return false
  return true
+}
+/**
+ * 地區偏好（F7）：開啟時，自動挑的站只派地區中心半徑內的店。硬過濾——Google
+ * 的 locationBias 只是提示，真正的保證是這裡的距離檢查（mock 層級也可驗）。
+ * 指定／固定／已完成的地點是使用者的選擇，不套地區限制（跟評論門檻同一原則）。
+ */
+function areaOk(p:Candidate,s:Stop,pref:{lat:number;lng:number}|null):boolean{
+ if(!pref)return true
+ const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
+ if(!auto)return true
+ // dist 回公里，AREA_RADIUS_M 是公尺：先換算。
+ return dist(pref,p)*1000<=AREA_RADIUS_M
 }
 function order(stops:Stop[],origin:Coord):{stops:Stop[];distanceKm:number;warning?:string}{
  // Preserve fixed appointments and completed tasks in their relative slots; optimize only movable segments.
@@ -86,6 +99,8 @@ async function handler(req:Request):Promise<Response>{
  const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,200):[]
  // 排除清單上限 200（跟前端 mergeExclude 同步）：不喜歡 100＋placeMem 封鎖＋每站換掉過的 20＋其他站候選；舊版種類鍵（'ramen_restaurant'）先轉新鍵，舊的不喜歡才不會失效。
  const excludeKinds=Array.isArray(input.excludeKinds)?[...new Set(input.excludeKinds.filter(x=>typeof x==='string').map(normalizeKind))].slice(0,20):[]
+ // 地區偏好（F7）：開啟＋已知地區才生效；關掉或未知地區＝不過濾（防禦：舊資料不該整單失敗）。
+ const areaPref=input.areaOnly===true&&typeof input.area==='string'?areaCenter(input.area):null
  try{
   let origin:Record<string,unknown>,center:Coord
   if(gps){center=gps;origin={name:'目前位置',current:true,lat:gps.lat,lng:gps.lng}}
@@ -121,11 +136,12 @@ async function handler(req:Request):Promise<Response>{
    // 目前位置模式沒有地名可附加：只靠 locationBias（中心＝目前位置）找附近的店。
    const queryText=q+(preserve||s.specified||!location?'':' '+location)
    // 排除清單一長就可能一頁翻完都沒得選：eligible 為空時用 pageToken 往下一頁翻，最多 3 頁。
+   // 地區偏好開啟時，查詢的 locationBias 半徑也縮到地區半徑，讓 Google 先回附近的店；真正的保證是 areaOk 的硬過濾。
    let eligible:Candidate[]=[]
    let pageToken:string|undefined
    for(let page=0;page<3;page++){
-    const found=await search(key,queryText,center,20,{includedType:stopType,pageToken})
-    eligible=found.places.filter(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
+    const found=await search(key,queryText,center,20,{includedType:stopType,pageToken,biasRadiusM:areaPref?AREA_RADIUS_M:undefined})
+    eligible=found.places.filter(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
     if(eligible.length||!found.nextPageToken)break
     pageToken=found.nextPageToken
    }

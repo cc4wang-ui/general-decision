@@ -225,3 +225,63 @@ describe('出發地換成目前位置',()=>{
   expect(routeProposal({...legacy,useHere:true}).tasks.some(t=>!t.candidate)).toBe(true)
  })
 })
+
+describe('loadDaily：既有候選保留規則統一（紅隊 round 5 item 7，round 6）',()=>{
+ beforeEach(()=>{localStorage.clear()})
+ afterEach(()=>{localStorage.clear()})
+ const stationCand={id:'shibuya-station',name:'渋谷駅',address:'渋谷駅地下 1F',mapUrl:'https://maps.google.com/?cid=shibuya-station',lat:35.6595,lng:139.7005,rating:4.1,userRatingCount:9000,types:['transit_station'],primaryType:'transit_station'}
+ const seedRaw=(raw:Record<string,unknown>)=>{
+  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',mode:'creative',notes:[],avoid:[],seen:{},disliked:[],dislikedKinds:[],...raw}))
+ }
+ it('已完成 meal 的車站候選保留（使用者的選擇；伺服器端同一規則）',()=>{
+  const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:true,candidate:stationCand}
+  seedRaw({tasks:[meal]})
+  expect(loadDaily().tasks.find(t=>t.id==='meal')?.candidate?.id).toBe('shibuya-station')
+ })
+ it('已完成 rest 的車站候選清掉：rest 從來沒有可拜訪的店家，已完成與否都不帶候選',()=>{
+  const rest={id:'rest',title:'散步回家',minutes:75,kind:'rest',done:true,candidate:stationCand,eta:'18:00 抵達',departure:'17:00 離開',travelMin:30}
+  seedRaw({tasks:[rest]})
+  const out=loadDaily().tasks.find(t=>t.id==='rest')!
+  expect(out.candidate).toBeUndefined()
+  expect(out.eta).toBeUndefined()
+  expect(out.travelMin).toBeUndefined()
+ })
+ it('未完成 meal 的車站候選照樣清掉（item 7 只改已完成站）',()=>{
+  const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:false,candidate:stationCand}
+  seedRaw({tasks:[meal]})
+  expect(loadDaily().tasks.find(t=>t.id==='meal')?.candidate).toBeUndefined()
+ })
+})
+
+describe('loadDaily：地區偏好移轉（紅隊 round 5 F7，round 6）',()=>{
+ beforeEach(()=>{localStorage.clear()})
+ afterEach(()=>{localStorage.clear()})
+ const seedRaw=(raw:Record<string,unknown>)=>{
+  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',mode:'creative',tasks:[],notes:[],avoid:[],seen:{},disliked:[],dislikedKinds:[],...raw}))
+ }
+ it('舊資料的跨區自由文字偏好轉成結構化偏好：notes 移除那一行，area 澀谷、areaOnly 開啟',()=>{
+  seedRaw({notes:['固定健身房：FIT-EASY；不推薦其他付費健身房','以澀谷為生活基地，避免不必要跨區','偏好安靜咖啡廳、日式定食、藝術與日本 IP']})
+  const out=loadDaily()
+  expect(out.notes).not.toContain('以澀谷為生活基地，避免不必要跨區')
+  expect(out.notes).toContain('固定健身房：FIT-EASY；不推薦其他付費健身房')
+  expect(out.notes).toContain('偏好安靜咖啡廳、日式定食、藝術與日本 IP')
+  expect(out.area).toBe('澀谷')
+  expect(out.areaOnly).toBe(true)
+ })
+ it('舊資料沒有 areaOnly 欄位時預設開啟（當時沒有關掉的辦法，開啟才是忠實轉換）',()=>{
+  seedRaw({area:'新宿'})
+  const out=loadDaily()
+  expect(out.area).toBe('新宿')
+  expect(out.areaOnly).toBe(true)
+ })
+ it('舊資料 areaOnly 明確關掉時保持關掉',()=>{
+  seedRaw({area:'新宿',areaOnly:false})
+  const out=loadDaily()
+  expect(out.area).toBe('新宿')
+  expect(out.areaOnly).toBe(false)
+ })
+ it('舊資料 area 是未知地區時退回澀谷（防禦：打錯字不該整單失敗）',()=>{
+  seedRaw({area:'吉祥寺',areaOnly:true})
+  expect(loadDaily().area).toBe('澀谷')
+ })
+})
