@@ -10,6 +10,10 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4173',
     trace: 'off',
     ...devices['iPhone 13'],
+    // devices['iPhone 13'] 的 defaultBrowserType 是 webkit；不寫死 chromium 的話，
+    // runner 會拿 chromium binary 配 webkit 參數啟動，瀏覽器直接退出（tests round 14 F5）。
+    // 寫在 spread 之後，避免將來 descriptor 多了 browserName 把它蓋掉。
+    browserName: 'chromium',
   },
   webServer: {
     command: 'npx vite build && npx vite preview --port 4173 --strictPort --host 127.0.0.1',
