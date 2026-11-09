@@ -9,7 +9,7 @@
 
 規格：[DECIDE-DEV-DOC-v1.md](DECIDE-DEV-DOC-v1.md)（2026-09 的原始規格；Round 4 起的改動見檔頭附註）　畫面基準：[decide-mock-v5.html](decide-mock-v5.html)
 
-## 現在的狀態（2026-11-04）
+## 現在的狀態（2026-11-10）
 
 | 輪 | 內容 | 文件 |
 |---|---|---|
@@ -22,6 +22,13 @@
 | 今日行程 | PR #27–#32（另一條工作線）：真地點、照片、導航、固定行程、單站洗牌 | `STATE.md` |
 | 9 | 兩條線合併；修固定行程的時間檢查 | `state/ROUND9-PROGRESS.md` |
 | 10 | 路線圖全做：到店要開著、約會與宵夜不派酒吧、其他的需求換日文、「去」卡查真地點、記憶匯出入、今日行程用目前位置… | `state/ROUND10-PROGRESS.md` |
+| 11 | 約會步行上限 15 分、Routes 403 記原因（已開通）、分享面板 e2e；PR #34 `945088a`（2026-11-04） | `state/ROUND11-PROGRESS.md` |
+| 12 | 已知未修全處理、一次上線；PR #35 `0d88cdb`（2026-11-05） | `state/ROUND12-PROGRESS.md` |
+| 13 | 沒評分的店不過評分門檻、朋友聚餐不派購物中心；PR #36 `acfd4d2`（2026-11-05） | `state/ROUND13-PROGRESS.md` |
+| 14 | 種類只留類型＋品牌、刪整條店名判斷；PR #38 `766d2f49`（2026-11-09） | `state/ROUND14-PROGRESS.md` |
+| 日記時區 | 日記顯示本地時間；PR #39 `8ffcbda2`（2026-11-09） | `src/diary.ts` |
+| CI | CI＋分支保護上線（`check`／`e2e`／`required` 為 required check）；PR #40 `02999c9a`（2026-11-09） | `.github/workflows/ci.yml` |
+| 步驟 3 設定 | tsconfig／ESLint／Husky／Stryker 設定落地；PR #43 `eca366cc`（2026-11-10） | `eslint.config.mjs`、`stryker.config.mjs` |
 
 部署：Vercel 接在這個 repo，`main` 一更新就自動部署正式站。測試版在 PR 的分支上自動建。正式站有問題用 Vercel rollback。
 
@@ -31,7 +38,7 @@
 - **班長記得你**：`src/placeMem.ts` 只在手機存 place_id 與時間戳；「換一家」要報原因（店關了／不想吃這類／不要再來），口令卡印「新據點／第 N 次／偵察任務」。
 - **價位**：「吃」多一列預算（每人），依座標自動切台幣／日圓（`src/price.ts`）。
 - **上架準備**：同意畫面、隱私頁、檢舉入口、`docs/round3/STORE-LISTING.md`、`CAPACITOR-READY.md`。
-- 文件：市場調查與策略 `docs/round3/`（R1–R3、STRATEGY、DEV-PLAN-3）。Jev（TypeSafe）選配層：`src/typesafe.ts`、`src/jevJudge.ts`、`scripts/taste-judge.mjs`、`scripts/effort-route.mjs`，設 `TYPESAFE_API_KEY` 才會啟用。
+- 文件：市場調查與策略 `docs/round3/`（R1–R3、STRATEGY、DEV-PLAN-3）。Jev（TypeSafe）選配層：`src/typesafe.ts`、`scripts/taste-judge.mjs`、`scripts/effort-route.mjs`，設 `TYPESAFE_API_KEY` 才會啟用。（`src/jevJudge.ts` 已刪：全 repo 零引用。）
 
 ```bash
 npm run replay       # 離線重播：三方針 × 200 種子 × 14 天，新鮮度／品質門檻

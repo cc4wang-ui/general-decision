@@ -23,3 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 test-results/
+
+# Env / local config (never commit real keys)
+.env
+
+# Generated / build output
+playwright-report/
+design-dist/
+deploy/
+coverage/
+.vercel/

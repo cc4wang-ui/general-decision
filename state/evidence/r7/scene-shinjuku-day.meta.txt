@@ -1,6 +1,0 @@
-source: mcp__Vercel__web_fetch_vercel_url
-url: https://general-decision-3jj8zlppn-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=shinjuku
-deployment: dpl_9jUthkLRmM64Zy1y1t1SKE9kCvJd (R7 preview-1, source 94b4e0b)
-fetched: Mon, 02 Nov 2026 05:40:37 GMT (14:40 Tokyo), x-vercel-id iad1::v9f2w-1793598034125-48ba1ca3497d, x-vercel-cache MISS
-home: GET / → 200, data-deployment-id=dpl_9jUthkLRmM64Zy1y1t1SKE9kCvJd
-note: 工具回應原文逐字存檔（session 不能直接 curl preview）。

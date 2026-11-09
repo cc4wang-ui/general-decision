@@ -1,5 +1,0 @@
-source: mcp__Vercel__web_fetch_vercel_url
-url: https://general-decision-3jj8zlppn-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=shinjuku
-deployment: dpl_9jUthkLRmM64Zy1y1t1SKE9kCvJd (R7 preview-1, source 94b4e0b; 程式跟正式站 dpl_GRtU7onjopNWnQ1YrXRnQ9rM6eyA 相同)
-fetched: Mon, 02 Nov 2026 16:14:56 GMT (01:14 Tokyo), x-vercel-id iad1::vs4cd-1793636091574-eecf133825e0, x-vercel-cache MISS
-note: 第一次呼叫 60 秒超時（冷啟動），第二次成功；伺服器端可能跑了兩次（費用約兩倍）。工具回應原文逐字存檔。

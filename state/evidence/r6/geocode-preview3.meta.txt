@@ -1,5 +1,0 @@
-source: mcp__Vercel__web_fetch_vercel_url
-url: https://general-decision-dp4tfp3kw-cc4wang-uis-projects.vercel.app/api/probe?mode=geocode
-deployment: dpl_BczjRMsGvQNzoE386mdq6GnGGY3D (R6 preview-3, source fe698f4; geocode.ts 含「駅 → ja」查法)
-fetched: Mon, 02 Nov 2026 02:26:19 GMT (11:26 Tokyo), x-vercel-id iad1::vwl97-1793586377913-8083601da2f0, x-vercel-cache MISS
-note: 工具回應原文逐字存檔（session 不能直接 curl preview）。

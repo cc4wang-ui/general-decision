@@ -1,5 +1,0 @@
-URL: https://general-decision-2n41z4zy9-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=xinyi
-fetched: curl（分享連結 cookie）
-date: 2026-11-05 13:32:13 UTC（東京 22:32）
-status: 200
-x-vercel-id: iad1::iad1::8tfdn-1793885529969-9a270ffa3a88

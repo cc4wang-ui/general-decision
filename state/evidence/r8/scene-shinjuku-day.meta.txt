@@ -1,7 +1,0 @@
-URL: https://general-decision-4q8eho7x4-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=shinjuku
-deployment: dpl_BKFQJtdhHLUuyuhwXvKNteUa7bgW（R8 preview-1，f93d1b5）
-fetched: mcp__Vercel__web_fetch_vercel_url
-date: Tue, 03 Nov 2026 00:25:07 GMT（東京 09:25）
-x-vercel-id: iad1:iad1::iad1::zn6qk-1793665503869-68e0e5d7056d
-status: 200
-同一次確認首頁：/assets/index-DcEuZkNv.js（= 本機 f93d1b5 build），x-vercel-id iad1:iad1:iad1:iad1::nhpgz-1793665501476-bd660c7098d0

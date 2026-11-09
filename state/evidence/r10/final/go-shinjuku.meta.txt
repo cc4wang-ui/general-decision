@@ -1,5 +1,0 @@
-URL: https://general-decision-4pxuyv4px-cc4wang-uis-projects.vercel.app/api/probe?mode=go&loc=shinjuku
-fetched: curl（分享連結 cookie）
-date: 2026-11-04 00:02:19 UTC（東京 09:02）
-status: 200
-x-vercel-id: iad1::iad1::rpfrt-1793750531004-6889165251a4

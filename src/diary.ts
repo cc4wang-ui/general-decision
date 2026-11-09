@@ -1,5 +1,5 @@
 // 新兵日記 — IndexedDB 讀寫、週統計（第 4、10 節）。
-import { del, get, set } from 'idb-keyval'
+import { get, set } from 'idb-keyval'
 import type { DiaryEntry, Level, ModuleId, PickMode, ReissueReason, WeeklyReport } from './types.ts'
 
 const ENTRIES_KEY = 'decide.entries'
@@ -24,11 +24,6 @@ export async function putEntry(entry: DiaryEntry): Promise<DiaryEntry[]> {
   else list.push(entry)
   await set(ENTRIES_KEY, list)
   return list
-}
-
-export async function clearDiary(): Promise<void> {
-  await del(ENTRIES_KEY)
-  await del(WEEKLY_KEY)
 }
 
 // ── 週界：以本地時間的週一 00:00 為一週開始 ─────────────────────────

@@ -1,6 +1,0 @@
-source: mcp__Vercel__web_fetch_vercel_url
-url: https://general-decision-dp4tfp3kw-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=shinjuku
-deployment: dpl_BczjRMsGvQNzoE386mdq6GnGGY3D (R6 preview-3, source fe698f4)
-fetched: Mon, 02 Nov 2026 02:13:22 GMT (11:13 Tokyo), x-vercel-id iad1::p4g9n-1793585598905-aad9487d3d51, x-vercel-cache MISS
-home: GET / → 200, data-deployment-id=dpl_BczjRMsGvQNzoE386mdq6GnGGY3D
-note: 直接 curl 被 session 的 egress proxy 擋（403 CONNECT）；本檔是工具回應原文逐字存檔。

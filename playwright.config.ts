@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: 'tests',
+  // 只跑 Playwright 規格：裸 `npx playwright test` 不再誤載 vitest 單元測試
+  //（tests/unit/* 用 `npm test` 跑；Playwright 載入它們會直接報錯）。
+  testMatch: ['tests/e2e/**/*.spec.ts', 'tests/shots/**/*.spec.ts'],
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
