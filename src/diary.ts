@@ -162,3 +162,4 @@ export function makeEntry(
   if (meta?.mode) e.mode = meta.mode
   return e
 }
+// branch-protection verification (step 4): normal-flow test comment
