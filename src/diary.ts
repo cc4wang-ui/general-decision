@@ -31,7 +31,10 @@ export async function clearDiary(): Promise<void> {
   await del(WEEKLY_KEY)
 }
 
-// ── 週界：以台灣時間的週一 00:00 為一週開始 ─────────────────────────
+// ── 週界：以本地時間的週一 00:00 為一週開始 ─────────────────────────
+// 本地時間 = 看的人所在時區（runtime 的本地時區）。週界、日標籤、時間標籤、
+// 週報到期一律用本地 getter（getDay／getHours／setDate／setHours），不用台北時間
+//（使用者決定 2026-11-09：日記顯示本地時間）。
 export function weekStartOf(d: Date): string {
   const x = new Date(d)
   const dow = (x.getDay() + 6) % 7 // 週一 = 0
@@ -139,7 +142,7 @@ export async function saveWeekly(report: WeeklyReport): Promise<void> {
   await set(WEEKLY_KEY, all)
 }
 
-/** 第 10 節：now ≥ 本週日 20:00 才自動產週報。 */
+/** 第 10 節：now ≥ 本週日 20:00（本地時間）才自動產週報。 */
 export function weeklyDue(now: Date = new Date()): boolean {
   return now.getDay() === 0 && now.getHours() >= 20
 }

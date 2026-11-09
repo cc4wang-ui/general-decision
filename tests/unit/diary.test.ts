@@ -8,6 +8,16 @@ import type { DiaryEntry } from '../../src/types.ts'
 const e = (ts: string, module: DiaryEntry['module'], outcome: DiaryEntry['outcome']): DiaryEntry =>
   makeEntry(ts, module, 1, `${module}-big`, outcome)
 
+// 本地 wall-clock：日記一律用本地時間（使用者決定 2026-11-09），所以測試時間
+// 也用本地時間建。無時區後綴的 ISO 字串按本地時間解析，斷言用本地 getter，
+// 在任何時區都成立。不要用 `+08:00` 字面量：它把台北時間寫死，
+// 在東京／UTC 會讓 timeLabel／weeklyDue 這類本地斷言失敗。
+const at = (y: number, mo: number, d: number, h = 0, mi = 0) => {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${y}-${p(mo)}-${p(d)}T${p(h)}:${p(mi)}:00`
+}
+const local = (y: number, mo: number, d: number, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi)
+
 describe('diary 統計（第 10、13.1 節）', () => {
   it('服從率 =（done + reissued）÷ 全部', () => {
     // 12 筆：9 done、1 reissued、2 punished → (9+1)/12 = 83%
@@ -57,40 +67,45 @@ describe('diary 冪等（第 13.1 節）', () => {
 
 describe('週界與近 7 天', () => {
   it('週界落在週一 00:00', () => {
-    const ws = new Date(weekStartOf(new Date('2026-09-11T12:00:00+08:00'))) // 週五
+    const ws = new Date(weekStartOf(local(2026, 9, 11, 12))) // 本地週五
+    // 不只「是週一 00:00」，還要是「那一週的週一」：2026-09-11（五）→ 09-07（一）
+    expect(ws.getFullYear()).toBe(2026)
+    expect(ws.getMonth()).toBe(8)
+    expect(ws.getDate()).toBe(7)
     expect(ws.getDay()).toBe(1)
     expect(ws.getHours()).toBe(0)
+    expect(ws.getMinutes()).toBe(0)
   })
 
   it('entriesInWeek 只留那一週的', () => {
-    const ws = weekStartOf(new Date('2026-09-11T12:00:00+08:00'))
-    const inside = e('2026-09-11T12:00:00+08:00', 'eat', 'done')
-    const outside = e('2026-08-01T12:00:00+08:00', 'eat', 'done')
+    const ws = weekStartOf(local(2026, 9, 11, 12))
+    const inside = e(at(2026, 9, 11, 12), 'eat', 'done')
+    const outside = e(at(2026, 8, 1, 12), 'eat', 'done')
     expect(entriesInWeek([inside, outside], ws).map((x) => x.id)).toEqual([inside.id])
   })
 
   it('recentOrders 只取近 7 天', () => {
-    const now = new Date('2026-09-11T12:00:00+08:00')
-    const recent = e('2026-09-10T12:00:00+08:00', 'eat', 'done')
-    const old = e('2026-08-01T12:00:00+08:00', 'eat', 'done')
+    const now = local(2026, 9, 11, 12)
+    const recent = e(at(2026, 9, 10, 12), 'eat', 'done')
+    const old = e(at(2026, 8, 1, 12), 'eat', 'done')
     expect(recentOrders([recent, old], now)).toEqual([
-      { module: 'eat', big: 'eat-big', at: '2026-09-10T12:00:00+08:00' },
+      { module: 'eat', big: 'eat-big', at: '2026-09-10T12:00:00' },
     ])
   })
 
   it('週報只在週日 20:00 之後才到期', () => {
-    expect(weeklyDue(new Date('2026-09-13T20:00:00+08:00'))).toBe(true) // 週日 20:00
-    expect(weeklyDue(new Date('2026-09-13T19:59:00+08:00'))).toBe(false)
-    expect(weeklyDue(new Date('2026-09-12T22:00:00+08:00'))).toBe(false) // 週六
+    expect(weeklyDue(local(2026, 9, 13, 20))).toBe(true) // 本地週日 20:00
+    expect(weeklyDue(local(2026, 9, 13, 19, 59))).toBe(false)
+    expect(weeklyDue(local(2026, 9, 12, 22))).toBe(false) // 本地週六
   })
 })
 
 describe('日記分組', () => {
   it('同一天的併成一組，順序保持', () => {
     const list = [
-      e('2026-09-11T16:05:00+08:00', 'rest', 'punished'),
-      e('2026-09-11T12:41:00+08:00', 'eat', 'done'),
-      e('2026-09-10T19:00:00+08:00', 'attend', 'done'),
+      e(at(2026, 9, 11, 16, 5), 'rest', 'punished'),
+      e(at(2026, 9, 11, 12, 41), 'eat', 'done'),
+      e(at(2026, 9, 10, 19), 'attend', 'done'),
     ]
     const g = groupByDay(list)
     expect(g).toHaveLength(2)
@@ -99,8 +114,8 @@ describe('日記分組', () => {
   })
 
   it('日期與時間標籤', () => {
-    expect(dayLabel('2026-09-11T12:41:00+08:00')).toMatch(/^週. 09\/11$/)
-    expect(timeLabel('2026-09-11T12:41:00+08:00')).toBe('12:41')
+    expect(dayLabel(at(2026, 9, 11, 12, 41))).toBe('週五 09/11')
+    expect(timeLabel(at(2026, 9, 11, 12, 41))).toBe('12:41')
   })
 })
 
