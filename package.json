@@ -18,7 +18,11 @@
     "replay": "vitest run tests/unit/discovery-replay.test.ts",
     "probe:lanes": "node scripts/probe-lanes.mjs",
     "taste": "node scripts/taste-judge.mjs",
-    "route": "node scripts/effort-route.mjs docs/round3/effort-tasks.json"
+    "route": "node scripts/effort-route.mjs docs/round3/effort-tasks.json",
+    "lint": "eslint src api tests/unit",
+    "lint:fix": "eslint src api tests/unit --fix",
+    "prepare": "husky",
+    "test:mutants": "stryker run"
   },
   "dependencies": {
     "html-to-image": "^1.11.13",
@@ -28,14 +32,32 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/typescript-checker": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "eslint": "^10.14.0",
+    "husky": "^9.1.7",
     "jsdom": "^26.0.0",
+    "lint-staged": "^17.6.0",
     "typescript": "~6.0.2",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix"
+    ],
+    "api/**/*.ts": [
+      "eslint --fix"
+    ],
+    "tests/unit/**/*.{ts,tsx}": [
+      "eslint --fix"
+    ]
   }
 }
