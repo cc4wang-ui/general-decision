@@ -162,3 +162,6 @@ export function makeEntry(
   if (meta?.mode) e.mode = meta.mode
   return e
 }
+
+// branch-protection verification (step 4): intentional tsc failure, do not merge
+const _protection_test: string = 123;
