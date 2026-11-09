@@ -1,0 +1,160 @@
+# general-decision — GitHub Actions CI（草稿，step 2 準備用，未推送）
+#
+# 來源：IMPROVEMENT-PLAN.md §1 第 4 層（CI 門檻）＋ ci-gates/REPORT.md §5。
+# 本檔所有指令都取自本 repo 真實的 package.json（2026-11-09 於
+# ~/workspace/general-decision-fix/repo-round14/ 讀取，base b282682，
+# branch fix/daily-route-shuffle-dislikes），沒有憑空編造的 script。
+#
+# 前置條件（已滿足，2026-11-09 驗過）：本 workflow 假設 playwright.config.ts
+# 已寫 browserName: 'chromium'。PR #39（diary fix，merge 8ffcbda2）已把它
+# 加進去，main 的 playwright.config.ts:16 就是 browserName: 'chromium'。
+# 若無此行，Playwright 會預設用 webkit 跑 —— 正是 AGENTS.md round-14 F5 的
+# 教訓（臨時 e2e 設定缺 browserName，runner 用 webkit 參數啟動 chromium
+# binary，Chrome 約 470ms 後乾淨退出），e2e job 跑的不是 Chromium，門檻等於沒設。
+# 詳見 staging/branch-protection-checklist.md。
+name: CI
+
+# 觸發：PR 全跑；push 只跑 main。不要寫裸 on: [push, pull_request]，
+# 那會讓同一個 PR commit 觸發兩次 run（ci-gates/REPORT.md §5）。
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同分支新 push 取消舊 run，避免舊綠燈覆蓋新紅燈（REPORT.md §5）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check (tsc + vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          # repo 沒有 engines 欄位；取與 daily-ten 現有 CI 相同、且為 LTS 的 22。
+          # 本機驗證用 Node 24.22.1（2026-11-09），若將來鎖 engines 請同步改這裡。
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # tsc 必須是獨立的一步，不可併進 vitest。
+      # 證據：Vitest 用 esbuild 跑測試，不做型別檢查 —— 單元測試全過不代表型別沒錯。
+      # 教訓：round-11 實作報告寫「tsc: PASS」，實際 tsc 是 FAIL（5 個型別錯誤在測試檔）；
+      # round-14 又重演一次（測試檔 2 個未用 helper，TS6133，報告寫 exit 0 是假的）。
+      # 本 repo 的型別檢查是 `npm run typecheck`（= tsc -b，package.json 實有指令），
+      # 它用 project references 覆蓋：tsconfig.app.json 含 src、tests/unit、api；
+      # tsconfig.node.json 含 vite.config.ts、playwright.config.ts、tests/e2e、tests/shots。
+      # 所以測試檔的型別錯誤會在這裡被擋住，不是只靠 vitest。
+      - name: Typecheck
+        run: npm run typecheck
+
+      # 沒有 lint 步驟 —— 誠實說明，不是漏寫。
+      # 2026-11-09 查 package.json：沒有 lint script，也沒有 eslint 相依套件，
+      # 所以本 workflow 不編造一個 lint 指令。ESLint 收緊是計畫 step 3 的工作；
+      # step 3 落地（加 lint script）之後，再把 `npm run lint` 加回這個 job。
+      # 在此之前，check job = tsc + vitest。
+
+      # 指令取自 package.json："test": "vitest run"。不加 reporter 參數，
+      # 保持與本機驗證同一條指令（本機 round-14：vitest 1032/1034，
+      # 其中 2 個 diary 失敗為 pre-existing；daily-route 107/107）。
+      - name: Unit tests
+        run: npm test
+
+  e2e:
+    name: e2e (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 瀏覽器版本釘選：不要裝「最新版 Chromium」，要裝 lockfile 決定的版本。
+      # 教訓：Chromium 1194 全敗／1243 全過是環境漂移，不是 flaky ——
+      # 版本一變，e2e 結果就跟著變，重跑沒有用。所以版本必須可重現、可追溯。
+      # 釘選機制就是 npm ci：package-lock.json 鎖住 @playwright/test 的確切版本
+      # （2026-11-09：^1.50.0 解析為 1.63.0），而該版本內建的 Chromium
+      # revision 就是 1243（browserVersion 153.0.8010.12）。
+      # 升級 Playwright = 換瀏覽器版本，必須是有意的 commit，不可順手升級。
+      # --with-deps 同時裝系統依賴（本機 VM 換機後缺 libgtk-4 等系統庫、
+      # install-deps exit 0 卻沒裝上的教訓，見 AGENTS.md round-14 F5）。
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # 版本寫進 run log：門檻的一部分。將來 e2e 全敗時，第一件事是對照
+      # 這裡的 revision，而不是先猜 flaky。
+      - name: Log browser version
+        run: |
+          npx playwright --version
+          node -e "const b = require('./node_modules/playwright-core/browsers.json'); const c = b.browsers.find(x => x.name === 'chromium'); console.log('chromium revision:', c.revision, '| browserVersion:', c.browserVersion)"
+          ls ~/.cache/ms-playwright/
+
+      # Port 與 server 重用：
+      # - playwright.config.ts 把 preview server釘在 127.0.0.1:4173（strictPort）。
+      #   CI 裡每個 job 都是全新的 runner，不存在其他 agent 共用同台機器、
+      #   也不存在另一個 server 佔住 4173 的可能，所以這個 port 在 CI 內就是專用的。
+      #   教訓 round-13 F5（多個 agent 共用 port 4173、reuseExistingServer: true，
+      #   測到別人的 app）是本機多工的問題；CI 的隔離正是解法，不需另換 port。
+      # - reuseExistingServer 在設定檔寫成 !process.env.CI；GitHub Actions
+      #   預設 CI=true，所以 CI 內一定是 false，絕不會接到舊 server。
+      # 指令取自 package.json："e2e": "playwright test tests/e2e"。
+      # 注意：tests/shots（npm run e2e:shots，截圖比對）不在這個門檻內，刻意不跑。
+      - name: Playwright e2e
+        run: npm run e2e
+
+      # 失敗時也要上傳報告：預設 success() 條件會跳過最需要的那次。
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # TypeScript 式 required 彙總 job（REPORT.md §2 關鍵發現 2）：
+  # 狀態來自 job 結果本身，不是人工填寫 —— 這是讓「報告寫 PASS、實際 FAIL」
+  # 變成不可能的結構。分支保護的 required checks 要勾 check、e2e、required 三個。
+  required:
+    name: required
+    if: always()
+    needs: [check, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check all jobs
+        run: |
+          set -euo pipefail
+          echo "needs: ${{ toJSON(needs) }}"
+          echo '${{ toJSON(needs) }}' | jq -e '
+            to_entries
+            | map(select(.value.result != "success"))
+            | if length > 0
+              then (map(.key + ": " + .value.result) | join(", ") | "FAILING JOBS: " + . | error)
+              else "all jobs succeeded"
+              end
+          '
+        # 已知的 skipped 洞（REPORT.md §1），以及本彙總 job 堵洞的方式：
+        # GitHub 自己的 required-check 判定把 skipped 當成 Success —— 依賴失敗
+        # job 的 job 會被跳過、可能不擋合併。所以這裡不用「沒有 failure 就算過」，
+        # 而是要求每個 needs 的 result 嚴格等於 "success"；任何 skipped / failure /
+        # cancelled 都讓 required 失敗。if: always() 保證即使 check 或 e2e 失敗，
+        # required 仍會跑起來判定，而不是跟著被跳過。
