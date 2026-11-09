@@ -1,5 +1,0 @@
-URL: https://general-decision-mohauuinv-cc4wang-uis-projects.vercel.app/api/probe?mode=scene&loc=xinyi
-fetched: curl（分享連結 cookie）
-date: 2026-11-04 00:05:02 UTC（東京 09:05）
-status: 200
-x-vercel-id: iad1::iad1::chcbj-1793750699546-3326c31eb69e

@@ -103,7 +103,7 @@ export function stationStart(order: Order, origin: string, walkMin?: number): Or
   const steps = order.steps ?? []
   if (steps.some((s) => STATION_RE.test(s) || s.includes(label))) return order
   const head = walkMin ? `從${label}出站走 ${walkMin} 分，` : `從${label}出站後，`
-  return { ...order, steps: steps.length ? [head + steps[0]!, ...steps.slice(1)] : [head.replace(/，$/, '。')] }
+  return { ...order, steps: steps.length ? [head + steps[0], ...steps.slice(1)] : [head.replace(/，$/, '。')] }
 }
 
 /**
@@ -249,10 +249,10 @@ export function fixHours(order: Order, pick: PickResult, level: Level, now: Date
         return timeFirst ? `${want}${ctxWord}` : `${ctxWord}${want}`
       })
     }
-    apply(OPEN_RES[0]!, opensAt, false)
-    apply(OPEN_RES[1]!, opensAt, true)
-    apply(CLOSE_RES[0]!, openUntil, false)
-    apply(CLOSE_RES[1]!, openUntil, true)
+    apply(OPEN_RES[0], opensAt, false)
+    apply(OPEN_RES[1], opensAt, true)
+    apply(CLOSE_RES[0], openUntil, false)
+    apply(CLOSE_RES[1], openUntil, true)
     return out === text ? text : tidy(out)
   }
   const top0 = fix(order.meme.top)
@@ -378,10 +378,4 @@ export function localizeWeeklyText(body: string, verdict: string): { body: strin
   const hits = [...b.hits, ...v.hits]
   if (hits.length) console.warn(`[locale] 週報用語守門命中 ${hits.length} 處：${hits.join('、')}`)
   return { body: stripUrls(b.text).text, verdict: stripUrls(v.text).text }
-}
-
-/** 罰則倒數總長（毫秒），給測試與 e2e 用。 */
-export function punishmentMs(level: Level, count: number, stepMs: number): number {
-  void level
-  return count * stepMs
 }
