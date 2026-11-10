@@ -283,6 +283,12 @@ async function handler(req:Request):Promise<Response>{
   // 「沒候選又沒標記」的站才算未解決（防禦檢查，正常流程走不到）。
   const unresolved=ordered.stops.filter(s=>!s.candidate&&!isTextOnlyRest(s)&&!s.noCandidate)
   if(unresolved.length)return respond({error:'unresolved_stops',message:'部分行程尚未找到真實地點，無法計算可靠交通時間。原行程保留。'},422)
+  // 2.1 O1（使用者 2026-11-10 已裁定：回傳部分行程並標示缺站）：逐站 noCandidate
+  // 早已存在（round 7 起，薄池時 200＋逐站標示、不整單 422）；這裡再加頂層契約欄位
+  // partial＋missingStops，讓呼叫端不用掃描 stops 就知道缺了哪幾站、為什麼缺。
+  // rest 純文字站從來不是缺站，不列入。
+  const missingStops=ordered.stops.filter(s=>!s.candidate&&!isTextOnlyRest(s)&&s.noCandidate).map(s=>({id:s.id,reason:s.noCandidateReason??'empty'}))
+  const partial=missingStops.length>0
   try{
    const {matrix,distances}=await travelMatrix(key,center,located)
    const schedule=scheduleRoute(located,matrix,distances,now)
@@ -290,12 +296,12 @@ async function handler(req:Request):Promise<Response>{
    // 站），rest 純文字站與無候選站在 Routes 成功時會整站消失（實測確認；這
    // 也是 live 三輪從沒看到休息站的原因）。失敗路徑本來就回 ordered 全單，不用改。
    const merged=mergeScheduled(ordered.stops,schedule.stops)
-   return respond({origin,...schedule,stops:merged,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
+   return respond({origin,...schedule,stops:merged,partial,missingStops,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
   }catch(e){
    console.warn('[daily-route] Routes matrix unavailable:', e instanceof Error?e.message:'unknown')
    // Keep verified names, photos and navigation functional even if the separate Routes API is not enabled.
    // Do NOT label these geographically grouped stops as verified walking ETAs.
-   return respond({origin,stops:ordered.stops.map(({candidate,...rest})=>({...rest,candidate})),routeVerified:false,travelMode:null,verifiedSource:'Google Places',searchedAt:new Date().toISOString(),conflicts:[],warning:'Google Routes 暫時無法驗證；僅依地理接近程度排順序。每站請開啟 Google Maps 取得實際導航時間。'})
+   return respond({origin,stops:ordered.stops.map(({candidate,...rest})=>({...rest,candidate})),partial,missingStops,routeVerified:false,travelMode:null,verifiedSource:'Google Places',searchedAt:new Date().toISOString(),conflicts:[],warning:'Google Routes 暫時無法驗證；僅依地理接近程度排順序。每站請開啟 Google Maps 取得實際導航時間。'})
   }
  }catch(e){return respond({error:'places_unavailable',message:e instanceof Error?e.message:'店家搜尋失敗'},502)}
 }
