@@ -8,7 +8,7 @@ const cand = (id: string, name: string) => ({ id, name, address: '渋谷', mapUr
 
 const state = (intent = ''): DailyState => ({ day: '2026-11-03', area: '澀谷', currentPlace: '宮下公園', intent, tasks: [], notes: [], avoid: [] })
 
-describe('parseIntent：一日級意圖 → 站種類（封閉關鍵字表）', () => {
+describe('parseIntent：一日級意圖 → 站 id（封閉關鍵字表）', () => {
   it('gym：健身房／gym／ジム／筋トレ都命中', () => {
     expect(parseIntent('今天去健身房')).toEqual(['gym'])
     expect(parseIntent('go to the gym after work')).toEqual(['gym'])
@@ -22,16 +22,16 @@ describe('parseIntent：一日級意圖 → 站種類（封閉關鍵字表）', 
     expect(parseIntent('午餐吃定食')).toEqual(['meal'])
     expect(parseIntent('晚餐吃什麼')).toEqual(['meal'])
   })
-  it('creative：展覽／美術館／art 都命中', () => {
+  it('creative：展覽／美術館／art 都命中探索站 id（咖啡站不再共站）', () => {
     expect(parseIntent('去看展覽')).toEqual(['creative'])
     expect(parseIntent('美術館に行きたい')).toEqual(['creative'])
     expect(parseIntent('an art exhibition')).toEqual(['creative'])
     expect(parseIntent('アートを見に行く')).toEqual(['creative'])
   })
-  it('coffee：咖啡／カフェ命中 creative 種類（咖啡站的 kind 就是 creative）', () => {
-    expect(parseIntent('想喝咖啡')).toEqual(['creative'])
-    expect(parseIntent('カフェで休憩')).toEqual(['creative', 'rest'])
-    expect(parseIntent('have a coffee')).toEqual(['creative'])
+  it('coffee：咖啡／カフェ／coffee 命中咖啡站 id（不再是 creative 種類）', () => {
+    expect(parseIntent('想喝咖啡')).toEqual(['coffee'])
+    expect(parseIntent('カフェで休憩')).toEqual(['coffee', 'rest'])
+    expect(parseIntent('have a coffee')).toEqual(['coffee'])
   })
   it('shopping：購物／買い物／shopping 都命中', () => {
     expect(parseIntent('去購物')).toEqual(['shopping'])
@@ -57,9 +57,10 @@ describe('parseIntent：一日級意圖 → 站種類（封閉關鍵字表）', 
     expect(parseIntent('push the cart')).toEqual([])
     expect(parseIntent('ramenya')).toEqual([])
   })
-  it('多命中：按 catalog 順序回傳（meal 在 creative 前）', () => {
+  it('多命中：按 catalog 順序回傳站 id（meal 在 creative 前，coffee 在 shopping 前）', () => {
     expect(parseIntent('我今天想去吃拉麵然後看展覽')).toEqual(['meal', 'creative'])
-    expect(parseIntent('健身完去喝咖啡')).toEqual(['gym', 'creative'])
+    expect(parseIntent('健身完去喝咖啡')).toEqual(['gym', 'coffee'])
+    expect(parseIntent('去看展覽然後喝咖啡')).toEqual(['creative', 'coffee'])
   })
 })
 
@@ -102,12 +103,19 @@ describe('buildDaily：意圖驅動（mode 已刪）', () => {
     expect(meal.eta).toBe('12:00 抵達')
     expect(meal.travelMin).toBe(30)
   })
-  it('creative 種類同時對應探索站與咖啡站（咖啡站的 kind 也是 creative）', () => {
+  it('展覽意圖只指定探索站：咖啡站維持預設（不再共站）', () => {
     const tasks = buildDaily(state('去看展覽'))
     expect(tasks.find(t => t.id === 'creative')?.specified).toBe(true)
     expect(tasks.find(t => t.id === 'creative')?.place).toBe('去看展覽')
+    expect(tasks.find(t => t.id === 'coffee')?.specified).toBeFalsy()
+    expect(tasks.find(t => t.id === 'coffee')?.place).toBeUndefined()
+  })
+  it('咖啡意圖只指定咖啡站：探索站維持預設（不再共站）', () => {
+    const tasks = buildDaily(state('想喝咖啡'))
     expect(tasks.find(t => t.id === 'coffee')?.specified).toBe(true)
-    expect(tasks.find(t => t.id === 'coffee')?.place).toBe('去看展覽')
+    expect(tasks.find(t => t.id === 'coffee')?.place).toBe('想喝咖啡')
+    expect(tasks.find(t => t.id === 'creative')?.specified).toBeFalsy()
+    expect(tasks.find(t => t.id === 'creative')?.place).toBeUndefined()
   })
   it('replanDaily：已完成任務保留，意圖命中的站 specified', () => {
     const s = state('想吃拉麵')
@@ -121,6 +129,75 @@ describe('buildDaily：意圖驅動（mode 已刪）', () => {
   it('avoid 優先於意圖：略過的站不出現', () => {
     const tasks = buildDaily({ ...state('想吃拉麵'), avoid: ['meal'] })
     expect(tasks.some(t => t.id === 'meal')).toBe(false)
+  })
+})
+
+describe('buildDaily：逐站指定優先於日意圖（intentSpecified 標記）', () => {
+  // 日意圖指定的前一站：經 buildDaily 產生，帶 intentSpecified 標記
+  const intentPrev = (intent: string) => buildDaily(state(intent)).map(t => t.id === 'meal'
+    ? { ...t, candidate: cand('m1', '拉麵店'), eta: '12:00 抵達', departure: '11:30 離開', travelMin: 30 }
+    : t)
+  // 逐站指定的前一站：使用者親手指定「一蘭」，無 intentSpecified 標記
+  const perStopPrev = () => buildDaily(state('')).map(t => t.id === 'meal'
+    ? { ...t, specified: true, place: '一蘭', candidate: cand('m1', '一蘭'), eta: '12:00 抵達', departure: '11:30 離開', travelMin: 30 }
+    : t)
+  it('逐站指定「一蘭」後輸入日意圖「想吃壽司」→ meal 站仍是一蘭、候選與 eta 保留', () => {
+    const tasks = buildDaily({ ...state('想吃壽司'), tasks: perStopPrev() })
+    const meal = tasks.find(t => t.id === 'meal')!
+    expect(meal.place).toBe('一蘭')
+    expect(meal.specified).toBe(true)
+    expect(meal.intentSpecified).toBeFalsy()
+    expect(meal.candidate?.id).toBe('m1')
+    expect(meal.eta).toBe('12:00 抵達')
+    expect(meal.travelMin).toBe(30)
+  })
+  it('日意圖站換意圖 → place 更新、舊候選清掉、標記仍在', () => {
+    const tasks = buildDaily({ ...state('想吃壽司'), tasks: intentPrev('想吃拉麵') })
+    const meal = tasks.find(t => t.id === 'meal')!
+    expect(meal.place).toBe('想吃壽司')
+    expect(meal.specified).toBe(true)
+    expect(meal.intentSpecified).toBe(true)
+    expect(meal.candidate).toBeUndefined()
+    expect(meal.eta).toBeUndefined()
+  })
+  it('同一意圖重跑 → 候選保留、標記仍在', () => {
+    const tasks = buildDaily({ ...state('想吃拉麵'), tasks: intentPrev('想吃拉麵') })
+    const meal = tasks.find(t => t.id === 'meal')!
+    expect(meal.candidate?.id).toBe('m1')
+    expect(meal.eta).toBe('12:00 抵達')
+    expect(meal.intentSpecified).toBe(true)
+  })
+  it('意圖清空 → 日意圖站回復預設、逐站指定站不受影響', () => {
+    const prev = intentPrev('想吃拉麵').map(t => t.id === 'coffee'
+      ? { ...t, specified: true, place: 'Fuglen Tokyo', candidate: cand('c1', 'Fuglen Tokyo') }
+      : t)
+    const tasks = buildDaily({ ...state(''), tasks: prev })
+    const meal = tasks.find(t => t.id === 'meal')!
+    expect(meal.specified).toBeFalsy()
+    expect(meal.place).toBeUndefined()
+    expect(meal.candidate).toBeUndefined()
+    expect(meal.intentSpecified).toBeFalsy()
+    const coffee = tasks.find(t => t.id === 'coffee')!
+    expect(coffee.specified).toBe(true)
+    expect(coffee.place).toBe('Fuglen Tokyo')
+    expect(coffee.candidate?.id).toBe('c1')
+  })
+  it('意圖改成不再命中該站 → 該站回復預設（舊意圖的地點不殘留）', () => {
+    const tasks = buildDaily({ ...state('去看展覽'), tasks: intentPrev('想吃拉麵') })
+    const meal = tasks.find(t => t.id === 'meal')!
+    expect(meal.specified).toBeFalsy()
+    expect(meal.place).toBeUndefined()
+    expect(meal.candidate).toBeUndefined()
+    expect(meal.intentSpecified).toBeFalsy()
+    expect(tasks.find(t => t.id === 'creative')?.place).toBe('去看展覽')
+  })
+  it('舊存檔無標記的指定站視為逐站指定：日意圖不覆蓋（相容規則）', () => {
+    const prev = buildDaily(state('')).map(t => t.id === 'meal'
+      ? { ...t, specified: true, place: '某定食店', candidate: cand('m1', '定食店') }
+      : t)
+    const tasks = buildDaily({ ...state('想吃壽司'), tasks: prev })
+    expect(tasks.find(t => t.id === 'meal')?.place).toBe('某定食店')
+    expect(tasks.find(t => t.id === 'meal')?.candidate?.id).toBe('m1')
   })
 })
 

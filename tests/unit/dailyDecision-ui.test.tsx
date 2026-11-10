@@ -375,6 +375,38 @@ describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () =
     // 改意圖不觸發伺服器請求（跟舊模式按鈕一樣；照片 API 的呼叫不算）
     expect(fetchMock.mock.calls.some(c => urlText(c[0]).includes('/api/daily-route'))).toBe(false)
   })
+  it('咖啡與展覽意圖的提示分開：咖啡 → 咖啡站、展覽 → 探索站（不再共站）', async () => {
+    seed(cand('s1', '某咖啡店'))
+    const fetchMock = vi.fn((_url: string | URL | Request) => Promise.resolve({ ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想喝咖啡' } })
+    expect(screen.getByTestId('daily-intent-hint').textContent).toBe('已辨識：咖啡 → 咖啡站')
+    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '去看展覽' } })
+    expect(screen.getByTestId('daily-intent-hint').textContent).toBe('已辨識：展覽 → 探索站')
+  })
+  it('伺服器回應洗掉標記後，換意圖仍能更新日意圖站（標記在合併時補回）', async () => {
+    // 種子：日意圖指定的 meal 站（帶標記＋候選），伺服器 sanitize 只回傳已知欄位、沒有標記
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: '想吃拉麵',
+    }))
+    const serverStop = { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: [serverStop], routeVerified: false, conflicts: [] }) }
+      : { ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
+    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃壽司' } })
+    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('想吃壽司')
+  })
   it('空狀態文案是意圖導向、對齊實際按鈕文案（不再提模式／生成今日行程）', async () => {
     localStorage.setItem(KEY, JSON.stringify({
       day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
