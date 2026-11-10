@@ -445,6 +445,44 @@ describe('G6 — 意圖輸入（2.0 重做：結構化輸入——目的地＋�
     expect(screen.getByText('安靜咖啡廳｜閱讀、寫下 3 個新觀察')).toBeTruthy()
     expect(screen.getByLabelText<HTMLInputElement>('安靜咖啡廳｜閱讀、寫下 3 個新觀察 指定地點').value).toBe('')
   })
+  it('RT4-F1「略過後再選站」組合：先略過 meal 再用選單選午餐站 → avoid 解除、meal 卡回到路線且指定為一蘭、摘要與路線一致', async () => {
+    // 紅隊 RT4-F1：舊碼下選單顯示午餐站、摘要寫「目的地：一蘭 → 午餐站」，但 avoid 仍含 meal、
+    // 路線裡根本沒有 meal 卡——摘要宣稱與路線／存檔狀態矛盾。此測試同時斷言存檔 state、
+    // 路線裡的 meal 卡、摘要文字三側，只斷言一側是空洞測試。
+    skipSeed({ destination: '一蘭', destinationStation: 'meal', activities: ['meal', 'coffee'] })
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    const mealCard = screen.getByText('澀谷｜一人友善的日式定食').closest('article')!
+    fireEvent.click(within(mealCard).getByText('今天略過'))
+    expect(screen.queryByText('澀谷｜一人友善的日式定食')).toBeNull()
+    fireEvent.change(stationSelect(), { target: { value: 'meal' } })
+    expect(stationSelect().value).toBe('meal')
+    expect(summary()).toBe('目的地：一蘭 → 午餐站；還想：喝咖啡')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { intent: DailyIntent; avoid: string[] }
+    expect(saved.intent).toEqual({ destination: '一蘭', destinationStation: 'meal', activities: ['coffee'] })
+    expect(saved.avoid).not.toContain('meal')
+    expect(screen.getByText('澀谷｜一人友善的日式定食')).toBeTruthy()
+    expect(screen.getByLabelText<HTMLInputElement>('澀谷｜一人友善的日式定食 指定地點').value).toBe('一蘭')
+  })
+  it('O1 先選站、後填目的地：空目的地選站留著，填目的地後立即生效', async () => {
+    // RT4-O1 裁定（放寬不變量）：目的地為空時選站，選擇不被彈回；摘要仍顯示空意圖文案
+    // （站要等目的地填了才生效），填目的地後摘要與路線立即跟上。
+    seed(cand('s1', '某咖啡店'))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(stationSelect(), { target: { value: 'meal' } })
+    expect(stationSelect().value).toBe('meal')
+    expect(summary()).toBe('今天沒有指定目的地或活動，留空就隨興探索。')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { intent: DailyIntent }
+    expect(saved.intent).toEqual({ destination: '', destinationStation: 'meal', activities: [] })
+    fireEvent.change(destInput(), { target: { value: '一蘭' } })
+    expect(stationSelect().value).toBe('meal')
+    expect(summary()).toBe('目的地：一蘭 → 午餐站')
+    // seed 的 meal 任務標題是「定食」（非目錄標題），逐站輸入框的 label 跟任務標題走。
+    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('一蘭')
+  })
   it('G3「今天略過」擴充：略過非目的地活動站 → 目的地站不受影響', async () => {
     skipSeed({ destination: '一蘭', destinationStation: 'meal', activities: ['meal', 'coffee'] })
     render(<DailyDecision onBack={() => {}} />)

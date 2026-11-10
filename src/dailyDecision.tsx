@@ -26,8 +26,11 @@ export const EMPTY_INTENT: DailyIntent = { destination: '', destinationStation: 
 /** 結構化意圖正規化（唯一規則，所有寫入點共用）——純驗證函式，不產生預設：
  * - destination：trim，截到 120 字（與舊意圖框上限、addFixedTask 的 place 上限一致）。
  * - activities：只留 5 個合法站 id，去重，按 catalog 順序（gym／meal／creative／coffee／shopping）存放。
- * - 不變量：destination 為空時 destinationStation 必為 ''（空目的地沒有附著對象）。
- * 便利預設不在這裡：存入的惰性意圖 { destination, station: '', activities: [單一] } 是合法狀態
+ * - 不變量（RT4-O1 裁定，2026-11-10）：目的地為空時 destinationStation 仍可存著——
+ *   先選站、後填目的地是合法順序（設計 §2.2）。站只在目的地非空時生效：
+ *   buildDaily 的 dest 守衛（dest !== '' 才取站）與 intentSummaryText 的同款守衛
+ *   保證空目的地時站不進路線、不進摘要。舊不變量（空目的地站必為 ''）會把
+ *   先選的站立即清掉，與 §2.2 衝突，已刪除。
  * （設計 §2.3），buildDaily／loadDaily／略過等重新推導都不該把它改掉；預設只在使用者主動
  * 輸入時由 applyConvenienceDefault 觸發（目的地 input、活動 checkbox 兩處）。
  * 純函式，不改傳入物件，回傳新物件（activities 換新陣列）。 */
@@ -35,7 +38,7 @@ export function normalizeIntent(intent: DailyIntent): DailyIntent {
   const destination = typeof intent.destination === 'string' ? intent.destination.trim().slice(0, 120) : ''
   const activities = [...new Set((Array.isArray(intent.activities) ? intent.activities : []).filter(isIntentStationId))]
     .sort((a, b) => INTENT_CATALOG_ORDER.indexOf(a) - INTENT_CATALOG_ORDER.indexOf(b))
-  const destinationStation: IntentStationId | '' = destination === '' ? '' : (isIntentStationId(intent.destinationStation) ? intent.destinationStation : '')
+  const destinationStation: IntentStationId | '' = isIntentStationId(intent.destinationStation) ? intent.destinationStation : ''
   return { destination, destinationStation, activities }
 }
 /** 便利預設（設計 §2.5）：destination 非空、destinationStation 為 ''、且恰好選了一個活動時，
@@ -586,7 +589,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
             <input id="daily-intent-destination" data-testid="daily-intent-destination" aria-label="想去哪裡" value={state.intent.destination} maxLength={120} placeholder="例如：一蘭、Fuglen Tokyo、下北澤（可留空）" onChange={e=>change(s=>replanDaily({...s,intent:applyConvenienceDefault(normalizeIntent({...s.intent,destination:e.target.value.slice(0,120)}))}))} />
             <label htmlFor="daily-intent-destination-station">目的地是哪一站</label>
             <div className="dd-area">
-              <select id="daily-intent-destination-station" data-testid="daily-intent-destination-station" aria-label="目的地是哪一站" value={state.intent.destinationStation} onChange={e=>change(s=>replanDaily({...s,intent:normalizeIntent({...s.intent,destinationStation:e.target.value as IntentStationId | ''})}))}>
+              <select id="daily-intent-destination-station" data-testid="daily-intent-destination-station" aria-label="目的地是哪一站" value={state.intent.destinationStation} onChange={e=>{ const v = e.target.value as IntentStationId | ''; return change(s=>replanDaily({...s, avoid: s.avoid.filter(x=>x!==v), intent:normalizeIntent({...s.intent,destinationStation:v})})) }}>
+                {/* 站選單選站＝明確想要（RT4-F1，設計 §2.4）：該站從 avoid 移除，與 checkbox
+                  勾選解除 avoid（設計 §3.4）同一理據——新的明確表達勝過舊的「今天略過」。 */}
                 <option value="">請選擇是哪一站…</option>
                 {(['gym','meal','creative','coffee','shopping'] as const).map(id=><option key={id} value={id}>{DAILY_STATION_LABEL[id]}</option>)}
               </select>

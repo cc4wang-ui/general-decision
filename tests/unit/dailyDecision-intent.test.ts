@@ -36,9 +36,15 @@ describe('G1 — 形狀與正規化（normalizeIntent／sameIntent／copyIntent�
     const out = normalizeIntent({ destination: '', destinationStation: '', activities: ['shopping', 'gym', 'gym', 'rest', 'foo', ''] as unknown as DailyIntent['activities'] })
     expect(out.activities).toEqual(['gym', 'shopping'])
   })
-  it('不變量：目的地為空時站必為空字串', () => {
-    expect(normalizeIntent(mkIntent('  ', 'meal', [])).destinationStation).toBe('')
-    expect(normalizeIntent(mkIntent('', 'meal', ['meal'])).destinationStation).toBe('')
+  it('放寬不變量（RT4-O1 裁定）：目的地為空時已選的站仍存著，不進路線（生效由 buildDaily 的 dest 守衛決定）', () => {
+    // 舊不變量（空目的地站必為 ''）把先選的站立即清掉，與設計 §2.2「先選站、後填目的地也合法」
+    // 衝突，已刪除。站存著但不生效：buildDaily 只在 dest 非空時取站。
+    expect(normalizeIntent(mkIntent('  ', 'meal', [])).destinationStation).toBe('meal')
+    expect(normalizeIntent(mkIntent('', 'meal', ['meal'])).destinationStation).toBe('meal')
+    expect(normalizeIntent(mkIntent('', 'rest' as DailyIntent['destinationStation'], [])).destinationStation).toBe('')
+    const tasks = buildDaily(state(mkIntent('', 'meal', [])))
+    expect(tasks.every(t => !t.specified)).toBe(true)
+    expect(tasks.find(t => t.id === 'meal')?.place).toBeUndefined()
   })
   it('normalizeIntent 不產生便利預設：惰性意圖（目的地＋站空＋單一活動）原樣保留', () => {
     // 結構性修復（略過後靜默重附）：預設已移出 normalizeIntent——存入的惰性意圖是合法狀態，
@@ -317,6 +323,15 @@ describe('G5 — loadDaily：舊存檔移轉', () => {
     const out = loadDaily()
     expect(out.intent).toEqual(mkIntent('一蘭', 'meal', ['meal']))
     expect(out.appliedIntent).toEqual(mkIntent('一蘭', 'meal', ['meal']))
+  })
+  it('先選站的意圖重開頁面仍留著：目的地為空、站已選的同日存檔，載入後站不被清掉', () => {
+    // RT4-O1：放寬後的不變量允許空目的地＋已選站存著；載入經 validateStructuredIntent／
+    // normalizeIntent 也不得清掉它（填目的地後立即生效，見 UI 測試）。
+    const stationOnly = mkIntent('', 'meal', [])
+    seed({ intent: stationOnly, appliedIntent: stationOnly, tasks: [] })
+    const out = loadDaily()
+    expect(out.intent).toEqual(stationOnly)
+    expect(out.intent.destinationStation).toBe('meal')
   })
   it('惰性意圖重開頁面不重新附著：目的地＋站空＋恰好一個活動的同日存檔，載入後站仍為空字串', () => {
     // 協調員探針證實的缺陷：loadDaily → validateStructuredIntent 經 normalizeIntent
