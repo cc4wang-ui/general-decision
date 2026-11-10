@@ -199,7 +199,7 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 | 自由文字解析（`parseIntent` 關鍵字表） | 紅隊第 1 輪 FAIL：3 blocking（F1 伺服器往返標記失效、F2 否定語境當肯定、F3 CJK 單字子字串誤命中）＋3 non-blocking | 見 `pr1/redteam/REPORT.md` |
 | Fix round 2（`31a220e`） | 紅隊第 2 輪 FAIL：R2-F1 否定邏輯缺口、R2-F2 子字串誤命中未除根（blocking）、R2-F3 搜尋後候選保留失效 | 同類問題第三次出現；使用者裁定 (a) 結構性重做意圖解析 |
 | Fix round 3（`501fd7d`） | 紅隊第 3 輪 FAIL：R3-F1～F3 否定形缺口（blocking）、R3-F4 詞邊界新殺合法複合詞 | 架構錯誤信號：日文自由文字解析無真正分詞不可能收斂；不得開 fix round 4 |
-| 使用者裁定（2026-11-10 16:46 JST） | 改結構化輸入；解析器整塊刪除（24 個識別字在 `src/`／`tests/`／`api/` 全數零命中） | 見 `pr1/DESIGN-structured-input.md` |
+| 使用者裁定（2026-11-10 16:46 JST） | 改結構化輸入；解析器整塊刪除（23 個識別字在 `src/`／`tests/`／`api/` 全數零命中） | 見 `pr1/DESIGN-structured-input.md` |
 | 結構化重做（`5b31687`）＋略過修復（`e547894`） | 紅隊第 4 輪 FAIL：RT4-F1（略過後再選站，摘要宣稱附著、路線無該站）blocking＋O1 觀察（先選站、後填目的地被彈回） | 使用者 2026-11-10 17:50 JST 裁定兩項都照協調員建議做：(a) 選站移除其 `avoid`；(b) 放寬不變量，站可先選、目的地後填 |
 | RT4 fix（`da67c16`） | 紅隊第 5 輪 PASS：0 findings | 見 `pr1/redteam/REPORT-5.md`；PR #50 合併 |
 
