@@ -9,7 +9,10 @@ export function validPoint(v:unknown):Point|null{
  if(lat<-90||lat>90||lng<-180||lng>180)return null
  return {lat,lng}
 }
-export type ScheduledStop={id:string;title?:string;minutes?:number;start?:string;locked?:boolean;custom?:boolean;done?:boolean;candidate?:Point;eta?:string;departure?:string;travelMin?:number;conflict?:string}
+export type ScheduledStop={id:string;title?:string;minutes?:number;start?:string;locked?:boolean;custom?:boolean;done?:boolean;candidate?:Point;eta?:string;departure?:string;travelMin?:number;conflict?:string
+/** 跨日偏移（PR-4 修正輪）：錨點當日為第 0 天；ETA／離開時間跨過午夜為 1，依此類推。
+ * 與 eta／departure 同一束：清掉 ETA 時一起清。舊回應／舊存檔沒有此欄位時視為 0（當天）。 */
+etaDayOffset?:number;departureDayOffset?:number}
 const clock=(m:number)=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0')
 const minute=(t:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t)?Number(t.slice(0,2))*60+Number(t.slice(3)):null
 /** 有效開始時間（PR-4）：使用者開始時間合法（HH:MM）且比伺服器當下時間晚 → 用
@@ -74,10 +77,26 @@ export async function travelMatrix(key:string,origin:Point,stops:ScheduledStop[]
 }
 export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[][],distances:number[][],now:string):{stops:T[];distanceKm:number;travelMinutes:number;conflicts:string[]}{
  const originIndex=0,idx=new Map(stops.map((s,i)=>[s.id,i+1]))
- const appointments=stops.filter(s=>s.locked||s.custom||s.done).sort((a,b)=>(a.start??'99:99').localeCompare(b.start??'99:99'))
+ const anchorMin=minute(now)??9*60
+ /** 固定安排只有 HH:MM、沒有日期（PR-4 修正輪，午夜規則，見 DESIGN §8）：
+  * 對到同一條時間線時，取「當天」與「隔天」兩次出現中離錨點最近的一次；
+  * 距離相等時取當天。昨天那一次永遠不考慮——行程從今天往後排，固定安排
+  * 不可能是昨天。例：錨點 23:59＋00:30 → 隔天 00:30（31 分鐘後）；
+  * 錨點 15:00＋10:00 → 當天 10:00（已過去 5 小時，照舊標晚到 310 分鐘）；
+  * 錨點 00:00＋23:59 → 當天 23:59（不早於錨點，一律當天）。
+  * 不合法／缺 start → null（無 deadline，既有行為）。 */
+ const deadlineAbs=(start?:string):number|null=>{
+  if(!start)return null
+  const m=minute(start)
+  if(m===null)return null
+  return m>=anchorMin-720?m:m+1440
+ }
+ /** 絕對分鐘轉跨日偏移：錨點當日 0，跨過午夜 1，依此類推（clock() 只管 HH:MM 顯示）。 */
+ const dayOffset=(abs:number)=>Math.floor(abs/1440)
+ const appointments=stops.filter(s=>s.locked||s.custom||s.done).sort((a,b)=>(deadlineAbs(a.start)??Infinity)-(deadlineAbs(b.start)??Infinity))
  const flexible=stops.filter(s=>!appointments.includes(s))
  const ordered:T[]=[]
- let position=originIndex,at=minute(now)??9*60,travelMinutes=0,distanceKm=0
+ let position=originIndex,at=anchorMin,travelMinutes=0,distanceKm=0
  const conflicts:string[]=[]
  const visit=(s:T)=>{
   const next=idx.get(s.id)
@@ -87,16 +106,16 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
   if(next===undefined||!mRow||!dRow)throw new Error('部分站點無法步行抵達')
   const duration=mRow[next],distance=dRow[next]
   if(duration===undefined||distance===undefined||!Number.isFinite(duration))throw new Error('部分站點無法步行抵達')
-  const arrival=at+duration,deadline=s.start?minute(s.start):null
+  const arrival=at+duration,deadline=deadlineAbs(s.start)
   const eta=deadline!==null&&arrival<deadline?deadline:arrival
   const conflict=deadline!==null&&arrival>deadline?'預計晚到 '+(arrival-deadline)+' 分鐘':undefined
   if(conflict)conflicts.push((s.title??s.id)+'：'+conflict)
-  ordered.push({...s,eta:clock(eta),departure:clock(eta+(s.minutes??45)),travelMin:duration,conflict})
+  ordered.push({...s,eta:clock(eta),departure:clock(eta+(s.minutes??45)),etaDayOffset:dayOffset(eta),departureDayOffset:dayOffset(eta+(s.minutes??45)),travelMin:duration,conflict})
   travelMinutes+=duration;distanceKm+=distance;at=eta+(s.minutes??45);position=next
  }
  for(const fixed of [...appointments,{id:'__end__'} as T]){
   const target=fixed.id==='__end__'?null:fixed
-  const deadline=target?.start?minute(target.start):null
+  const deadline=target?.start?deadlineAbs(target.start):null
   while(flexible.length){
    const possible=flexible.map((s,i)=>{
     const p=idx.get(s.id)

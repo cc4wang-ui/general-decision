@@ -300,7 +300,9 @@ async function handler(req:Request):Promise<Response>{
    // 站），rest 純文字站與無候選站在 Routes 成功時會整站消失（實測確認；這
    // 也是 live 三輪從沒看到休息站的原因）。失敗路徑本來就回 ordered 全單，不用改。
    const merged=mergeScheduled(ordered.stops,schedule.stops)
-   return respond({origin,...schedule,stops:merged,partial,missingStops,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
+   // anchorTime（PR-4 修正輪，O2）：回傳實際用的錨點——過去時間被 clamp 時，
+   // 前端才能在狀態列寫明「已以現在 HH:MM 開始排」。新欄位，舊客戶端不讀就忽略。
+   return respond({origin,...schedule,stops:merged,partial,missingStops,anchorTime:now,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
   }catch(e){
    console.warn('[daily-route] Routes matrix unavailable:', e instanceof Error?e.message:'unknown')
    // Keep verified names, photos and navigation functional even if the separate Routes API is not enabled.
