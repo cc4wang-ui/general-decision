@@ -84,7 +84,7 @@ const SCENE_PREF_KEY = 'decide.scene.v1'
 export function loadLastScene(module: string): string {
   try {
     const v = JSON.parse(read(SCENE_PREF_KEY) ?? '{}') as Record<string, unknown>
-    return typeof v[module] === 'string' ? (v[module] as string) : ''
+    return typeof v[module] === 'string' ? (v[module]) : ''
   } catch { return '' }
 }
 export function saveLastScene(module: string, scene: string): void {

@@ -398,9 +398,11 @@ function readCuisineStats(v: unknown): CuisineStats | string {
   if (!isObj(v)) return '不是一張表'
   const out: CuisineStats = {}
   for (const [k, ab] of Object.entries(v)) {
-    const ok = isKey(k, 100) && Array.isArray(ab) && ab.length === 2 && ab.every((x) => typeof x === 'number' && Number.isFinite(x) && x > 0)
-    if (!ok) return `「${k.slice(0, 20)}」`
-    out[k] = [ab[0], ab[1]]
+    // 長度 2 且兩格都是有限正數才收；其餘整份不收（見 parseMemFile 的 fail-closed 原則）。
+    const nums = Array.isArray(ab) && ab.length === 2 ? ab.filter((x): x is number => typeof x === 'number' && Number.isFinite(x) && x > 0) : []
+    const first = nums[0], second = nums[1]
+    if (!isKey(k, 100) || nums.length !== 2 || first === undefined || second === undefined) return `「${k.slice(0, 20)}」`
+    out[k] = [first, second]
   }
   return out
 }

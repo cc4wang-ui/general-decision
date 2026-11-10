@@ -174,7 +174,6 @@ export function sceneOptions(module: ModuleId): string[] {
 /** 手動輸入：去掉換行與控制字元、頭尾空白，截到 SCENE_TEXT_MAX 字。空字串＝沒填。 */
 export function sanitizeSceneText(v: unknown): string {
   if (typeof v !== 'string') return ''
-  // eslint-disable-next-line no-control-regex
   const s = v.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
   return [...s].slice(0, SCENE_TEXT_MAX).join('')
 }
@@ -329,9 +328,15 @@ export function sceneTiers<T extends Cand>(cands: T[], scene: Scene | null): T[]
     const soft = pool.filter((c) => passes(c, { ...scene.rule, minRating: undefined }))
     const ratings = [...new Set(soft.map((c) => c.rating ?? 0))].sort((a, b) => b - a)
     for (let i = 0; i < ratings.length;) {
-      const floor = ratings[i] - 0.2 - EPS
+      const top = ratings[i]
+      if (top === undefined) break
+      const floor = top - 0.2 - EPS
       tiers.push(soft.filter((c) => (c.rating ?? 0) >= floor))
-      while (i < ratings.length && ratings[i] >= floor) i++
+      while (i < ratings.length) {
+        const r = ratings[i]
+        if (r === undefined || r < floor) break
+        i++
+      }
     }
     tiers.push(hardPool(pool, scene.rule))
   } else tiers.push(pool)

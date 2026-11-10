@@ -248,9 +248,10 @@ describe('Daily itinerary controls',()=>{
  it('keeps fixed existing commitments across replan',()=>{
   const withFixed=addFixedTask(state(),'與朋友見面','吉祥寺','15:00',60)
   const fixed=withFixed.tasks[0]
-  expect(fixed.locked).toBe(true)
+  expect(fixed).toBeDefined()
+  expect(fixed?.locked).toBe(true)
   const result=replanDaily(withFixed)
-  expect(result.tasks.find(t=>t.id===fixed.id)).toEqual(fixed)
+  expect(result.tasks.find(t=>t.id===fixed?.id)).toEqual(fixed)
  })
  it('rejects incomplete fixed commitments',()=>{
   expect(addFixedTask(state(),'','吉祥寺','15:00',60).tasks).toHaveLength(0)
@@ -275,8 +276,10 @@ describe('出發地換成目前位置',()=>{
  const routed=():DailyState=>{
   const s={...state(),currentPlace:'渋谷駅'}
   const tasks:DailyTask[]=buildDaily(s).map(t=>({...t,candidate:{...shibuya,id:'c-'+t.id}}))
-  tasks[0]={...tasks[0],done:true}
-  tasks[1]={...tasks[1],specified:true,place:'Fuglen Tokyo'}
+  const t0=tasks[0],t1=tasks[1]
+  if(!t0||!t1)throw new Error('expected default tasks')
+  tasks[0]={...t0,done:true}
+  tasks[1]={...t1,specified:true,place:'Fuglen Tokyo'}
   return {...s,tasks,routedFrom:originKey(s)}
  }
  it('originKey 分得出目前位置與輸入的地名',()=>{
@@ -291,9 +294,11 @@ describe('出發地換成目前位置',()=>{
   const s=routed()
   const out=routeProposal({...s,useHere:true})
   const byId=new Map(out.tasks.map(t=>[t.id,t]))
-  expect(byId.get(s.tasks[0].id)?.candidate?.id).toBe('c-'+s.tasks[0].id) // 已完成
-  expect(byId.get(s.tasks[1].id)?.place).toBe('Fuglen Tokyo') // 你指定的地點
-  expect(byId.get(s.tasks[1].id)?.specified).toBe(true)
+  const first=s.tasks[0],second=s.tasks[1]
+  if(!first||!second)throw new Error('expected default tasks')
+  expect(byId.get(first.id)?.candidate?.id).toBe('c-'+first.id) // 已完成
+  expect(byId.get(second.id)?.place).toBe('Fuglen Tokyo') // 你指定的地點
+  expect(byId.get(second.id)?.specified).toBe(true)
   const auto=out.tasks.filter(t=>!t.done&&!t.specified)
   expect(auto.length).toBeGreaterThan(0)
   expect(auto.every(t=>!t.candidate)).toBe(true) // 讓伺服器在目前位置附近重找

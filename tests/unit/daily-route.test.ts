@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import api from '../../api/daily-route.ts'
 import { validPoint } from '../../src/dailyRouting.ts'
+import { bodyText, urlText } from './mockFetch.ts'
 
 const handler = api.fetch
 const post = (body: unknown) =>
@@ -54,10 +55,10 @@ const ramenShop = place('ramen-1', 35.691, 139.701, {
 /** Places 依查詢回一家店；Routes 回 403（跟現在正式環境一樣）。記下每一次呼叫。 */
 function mockGoogle() {
   const calls: { url: string; body: Record<string, unknown> }[] = []
-  const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
-    calls.push({ url: String(url), body })
-    if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+  const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+    calls.push({ url: urlText(url), body })
+    if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
     const q = String(body.textQuery)
     return new Response(JSON.stringify({ places: [place('p-' + q.slice(0, 12), 35.69, 139.70)] }), { status: 200 })
   })
@@ -83,7 +84,7 @@ describe('validPoint（目前位置座標）', () => {
       { lat: 90.0001, lng: 0 }, { lat: -91, lng: 0 }, { lat: 0, lng: 180.5 }, { lat: 0, lng: -181 },
       { lat: '35.6', lng: 139.7 }, { lat: 35.6 }, { lng: 139.7 }, { lat: Number.NaN, lng: 1 }, { lat: 1, lng: Infinity },
       null, undefined, 'here', 35.6, [35.6, 139.7],
-    ]) expect(validPoint(bad), JSON.stringify(bad) ?? String(bad)).toBeNull()
+    ]) expect(validPoint(bad), JSON.stringify(bad) ?? typeof bad).toBeNull()
   })
 })
 
@@ -164,10 +165,10 @@ function mockGoogleMulti() {
   const calls: { url: string; body: Record<string, unknown>; headers: unknown }[] = []
   const page1 = [...['m1', 'm2', 'm3', 'm4', 'm5', 'm6'].map((id, i) => validShop(id, i)), stationShop, lowReviewShop]
   const page2 = [validShop('m7', 9)]
-  const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
-    calls.push({ url: String(url), body, headers: init?.headers })
-    if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+  const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+    calls.push({ url: urlText(url), body, headers: init?.headers })
+    if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
     if (body.pageToken === 'page2') return new Response(JSON.stringify({ places: page2 }), { status: 200 })
     return new Response(JSON.stringify({ places: page1, nextPageToken: 'page2' }), { status: 200 })
   })
@@ -179,10 +180,10 @@ function mockGoogleMulti() {
 function mockGoogleSinglePage() {
   const calls: { url: string; body: Record<string, unknown>; headers: unknown }[] = []
   const page1 = [...['m1', 'm2', 'm3', 'm4', 'm5', 'm6'].map((id, i) => validShop(id, i)), stationShop, lowReviewShop]
-  const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
-    calls.push({ url: String(url), body, headers: init?.headers })
-    if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+  const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+    calls.push({ url: urlText(url), body, headers: init?.headers })
+    if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
     return new Response(JSON.stringify({ places: page1 }), { status: 200 })
   })
   vi.stubGlobal('fetch', f)
@@ -247,10 +248,10 @@ describe('類型過濾與評論門檻', () => {
 describe('種類級排除（dislikedKinds）', () => {
   function mockKind(first: unknown) {
     const calls: { url: string; body: Record<string, unknown> }[] = []
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
-      calls.push({ url: String(url), body })
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+      calls.push({ url: urlText(url), body })
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [first, validShop('ok1', 0)] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -258,8 +259,8 @@ describe('種類級排除（dislikedKinds）', () => {
   }
   /** 池子只有一家店時選中才是確定的：兩家都合格時隨機挑，斷言第一家會不穩定。 */
   function mockSingle(first: unknown) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [first] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -302,18 +303,18 @@ describe('種類級排除（dislikedKinds）', () => {
 describe('種類級排除（真實店名，紅隊 §3.1）', () => {
   function mockKind(first: unknown) {
     const calls: { url: string; body: Record<string, unknown> }[] = []
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
-      calls.push({ url: String(url), body })
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+      calls.push({ url: urlText(url), body })
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [first, validShop('ok1', 0)] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
     return { f, calls }
   }
   function mockSingle(first: unknown) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [first] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -377,8 +378,8 @@ const chukaSobaShop = place('chuka-soba-1', 35.691, 139.701, {
 describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
   /** 池子裡只有一家店：被排除就無候選，選中才是沒被誤判。 */
   function mockSingle(first: unknown) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [first] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -413,8 +414,8 @@ describe('種類判斷修正（紅隊 round 2 Finding 1／2）', () => {
 describe('種類判斷修正（紅隊 round 3 Finding B：中華そば）', () => {
   /** 池子裡只有一家店：被排除就無候選，選中才是沒被誤判。 */
   function mockSingle(first: unknown) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [first] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -522,8 +523,8 @@ const sobaAnShop = place('soba-an-1', 35.691, 139.701, {
 describe('種類判斷修正（紅隊 round 4 Finding 1／2／3）', () => {
   /** 池子裡只有一家店：被排除就無候選，選中才是沒被誤判。 */
   function mockSingle(first: unknown) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [first] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -615,8 +616,8 @@ describe('種類判斷修正（紅隊 round 4 Finding 1／2／3）', () => {
 describe('非自動站新解析也跑 DENY 檢查（紅隊 round 4 Finding 4）', () => {
   /** 指定地名查回什麼就回什麼：只有車站時，車站不能當成候選。 */
   function mockPlaces(places: unknown[]) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -657,8 +658,8 @@ describe('非自動站新解析也跑 DENY 檢查（紅隊 round 4 Finding 4）'
 describe('種類判斷修正（紅隊 round 5 F1–F6，round 6 兩層拉麵表）', () => {
   /** 池子裡只有一家店：被排除就無候選，選中才是沒被誤判。雙向都要驗：排除真種類要 200＋無候選，排除誤判種類要 200 選中。 */
   function mockSingle(first: unknown) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [first] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -848,10 +849,10 @@ describe('地區偏好（紅隊 round 5 F7，round 6 結構化修復）', () => 
   const shoppingStop = [{ id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30 }]
   function mockPlaces(places: unknown[]) {
     const calls: { url: string; body: Record<string, unknown> }[] = []
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
-      calls.push({ url: String(url), body })
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+      calls.push({ url: urlText(url), body })
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -928,8 +929,8 @@ describe('既有候選保留規則統一（紅隊 round 5 item 7，round 6）', 
   /** 伺服器收到的既有候選是 lat／lng 形狀（不是 Places 的 location.latitude）。 */
   const stationCandidate = { id: 'shibuya-station', name: '渋谷駅', lat: 35.6595, lng: 139.7005, address: '渋谷駅', mapUrl: 'https://maps.google.com/?cid=shibuya-station', types: ['transit_station', 'train_station'], primaryType: 'transit_station', rating: 4.2, userRatingCount: 9000 }
   function mockPlaces(places: unknown[]) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -986,8 +987,8 @@ describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）',
   const readStops = async (res: Response) => (await res.json() as { stops: StopOut[] }).stops
   const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
   function mockPlaces(places: unknown[]) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -995,9 +996,9 @@ describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）',
   }
   /** 依查詢回不同池子：meal 查回麺喜やしま（只有它），coffee 查回一間咖啡店。 */
   function mockPerQuery() {
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
       const q = String(body.textQuery)
       const places = q.includes('coffee') ? [validShop('cafe-1', 0)] : [yashimaShop]
       return new Response(JSON.stringify({ places }), { status: 200 })
@@ -1106,8 +1107,8 @@ describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）',
     expect(out.noCandidateReason).toBe('area')
   })
   it('Routes 成功時 rest 站也要回來（舊版只回有候選的站，rest 在成功路徑會整站消失）', async () => {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) {
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) {
         const elements = [
           { originIndex: 0, destinationIndex: 1, duration: '300s', distanceMeters: 400 },
           { originIndex: 1, destinationIndex: 0, duration: '300s', distanceMeters: 400 },
@@ -1128,8 +1129,8 @@ describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）',
     expect(data.stops.find((s) => s.id === 'meal')?.candidate?.id).toBe('m1')
   })
   it('Routes 成功時無候選站也要回來（不只回有候選的站）', async () => {
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      if (String(url).includes('routes.googleapis.com')) {
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) {
         const elements = [
           { originIndex: 0, destinationIndex: 1, duration: '300s', distanceMeters: 400 },
           { originIndex: 1, destinationIndex: 0, duration: '300s', distanceMeters: 400 },
@@ -1137,7 +1138,7 @@ describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）',
         return new Response(JSON.stringify(elements), { status: 200 })
       }
       // meal 查回澀谷店；shopping 查回原宿店（地區偏好擋掉 → 無候選原因 area）。
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
       const places = String(body.textQuery).includes('drugstore') ? [harajukuDrug] : [validShop('m1', 0)]
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
@@ -1175,9 +1176,9 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
     const mealA = validShop('meal-a', 0)
     const mealB = validShop('meal-b', 1)
     const cafe1 = validShop('cafe-1', 0)
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
       const q = String(body.textQuery)
       const places = q.includes('coffee') ? [cafe1] : [mealA, mealB]
       return new Response(JSON.stringify({ places }), { status: 200 })
@@ -1214,9 +1215,9 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
   it('K1：others 還能防重複——meal 重找時不會選到 coffee 現任候選那間店', async () => {
     const cafe1 = validShop('cafe-1', 0)
     const mealB = validShop('meal-b', 1)
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
       const q = String(body.textQuery)
       // meal 池子裡第一間就是 coffee 的現任候選（同一間店也會出現在別站的查詢結果裡）
       const places = q.includes('coffee') ? [cafe1] : [cafe1, mealB]
@@ -1233,8 +1234,8 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
     expect(stopOf(stops, 'coffee').candidate?.id).toBe('cafe-1')
   })
   it('無候選標題還原：麺喜やしま被不喜歡、池子只有它 → 該站無候選，title 是目錄標題「澀谷｜一人友善的日式定食」，不是店名', async () => {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [yashimaShop] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -1253,9 +1254,9 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
       displayName: { text: 'スギ薬局 原宿店' }, rating: 4.0, userRatingCount: 150,
       types: ['drugstore'], primaryType: 'drugstore',
     })
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
       const q = String(body.textQuery)
       const places = q.includes('drugstore') ? [harajukuDrug] : q.includes('coffee') ? [validShop('cafe-1', 0)] : [validShop('m1', 0)]
       return new Response(JSON.stringify({ places }), { status: 200 })
@@ -1279,8 +1280,8 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
       displayName: { text: '藪蕎麦' }, rating: 4.1, userRatingCount: 300,
       types: ['noodle_shop', 'restaurant'], primaryType: 'noodle_shop',
     })
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [yabuNoodle] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -1301,8 +1302,8 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
       displayName: { text: '麺処讃岐うどん' }, rating: 4.2, userRatingCount: 300,
       types: ['noodle_shop', 'restaurant'], primaryType: 'noodle_shop',
     })
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places: [udonNoodle] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -1323,8 +1324,8 @@ describe('round 8：兩份排除清單分開（K1）／無候選標題還原／o
         displayName: { text: name }, rating: 4.2, userRatingCount: 300,
         types: ['noodle_shop', 'restaurant'], primaryType: 'noodle_shop',
       })
-      const f = vi.fn(async (url: string | URL | Request) => {
-        if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const f = vi.fn((url: string | URL | Request) => {
+        if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
         return new Response(JSON.stringify({ places: [p] }), { status: 200 })
       })
       vi.stubGlobal('fetch', f)
@@ -1347,8 +1348,8 @@ describe('round 9 F1b／F2：既有候選缺評論數＝未知（保留）、新
   const readStops = async (res: Response) => (await res.json() as { stops: StopOut[] }).stops
   const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
   function mockPlaces(places: unknown[]) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -1424,8 +1425,8 @@ describe('round 10：R9-K1 同一請求內防重複（本請求已挑出的店�
   })
   /** 不論查詢都回同一池子（同一家店會出現在別站的查詢結果裡，live round 7 就有前例）。 */
   function mockPool(places: unknown[]) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -1590,18 +1591,18 @@ describe('round 11：壁畫地標拒絕／完整重新生成隨機化／seen 送
   /** 依查詢回不同池子：meal／coffee／creative／shopping 各回自己的店，否則隨機挑選
    * 會跨站亂挑、測試不確定。判斷用 includedType（比查詢字串穩定）。 */
   function mockPools(byType: Record<string, unknown[]>) {
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
-      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
-      const t = String(body.includedType ?? '')
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+      const t = (typeof body.includedType === 'string' ? body.includedType : '')
       return new Response(JSON.stringify({ places: byType[t] ?? [] }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
   }
   /** 不論查詢都回同一池子（單站測試用）。 */
   function mockPool(places: unknown[]) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -1786,8 +1787,8 @@ describe('round 13：回歸 20x（架構重構後種類排除仍有效）', () =
   const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
   const mealStop = [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }]
   function mockPool(places: unknown[]) {
-    const f = vi.fn(async (url: string | URL | Request) => {
-      if (String(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
       return new Response(JSON.stringify({ places }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)

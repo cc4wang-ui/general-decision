@@ -70,8 +70,8 @@ export function readTrial(): TrialEntry[] {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return []
-    const v = JSON.parse(raw)
-    return Array.isArray(v) ? (v.filter((e) => e && typeof e.at === 'string' && typeof e.module === 'string') as TrialEntry[]) : []
+    const v: unknown = JSON.parse(raw)
+    return Array.isArray(v) ? v.filter((e: unknown): e is TrialEntry => !!e && typeof e === 'object' && 'at' in e && typeof e.at === 'string' && 'module' in e && typeof e.module === 'string') : []
   } catch { return [] }
 }
 
@@ -83,7 +83,7 @@ function write(list: TrialEntry[], now: number): void {
 
 /** 記一筆（超過 60 天的、超過上限的自動清掉）。 */
 export function recordTrial(entry: Omit<TrialEntry, 'at'> & { at?: string }, now = Date.now()): void {
-  write([{ ...entry, at: entry.at ?? new Date(now).toISOString() } as TrialEntry, ...readTrial()], now)
+  write([{ ...entry, at: entry.at ?? new Date(now).toISOString() }, ...readTrial()], now)
 }
 
 /** 從伺服器回的 debug 抽出要留的數字（不含店名）。 */

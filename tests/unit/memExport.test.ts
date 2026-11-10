@@ -6,13 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const store = new Map<string, unknown>()
 const writes: string[][] = []
 vi.mock('idb-keyval', () => ({
-  get: async (k: string) => structuredClone(store.get(k)),
-  set: async (k: string, v: unknown) => { store.set(k, structuredClone(v)) },
-  setMany: async (entries: [string, unknown][]) => {
+  get: (k: string) => structuredClone(store.get(k)),
+  set: (k: string, v: unknown) => { store.set(k, structuredClone(v)) },
+  setMany: (entries: [string, unknown][]) => {
     writes.push(entries.map(([k]) => k))
     for (const [k, v] of entries) store.set(k, structuredClone(v))
   },
-  del: async (k: string) => { store.delete(k) },
+  del: (k: string) => { store.delete(k) },
 }))
 
 const {
@@ -103,7 +103,7 @@ describe('匯入驗證：壞檔整份不收、說得出原因', () => {
     writes.length = 0
     const bad = fileOf([entry('new1', { shown: [T0 + DAY] }), { ...entry('new2'), shown: [Number.NaN] }])
     const r = await importMem(bad, T0 + DAY)
-    expect(r).toEqual({ ok: false, why: expect.stringMatching(/第 2 家.*shown/) })
+    expect(r).toEqual({ ok: false, why: expect.stringMatching(/第 2 家.*shown/) as string })
     expect(snapshot()).toEqual(before)
     expect(writes).toHaveLength(0)
     expect(await getMem('new1')).toBeUndefined() // 第 1 家是好的也不收：整份不收

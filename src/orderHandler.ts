@@ -56,7 +56,7 @@ function cleanMem(v: unknown): PlaceMemSummary[] {
   if (!Array.isArray(v)) return []
   const out: PlaceMemSummary[] = []
   // R3R-2：截到 200 筆時，封鎖（x）與愛店（fav）優先保留——「不要再來」的店不能因為記憶太長被擠掉。
-  const head = v.slice(0, MAX_MEM * 5)
+  const head: unknown[] = v.slice(0, MAX_MEM * 5)
   const keep = (m: unknown) => isRecord(m) && (m.x !== undefined || m.fav === true)
   const ordered = [...head.filter(keep), ...head.filter((m) => !keep(m))]
   for (const m of ordered.slice(0, MAX_MEM)) {

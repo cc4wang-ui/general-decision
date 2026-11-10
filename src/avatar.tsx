@@ -41,7 +41,7 @@ export function avatarSvg(lv: Level, mood: Mood = 'idle', onDark = false): strin
   s += '<circle cx="60" cy="33" r="4.5" fill="' + gold + '"/><path d="M60 29.5 l1.2 2.5 2.8 .3 -2 1.9 .5 2.8 -2.5 -1.3 -2.5 1.3 .5 -2.8 -2 -1.9 2.8 -.3 Z" fill="#AC7C00"/></g>'
   if (lv === 2) s += '<path d="M42 48 q18 -6 36 0" stroke="#BCBCBC" stroke-width="1" fill="none"/>' /* 白髮線 */
   /* 眉 */
-  const brow = { idle: [0, 0], bark: [-3, 3], praise: [-2, -2], punish: [-4, 4] }[mood]!
+  const brow = { idle: [0, 0], bark: [-3, 3], praise: [-2, -2], punish: [-4, 4] }[mood]
   if (lv === 0) s += '<path d="M42 ' + (52 + brow[0]!) + ' q7 -4 14 0 M64 ' + (52 + brow[0]!) + ' q7 -4 14 0" stroke="' + ink + '" stroke-width="2.4" fill="none" stroke-linecap="round"/>'
   else s += '<path d="M40 ' + (50 + brow[0]!) + ' L56 ' + (54 + brow[1]!) + ' M80 ' + (50 + brow[0]!) + ' L64 ' + (54 + brow[1]!) + '" stroke="' + ink + '" stroke-width="' + (lv === 2 ? 4.5 : 3.8) + '" fill="none" stroke-linecap="round"/>'
   /* 眼 */

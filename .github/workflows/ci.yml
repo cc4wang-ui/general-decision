@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   check:
-    name: check (tsc + vitest)
+    name: check (tsc + lint + vitest)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -53,16 +53,17 @@ jobs:
       # round-14 又重演一次（測試檔 2 個未用 helper，TS6133，報告寫 exit 0 是假的）。
       # 本 repo 的型別檢查是 `npm run typecheck`（= tsc -b，package.json 實有指令），
       # 它用 project references 覆蓋：tsconfig.app.json 含 src、tests/unit、api；
-      # tsconfig.node.json 含 vite.config.ts、playwright.config.ts、tests/e2e、tests/shots。
+      # tsconfig.check.json 含 vite.config.ts、playwright.config.ts、tests/shots。
+      # tests/e2e 不在 tsc 檢查範圍（step 3 決定 (b)：e2e 的 20 個
+      # noUncheckedIndexedAccess 錯誤全在 spec 檔，由 e2e job 實際跑來驗證）。
       # 所以測試檔的型別錯誤會在這裡被擋住，不是只靠 vitest。
       - name: Typecheck
         run: npm run typecheck
 
-      # 沒有 lint 步驟 —— 誠實說明，不是漏寫。
-      # 2026-11-09 查 package.json：沒有 lint script，也沒有 eslint 相依套件，
-      # 所以本 workflow 不編造一個 lint 指令。ESLint 收緊是計畫 step 3 的工作；
-      # step 3 落地（加 lint script）之後，再把 `npm run lint` 加回這個 job。
-      # 在此之前，check job = tsc + vitest。
+      # ESLint（step 3 落地）：`npm run lint`（= eslint src api tests/unit）。
+      # 0 problems 才過；CI 只認當下結果，不認「lint:fix 曾經修過」。
+      - name: Lint
+        run: npm run lint
 
       # 指令取自 package.json："test": "vitest run"。不加 reporter 參數，
       # 保持與本機驗證同一條指令（本機 round-14：vitest 1032/1034，

@@ -97,7 +97,10 @@ export function App() {
   // 連勝由日記推導；回首頁（screen 變）時重算，跨午夜也跟著換。
   const streak = useMemo(
     () => computeStreak(entries, new Date(), country === 'JP' ? 'Asia/Tokyo' : tzOf(undefined)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // screen 不在回呼裡，但要它變時重算（見上一行註解）。
+    // 注意：react-hooks plugin 未安裝，本來這裡有一行 eslint-disable-next-line
+    // react-hooks/exhaustive-deps；沒有該 plugin 時那行是死指令且 ESLint 報錯，
+    // 故刪除。若日後裝 plugin，該行要加回來（或改寫 deps）。
     [entries, country, screen],
   )
   const [budgets, setBudgets] = useState<Record<'TW' | 'JP', Band[]>>(() => ({ TW: loadBudget('TW'), JP: loadBudget('JP') }))

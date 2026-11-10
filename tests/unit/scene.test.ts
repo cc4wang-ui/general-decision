@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Round 5 情境（Cross 2026-11-01「返回的結果不符合我的需求，第一步先確認使用者情境偏好」）。
 // STOP 1：預設 ≥ 5 種＋「其他」（≤ 20 字），必選。STOP 2：每一種預設都會改查法；手動輸入變成關鍵字。
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import api, { sanitizeRequest } from '../../api/order.ts'
 import { CARD_BY_ID } from '../../src/cards.ts'
 import { mulberry32 } from '../../src/discovery.ts'
@@ -11,6 +11,7 @@ import { buildOrderPrompt } from '../../src/prompt.ts'
 import {
   SCENE_OTHER, SCENE_QUERIES, SCENE_TEXT_MAX, eatOtherQuery, restQuery, sanitizeSceneText, sceneFilter, sceneOf, sceneOptions, scenePasses, sceneWiden,
 } from '../../src/scene.ts'
+import { bodyText, urlText } from './mockFetch.ts'
 import { templateOrder } from '../../src/template.ts'
 import { stats } from '../../src/diary.ts'
 import { summarize, type TrialEntry } from '../../src/trial.ts'
@@ -186,7 +187,7 @@ describe('每一種預設都會改查法（STOP 2）', () => {
 
 describe('挑店前的情境篩選', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'restaurant', types: ['restaurant'], ...extra })
 
   it('聚餐／約會排除主類別是速食、超商的店；只是 types 裡順帶有 fast_food 的正餐店不排除', () => {
     const scene = sceneOf('eat', { scene: '朋友聚餐' })
@@ -219,7 +220,7 @@ describe('挑店前的情境篩選', () => {
 describe('口令對得上情境', () => {
   const pick = { place: { id: 'p1', name: '阿財魯肉飯', walkMin: 5 }, mode: 'new', visits: 1, pool: 5, afterFilter: 5, relaxed: [], exhausted: false, seen14d: false } as unknown as PickResult
   const req = (choices: Record<string, string | number>, module: 'eat' | 'rest' = 'eat'): OrderRequest =>
-    ({ module, level: 1, choices, now: '2026-11-01T12:00:00+08:00', recentOrders: [] }) as OrderRequest
+    ({ module, level: 1, choices, now: '2026-11-01T12:00:00+08:00', recentOrders: [] })
 
   it('prompt 帶情境一行；「其他」帶使用者的字；沒選情境不帶', () => {
     expect(buildOrderPrompt(req({ scene: '外帶' }), pick).user).toContain('情境：外帶')
@@ -297,9 +298,9 @@ describe('handler 接上情境', () => {
 
   const stub = (pages: RawPlace[][]) => {
     const bodies: Record<string, unknown>[] = []
-    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      if (String(url).includes('anthropic')) return claudeOk()
-      bodies.push(JSON.parse(String(init?.body ?? '{}')))
+    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('anthropic')) return claudeOk()
+      bodies.push(JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>)
       return new Response(JSON.stringify({ places: pages[bodies.length - 1] ?? [] }), { status: 200 })
     }))
     return bodies
@@ -347,10 +348,10 @@ describe('handler 接上情境', () => {
   it('「其他」：使用者的字進關鍵字、進口令的 prompt，不進伺服器 log；入口先清洗（控制字元、20 字）', async () => {
     const bodies = stub([[1, 2, 3, 4, 5].map((n) => at(`o${n}`, n * 50))])
     const prompts: string[] = []
-    const f = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const f = globalThis.fetch as unknown as Mock<(url: string, init?: RequestInit) => Promise<Response>>
     const inner = f.getMockImplementation() as (url: string, init?: RequestInit) => Promise<Response>
-    f.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (String(url).includes('anthropic')) prompts.push(String(init?.body ?? ''))
+    f.mockImplementation((url: string, init?: RequestInit) => {
+      if (urlText(url).includes('anthropic')) prompts.push(bodyText(init?.body))
       return inner(url, init)
     })
     const text = `有插座\n${'安靜'.repeat(20)}`
@@ -377,7 +378,7 @@ describe('handler 接上情境', () => {
 
 describe('checker 2026-11-01 第 1 輪的修正', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.6, primaryType: 'restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.6, primaryType: 'restaurant', types: ['restaurant'], ...extra })
 
   it('約會、聚餐排除甜點蛋糕店（內湖：法式料理 → 法式甜點蛋糕店）；選「甜食」時不排除', () => {
     const cake = c('aposo', { primaryType: 'cake_shop' })
@@ -443,7 +444,7 @@ describe('不合法的鐘點自動進位（內湖：「19:67分一到立刻起�
 
 describe('checker 第 2 輪：快打烊的店、快吃派到燒肉店', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.6, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.6, primaryType: 'cafe', types: ['cafe'], ...extra })
 
   it('還剩幾分鐘關門：優先用 nextCloseTime；沒有就用營業到 HH:MM（跨午夜 +24h）；沒資料 → undefined', async () => {
     const { minutesUntilClose, toCandidates } = await import('../../src/places.ts')
@@ -498,9 +499,9 @@ describe('handler：快打烊的店不派給久坐的情境', () => {
       const soon = [1, 2, 3, 4, 5].map((n) => at(`soon${n}`, n * 60, { primaryType: 'cafe', types: ['cafe'], currentOpeningHours: { openNow: true, nextCloseTime: '2026-11-01T12:20:00Z' } }))
       const late = at('late', 400, { primaryType: 'cafe', types: ['cafe'], currentOpeningHours: { openNow: true, nextCloseTime: '2026-11-01T15:00:00Z' } })
       const bodies: string[] = []
-      vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-        if (String(url).includes('anthropic')) return claudeOk()
-        bodies.push(String(init?.body ?? ''))
+      vi.stubGlobal('fetch', vi.fn((url: string | URL | Request, init?: RequestInit) => {
+        if (urlText(url).includes('anthropic')) return claudeOk()
+        bodies.push(bodyText(init?.body))
         return new Response(JSON.stringify({ places: bodies.length === 1 ? [...soon, late] : [] }), { status: 200 })
       }))
       const res = await handler(post({ module: 'rest', choices: { scene: '工作讀書', drink: '咖啡' }, now: '2026-11-01T12:00:00Z', seed }))
@@ -589,7 +590,7 @@ describe('Round 7：東京的歇', () => {
   })
   it('歇的篩選：水煙吧（type）、購物中心、百貨不派；選咖啡時店名有シーシャ／shisha 的也不派（即使 type=cafe）', () => {
     const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-      ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
+      ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra })
     const coffee = sceneOf('rest', { scene: '一個人放空', drink: '咖啡' })
     const cands = [
       c('アラビアン カフェ&バー', { primaryType: 'hookah_bar' }),
@@ -623,7 +624,7 @@ describe('Round 7：東京的歇', () => {
 import { NOT_COFFEE_RE } from '../../src/scene.ts'
 describe('Round 8：派錯店', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra })
   const night = [
     c('カラオケパセラ 新宿靖国通り店', { primaryType: 'karaoke', types: ['karaoke'] }),
     c('新宿カブキhall / 歌舞伎横丁｜Shinjuku Izakaya & Food Court Kabuki Hall', { primaryType: 'restaurant', types: ['restaurant'] }),
@@ -677,7 +678,7 @@ describe('Round 8：派錯店', () => {
 import { HARD_OPEN_MIN, localizeNeed, sceneTimes, sceneTimesLine, viable } from '../../src/scene.ts'
 describe('Round 10：到店要開著、約會擋酒吧、其他的需求換日文', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'cafe', types: ['cafe'], ...extra })
   it('viable：到店時剩不到 10 分（或已關）不算；沒有關門資料算', () => {
     expect(HARD_OPEN_MIN).toBe(10)
     expect(viable({ walkMin: 14, closeInMin: 8 })).toBe(false) // checker 22:51 コメダ
@@ -767,7 +768,7 @@ describe('Round 10：到店要開著、約會擋酒吧、其他的需求換日�
 // checker 2026-11-04 09:20：早上新宿約會放寬到 4.2★，走 32 分。放寬評分時，步行上限不放寬。
 describe('Round 11：約會步行上限 15 分', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra })
   const date = sceneOf('eat', { scene: '約會吃好一點' })
   it('規則：步行上限 15 分、半徑 1200 m（15 分 × 80 m）', () => {
     expect(date!.rule.maxWalk).toBe(15)
@@ -775,8 +776,12 @@ describe('Round 11：約會步行上限 15 分', () => {
   })
   it('4.3★ 以上但走超過 15 分的不派；15 分內有 4.3★ 就派它', () => {
     const cands = [c('far4.6', { rating: 4.6, walkMin: 32 }), c('near4.4', { rating: 4.4, walkMin: 9 })]
-    expect(sceneFilter(cands, date)).toEqual({ kept: [cands[1]], relaxed: false })
-    expect(scenePasses(cands[0], date)).toBe(false)
+    const near = cands[1]
+    if (!near) throw new Error('expected second candidate')
+    expect(sceneFilter(cands, date)).toEqual({ kept: [near], relaxed: false })
+    const far = cands[0]
+    if (!far) throw new Error('expected first candidate')
+    expect(scenePasses(far, date)).toBe(false)
   })
   it('15 分內沒有 4.3★ → 只放寬評分：派 15 分內最高分的（差 0.2★ 內），走 32 分的 4.2★ 不派', () => {
     const cands = [c('far4.2', { rating: 4.2, walkMin: 32 }), c('near4.0', { rating: 4.0, walkMin: 12 }), c('near3.9', { rating: 3.9, walkMin: 6 }), c('near3.6', { rating: 3.6, walkMin: 4 })]
@@ -802,7 +807,7 @@ describe('Round 11：約會步行上限 15 分', () => {
 import { sceneTiers } from '../../src/scene.ts'
 describe('Round 11 checker 第 1 輪：被記憶擋掉時一層一層退', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra })
   const date = sceneOf('eat', { scene: '約會吃好一點' })
   const A = c('A 4.2 近', { rating: 4.2, walkMin: 7 })
   const B = c('B 3.8 近', { rating: 3.8, walkMin: 5 })
@@ -832,8 +837,8 @@ describe('Round 11 checker 第 1 輪：被記憶擋掉時一層一層退', () =>
       at('C', 2300, { rating: 4.6, userRatingCount: 800, primaryType: 'italian_restaurant' }),
       at('D', 600, { rating: 4.7, userRatingCount: 800, primaryType: 'japanese_izakaya_restaurant' }),
     ]
-    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) =>
-      String(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
+    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request) =>
+      urlText(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
     for (const block of [Date.parse('2026-11-15'), 'forever' as const]) {
       for (let seed = 1; seed <= 20; seed++) {
         const res = await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed, mem: [{ id: 'A', sh: [], dn: [], x: block }] }))
@@ -848,7 +853,7 @@ describe('Round 11 checker 第 1 輪：被記憶擋掉時一層一層退', () =>
 // Round 12（Cross 2026-11-05「全部處理完之後一次上線 不要一直分段」）：Round 11 的已知未修全處理。
 describe('Round 12：評分階梯、約會不派外帶店與購物中心、歇整批放回也不放寬類型', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra })
   const date = sceneOf('eat', { scene: '約會吃好一點' })
   const r43 = c('4.3', { rating: 4.3 }), r42 = c('4.2', { rating: 4.2 }), r40 = c('4.0', { rating: 4.0 }), r38 = c('3.8', { rating: 3.8 }), r30 = c('3.0', { rating: 3.0 })
   const bar = c('bar', { rating: 4.7, primaryType: 'japanese_izakaya_restaurant' }), far = c('far', { rating: 4.6, walkMin: 29 })
@@ -900,8 +905,8 @@ describe('Round 12：評分階梯、約會不派外帶店與購物中心、歇�
       at('T', 180, { rating: 4.5, userRatingCount: 800, primaryType: 'meal_takeaway' }),
       at('BAR', 400, { rating: 4.7, userRatingCount: 800, primaryType: 'japanese_izakaya_restaurant' }),
     ]
-    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) =>
-      String(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
+    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request) =>
+      urlText(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
     const until = Date.parse('2026-11-15')
     for (let seed = 1; seed <= 20; seed++) {
       const one = (await (await handler(post({ choices: { scene: '約會吃好一點', diet: '都可以' }, seed, mem: [{ id: 'A43', sh: [], dn: [], x: until }] }))).json()) as Body
@@ -916,7 +921,7 @@ describe('Round 12：評分階梯、約會不派外帶店與購物中心、歇�
 // (2) 約會整批放回時，外帶店／購物中心／百貨又被放回來（Q1 只同意放回酒吧）。
 describe('Round 12 checker 第 1 輪：沒評分的店、約會整批放回的類型', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra })
   const date = sceneOf('eat', { scene: '約會吃好一點' })
   it('sceneTiers：每層都包含前面所有層；沒評分的店在最底層（Round 13：不過評分門檻）', () => {
     const A = c('A43', { rating: 4.3 }), U1 = c('U1', { rating: undefined }), U2 = c('U2', { rating: undefined })
@@ -940,8 +945,8 @@ describe('Round 12 checker 第 1 輪：沒評分的店、約會整批放回的�
     vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
-  const stubPlaces = (raw: RawPlace[]) => vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) =>
-    String(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
+  const stubPlaces = (raw: RawPlace[]) => vi.stubGlobal('fetch', vi.fn((url: string | URL | Request) =>
+    urlText(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
   it('handler：4.3★ 和 2 家沒評分的店都被擋 → 派 4.2／4.1，0 筆 3.8；20 種子', async () => {
     stubPlaces([
       at('A43', 300, { rating: 4.3, userRatingCount: 800, primaryType: 'japanese_restaurant' }),
@@ -974,7 +979,7 @@ describe('Round 12 checker 第 1 輪：沒評分的店、約會整批放回的�
 // Round 13（Cross 2026-11-05「沒評分擋掉 / 直接開下一輪」）：沒評分不過評分門檻；朋友聚餐不派購物中心等。
 describe('Round 13：沒評分擋掉、朋友聚餐不派購物中心', () => {
   const c = (id: string, extra: Partial<PlaceCandidate> = {}): PlaceCandidate =>
-    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra }) as PlaceCandidate
+    ({ id, name: id, walkMin: 5, rating: 4.5, primaryType: 'italian_restaurant', types: ['restaurant'], ...extra })
   const date = sceneOf('eat', { scene: '約會吃好一點' })
   const talk = sceneOf('rest', { scene: '談事情', drink: '咖啡' })
   const party = sceneOf('eat', { scene: '朋友聚餐' })
@@ -1006,8 +1011,8 @@ describe('Round 13：沒評分擋掉、朋友聚餐不派購物中心', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
-  const stubPlaces = (raw: RawPlace[]) => vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) =>
-    String(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
+  const stubPlaces = (raw: RawPlace[]) => vi.stubGlobal('fetch', vi.fn((url: string | URL | Request) =>
+    urlText(url).includes('anthropic') ? claudeOk() : new Response(JSON.stringify({ places: raw }), { status: 200 })))
   it('handler：約會 4.3★ 被擋、旁邊有 2 家沒評分 → 派 4.2／4.1★，0 筆沒評分；20 種子（R12 是 40/40 派沒評分）', async () => {
     stubPlaces([
       at('A43', 300, { rating: 4.3, userRatingCount: 800, primaryType: 'japanese_restaurant' }),

@@ -77,11 +77,11 @@ describe('/api/place-photo', () => {
       { name: 'Carol', url: null },
     ])
     expect(f).toHaveBeenCalledTimes(2)
-    const [detailsUrl, detailsInit] = f.mock.calls[0]
+    const [detailsUrl, detailsInit] = f.mock.calls[0]!
     expect(detailsUrl).toContain(`/v1/places/${PLACE_ID}`)
     expect((detailsInit!.headers as Record<string, string>)['X-Goog-FieldMask']).toBe('photos')
     expect((detailsInit!.headers as Record<string, string>)['X-Goog-Api-Key']).toBe('test-places-key')
-    expect(f.mock.calls[1][0]).toContain(`/v1/${photoName}/media?maxWidthPx=960&skipHttpRedirect=true`)
+    expect(f.mock.calls[1]![0]).toContain(`/v1/${photoName}/media?maxWidthPx=960&skipHttpRedirect=true`)
   })
 
   it('Places details 掛掉 → 502 photo_lookup_failed', async () => {

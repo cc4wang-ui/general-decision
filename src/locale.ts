@@ -104,7 +104,7 @@ export function localizeFields<T extends object>(obj: T, paths: (keyof T & strin
       if (r.hits.length) { hits.push(...r.hits.map((h) => `${key}:${h}`)); out = { ...out, [key]: r.text } }
     } else if (Array.isArray(v) && v.every((s) => typeof s === 'string')) {
       let changed = false
-      const arr = (v as string[]).map((s) => {
+      const arr = (v).map((s) => {
         const r = localizeText(s, country)
         if (r.hits.length) { changed = true; hits.push(...r.hits.map((h) => `${key}[]:${h}`)) }
         return r.text

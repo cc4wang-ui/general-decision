@@ -21,15 +21,15 @@ export function readDebug(): DebugEntry[] {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return []
-    const v = JSON.parse(raw)
-    return Array.isArray(v) ? (v.filter((e) => e && typeof e.at === 'string') as DebugEntry[]) : []
+    const v: unknown = JSON.parse(raw)
+    return Array.isArray(v) ? v.filter((e: unknown): e is DebugEntry => !!e && typeof e === 'object' && 'at' in e && typeof e.at === 'string') : []
   } catch { return [] }
 }
 
 /** 記一筆，超過 DEBUG_MAX 就砍掉最舊的。 */
 export function recordDebug(entry: Omit<DebugEntry, 'at'> & { at?: string }): void {
   try {
-    const next = [{ ...entry, at: entry.at ?? new Date().toISOString() } as DebugEntry, ...readDebug()].slice(0, DEBUG_MAX)
+    const next = [{ ...entry, at: entry.at ?? new Date().toISOString() }, ...readDebug()].slice(0, DEBUG_MAX)
     localStorage.setItem(KEY, JSON.stringify(next))
   } catch { /* 無痕模式或空間滿了，除錯紀錄不是主線功能，靜靜放棄 */ }
 }

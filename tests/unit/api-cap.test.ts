@@ -5,7 +5,7 @@ import { ERROR_TEXT, placesCallsToday, requestGeocode, underPlacesCap } from '..
 import { DAILY_PLACES_CAP } from '../../src/places.ts'
 
 function mockFetch(calls: string) {
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(
+  vi.stubGlobal('fetch', vi.fn(() => new Response(
     JSON.stringify({ loc: { lat: 25.0478, lng: 121.517 }, label: '台北車站' }),
     { status: 200, headers: { 'content-type': 'application/json', 'x-places-calls': calls } },
   )))
@@ -32,7 +32,7 @@ describe('requestGeocode 計入每日上限', () => {
   })
 
   it('沒有這個 header 不加', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ loc: { lat: 1, lng: 2 }, label: 'x' }), { status: 200 })))
+    vi.stubGlobal('fetch', vi.fn(() => new Response(JSON.stringify({ loc: { lat: 1, lng: 2 }, label: 'x' }), { status: 200 })))
     await requestGeocode('x')
     expect(placesCallsToday()).toBe(0)
   })
@@ -48,7 +48,7 @@ describe('Places 掛掉（checker 2026-11-01）', () => {
   it('伺服器回 503 places_down → 手機顯示「地圖服務暫時連不上」，試用紀錄記 places_down（不是 upstream／no_places）', async () => {
     const { ApiError, requestOrder } = await import('../../src/api.ts')
     const { readTrial } = await import('../../src/trial.ts')
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+    vi.stubGlobal('fetch', vi.fn(() => new Response(
       JSON.stringify({ error: 'places_down', message: 'x', debug: { module: 'eat', level: 1, error: 'places_down' } }),
       { status: 503, headers: { 'content-type': 'application/json' } },
     )))

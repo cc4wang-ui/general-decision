@@ -3,7 +3,7 @@ import { WEEKLY_SYSTEM_PROMPT, levelName, moduleTitle } from '../src/prompt.ts'
 import { parseWeekly, ParseError } from '../src/orderParse.ts'
 import { stats } from '../src/diary.ts'
 import { localizeWeeklyText } from '../src/rules.ts'
-import type { Level, WeeklyReport, WeeklyRequest } from '../src/types.ts'
+import type { WeeklyReport, WeeklyRequest } from '../src/types.ts'
 
 export const config = { runtime: 'nodejs' }
 
@@ -26,7 +26,7 @@ async function handler(request: Request): Promise<Response> {
     return json({ error: 'bad_request', message: '請求不是合法 JSON' }, 400)
   }
   const entries = Array.isArray(req?.entries) ? req.entries : []
-  const level = (req?.level ?? 1) as Level
+  const level = (req?.level ?? 1)
   const weekStart = req?.weekStart ?? new Date().toISOString()
 
   // 數字在這裡算，不外包給模型；Claude 只負責 body 與 verdict。
@@ -77,7 +77,7 @@ function buildUser(req: WeeklyRequest, s: WeeklyReport['stats']): string {
     .map((e) => `・${e.ts} ${moduleTitle(e.module)} ${e.big} → ${e.outcome}`)
   return [
     `本週開始：${req.weekStart}`,
-    `火力：${levelName((req.level ?? 1) as Level)}`,
+    `火力：${levelName((req.level ?? 1))}`,
     `【已算好的數字，直接用，不要自己再算】口令 ${s.orders} 道、服從率 ${s.complianceRate}%、罰則 ${s.punishments} 次、最弱模組 ${s.weakestModule ?? '無'}`,
     s.newPlaces !== undefined ? `【已算好】本週新占領 ${s.newPlaces} 個據點、回防 ${s.revisits} 次，直接用。` : '',
     `本週 entries：\n${lines.join('\n')}`,

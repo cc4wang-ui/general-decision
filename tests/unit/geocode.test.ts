@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import api from '../../api/geocode.ts'
 import type { GeocodeResponse } from '../../src/types.ts'
+import { bodyText, urlText } from './mockFetch.ts'
 
 const handler = api.fetch
 const post = (body: unknown) =>
@@ -22,7 +23,7 @@ describe('/api/geocode', () => {
   })
 
   it('查得到 → {loc,label}；Text Search pageSize 1、只要 location＋displayName、zh-TW；x-places-calls 1', async () => {
-    const f = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
+    const f = vi.fn((_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
       places: [{ location: { latitude: 25.0478, longitude: 121.517 }, displayName: { text: '台北車站' } }],
     }), { status: 200 }))
     vi.stubGlobal('fetch', f)
@@ -31,13 +32,13 @@ describe('/api/geocode', () => {
     expect(res.headers.get('x-places-calls')).toBe('1')
     expect((await res.json()) as GeocodeResponse).toEqual({ loc: { lat: 25.0478, lng: 121.517 }, label: '台北車站' })
     const [url, init] = f.mock.calls[0]!
-    expect(String(url)).toContain('places:searchText')
-    expect(JSON.parse(String(init!.body))).toEqual({ textQuery: '台北車站', pageSize: 1, languageCode: 'zh-TW' })
+    expect(urlText(url)).toContain('places:searchText')
+    expect(JSON.parse(bodyText(init!.body))).toEqual({ textQuery: '台北車站', pageSize: 1, languageCode: 'zh-TW' })
     expect((init!.headers as Record<string, string>)['X-Goog-FieldMask']).toBe('places.location,places.displayName')
   })
 
   it('查不到 → 404 not_found + 班長口吻', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })))
+    vi.stubGlobal('fetch', vi.fn(() => new Response(JSON.stringify({}), { status: 200 })))
     const res = await handler(post({ q: '火星基地' }))
     expect(res.status).toBe(404)
     expect(await res.json()).toEqual({ error: 'not_found', message: '找不到這個地方。報個車站或地標。' })
@@ -53,15 +54,15 @@ describe('/api/geocode', () => {
   })
 
   it('Places 掛掉 → 502；429 → 429', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('boom', { status: 500 })))
+    vi.stubGlobal('fetch', vi.fn(() => new Response('boom', { status: 500 })))
     expect((await handler(post({ q: '台北車站' }))).status).toBe(502)
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('slow', { status: 429 })))
+    vi.stubGlobal('fetch', vi.fn(() => new Response('slow', { status: 429 })))
     expect((await handler(post({ q: '台北車站' }))).status).toBe(429)
   })
 
   it('log 不記查詢字串與座標；GET → 405', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {})
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    vi.stubGlobal('fetch', vi.fn(() => new Response(JSON.stringify({
       places: [{ location: { latitude: 25.0478, longitude: 121.517 }, displayName: { text: '台北車站' } }],
     }), { status: 200 })))
     await handler(post({ q: '我家巷口' }))
@@ -83,23 +84,23 @@ describe('Round 6：日文站名', () => {
     expect(geocodeLanguage('台北車站')).toBe('zh-TW')
   })
   it('geocodeLookup：ok／not_found／http／timeout 四種結果', async () => {
-    const okFetch = (async () => new Response(JSON.stringify({ places: [{ location: { latitude: 35.6896, longitude: 139.7006 }, displayName: { text: '新宿駅' } }] }), { status: 200 })) as unknown as typeof fetch
+    const okFetch = (() => new Response(JSON.stringify({ places: [{ location: { latitude: 35.6896, longitude: 139.7006 }, displayName: { text: '新宿駅' } }] }), { status: 200 })) as unknown as typeof fetch
     expect(await geocodeLookup('新宿駅', 'k', 'https://x', okFetch)).toEqual({ kind: 'ok', loc: { lat: 35.6896, lng: 139.7006 }, label: '新宿駅' })
-    const empty = (async () => new Response(JSON.stringify({}), { status: 200 })) as unknown as typeof fetch
+    const empty = (() => new Response(JSON.stringify({}), { status: 200 })) as unknown as typeof fetch
     expect(await geocodeLookup('asdf', 'k', 'https://x', empty)).toEqual({ kind: 'not_found' })
-    const http = (async () => new Response('', { status: 429 })) as unknown as typeof fetch
+    const http = (() => new Response('', { status: 429 })) as unknown as typeof fetch
     expect(await geocodeLookup('x', 'k', 'https://x', http)).toEqual({ kind: 'http', status: 429 })
-    const boom = (async () => { throw new Error('abort') }) as unknown as typeof fetch
+    const boom = (() => { throw new Error('abort') }) as unknown as typeof fetch
     expect(await geocodeLookup('x', 'k', 'https://x', boom)).toEqual({ kind: 'timeout' })
   })
   it('/api/geocode 用假名查 → languageCode ja', async () => {
-    const f = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
+    const f = vi.fn((_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
       places: [{ location: { latitude: 35.6896, longitude: 139.7006 }, displayName: { text: '新宿駅' } }],
     }), { status: 200 }))
     vi.stubGlobal('fetch', f)
     const res = await handler(post({ q: 'しんじゅく駅' }))
     expect(res.status).toBe(200)
-    expect(JSON.parse(String(f.mock.calls[0]?.[1]?.body)).languageCode).toBe('ja')
+    expect((JSON.parse(bodyText(f.mock.calls[0]?.[1]?.body)) as { languageCode?: string }).languageCode).toBe('ja')
     expect((await res.json()) as GeocodeResponse).toEqual({ loc: { lat: 35.6896, lng: 139.7006 }, label: '新宿駅' })
   })
 })

@@ -100,7 +100,7 @@ describe('requestOrder 把 debug 從 Order 剝掉（不能汙染日記）', () =
 
   it('成功：回傳的 Order 沒有 debug 欄位，但紀錄裡有一筆', async () => {
     const { requestOrder } = await import('../../src/api.ts')
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+    vi.stubGlobal('fetch', vi.fn(() => new Response(
       JSON.stringify({ ...ORDER, debug: { module: 'eat', level: 1, picked: '阿財魯肉飯' } }),
       { status: 200, headers: { 'x-places-calls': '1' } },
     )))
@@ -113,7 +113,7 @@ describe('requestOrder 把 debug 從 Order 剝掉（不能汙染日記）', () =
 
   it('失敗：錯誤回應裡的 debug 也會被記下來——沒出口令才是最該查的', async () => {
     const { requestOrder, ApiError } = await import('../../src/api.ts')
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+    vi.stubGlobal('fetch', vi.fn(() => new Response(
       JSON.stringify({ error: 'no_places', message: '附近查不到營業中的店。換個地方再報告。', debug: { module: 'eat', level: 1, error: 'no_places' } }),
       { status: 502 },
     )))
@@ -124,7 +124,7 @@ describe('requestOrder 把 debug 從 Order 剝掉（不能汙染日記）', () =
 
   it('失敗且伺服器沒附 debug（例如離線）時，前端自己補一筆', async () => {
     const { requestOrder } = await import('../../src/api.ts')
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down') }))
+    vi.stubGlobal('fetch', vi.fn(() => { throw new Error('network down') }))
     await expect(requestOrder(req)).rejects.toThrow()
     expect(readDebug()[0]).toMatchObject({ module: 'eat', error: 'offline' })
     vi.unstubAllGlobals()

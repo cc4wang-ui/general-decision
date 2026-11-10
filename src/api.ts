@@ -171,12 +171,12 @@ export async function requestOrder(req: OrderRequest, geo?: TrialGeo): Promise<O
     addPlacesCalls(calls)
     const { debug, ...order } = data
     if (debug) recordDebug(debug)
-    const p = (order as Order).place
+    const p = (order).place
     recordTrial({
       ...base, ok: true, calls, ...fromDebug(debug),
       ...(p ? { placeId: p.id, mode: p.mode, band: p.band ?? null, ...(p.priceEst ? { priceEst: true } : {}) } : {}),
     })
-    return order as Order
+    return order
   } catch (e) {
     if (e instanceof ApiError) {
       recordDebug(e.debug ?? { module: req.module, level: req.level, error: e.kind })

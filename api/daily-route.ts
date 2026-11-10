@@ -109,7 +109,7 @@ function order(stops:Stop[],origin:Coord):{stops:Stop[];distanceKm:number;warnin
  let at=origin,km=0
  const result:Stop[]=[]
  const pending:Stop[]=[]
- const flush=()=>{while(pending.length){let best=0,score=Infinity;pending.forEach((s,i)=>{if(!s.candidate)return;const d=distanceKm(at,s.candidate);if(d<score){score=d;best=i}});const next=pending.splice(best,1)[0];if(next.candidate){km+=distanceKm(at,next.candidate);at={lat:next.candidate.lat,lng:next.candidate.lng}}result.push(next)}}
+ const flush=()=>{while(pending.length){let best=0,score=Infinity;pending.forEach((s,i)=>{if(!s.candidate)return;const d=distanceKm(at,s.candidate);if(d<score){score=d;best=i}});const next=pending.splice(best,1)[0];if(!next)break;if(next.candidate){km+=distanceKm(at,next.candidate);at={lat:next.candidate.lat,lng:next.candidate.lng}}result.push(next)}}
  for(const s of stops){if(s.locked||s.done||s.custom||!s.candidate){flush();if(s.candidate){km+=distanceKm(at,s.candidate);at={lat:s.candidate.lat,lng:s.candidate.lng}}result.push(s)}else pending.push(s)}
  flush()
  return {stops:result,distanceKm:Math.round(km*10)/10,warning:'路線按地理距離估算，非 Google Maps 實際步行／大眾運輸時間；固定行程時段衝突尚未自動驗證。'}
@@ -146,8 +146,15 @@ async function handler(req:Request):Promise<Response>{
  if(hasGps&&!gps)return respond({error:'bad_origin',message:'目前位置的座標不正確，無法排路線。原行程保留。'},400)
  const location=gps?'':safe(input.location,100)
  if(!gps&&!location)return respond({error:'location_required',message:'請先指定出發地。'},400)
- const list=Array.isArray(input.stops)?input.stops.slice(0,9):[]
- const stops:Stop[]=list.filter(x=>x&&typeof x==='object'&&typeof x.id==='string').map(x=>({id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,specified:x.specified===true,start:safe(x.start,10),minutes:Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate:x.candidate&&typeof x.candidate==='object'&&typeof x.candidate.id==='string'&&Number.isFinite(x.candidate.lat)&&Number.isFinite(x.candidate.lng)?x.candidate:undefined}))
+ const list:unknown[]=Array.isArray(input.stops)?input.stops.slice(0,9):[]
+ // 客戶端送來的 stops 是未驗證 JSON：先以型別守衛收進 Record，再逐欄位以 safe()/typeof 驗證；
+ // candidate 原樣透傳（與舊版 any 行為一致：形狀由 retentionOk／venueOk 在使用時重驗）。
+ const isStopInput=(x:unknown):x is Record<string,unknown>=>!!x&&typeof x==='object'&&typeof (x as Record<string,unknown>).id==='string'
+ const stops:Stop[]=list.filter(isStopInput).map(x=>{
+  const rawCandidate=x.candidate&&typeof x.candidate==='object'?x.candidate as Candidate:undefined
+  const candidate=rawCandidate&&typeof rawCandidate.id==='string'&&Number.isFinite(rawCandidate.lat)&&Number.isFinite(rawCandidate.lng)?rawCandidate:undefined
+  return {id:safe(x.id,90),kind:safe(x.kind,20),title:safe(x.title,100),place:safe(x.place,100),locked:x.locked===true,done:x.done===true,custom:x.custom===true,specified:x.specified===true,start:safe(x.start,10),minutes:typeof x.minutes==='number'&&Number.isFinite(x.minutes)?Math.max(5,Math.min(720,x.minutes)):45,candidate}
+ })
  const shuffle=safe(input.shuffle,90),excluded=Array.isArray(input.exclude)?input.exclude.filter(x=>typeof x==='string').slice(0,200):[]
  // 排除清單上限 200（跟前端 mergeExclude 同步）：不喜歡 100＋placeMem 封鎖＋每站換掉過的 20；其他站現任候選另外走 `others`（見下方），不再佔這 200 的額度。舊版種類鍵（'ramen_restaurant'）先轉新鍵，舊的不喜歡才不會失效。
  const excludeKinds=Array.isArray(input.excludeKinds)?[...new Set(input.excludeKinds.filter(x=>typeof x==='string').map(normalizeKind))].slice(0,20):[]
@@ -181,7 +188,9 @@ async function handler(req:Request):Promise<Response>{
    const page=await search(key,location+' Japan',undefined,1)
    const origins=page.places
    if(!origins.length)return respond({error:'origin_not_found',message:'無法確認出發地，請輸入更具體的車站或地址。'},404)
-   center={lat:origins[0].lat,lng:origins[0].lng};origin=origins[0]
+   const firstOrigin=origins[0]
+   if(!firstOrigin)return respond({error:'origin_not_found',message:'無法確認出發地，請輸入更具體的車站或地址。'},404)
+   center={lat:firstOrigin.lat,lng:firstOrigin.lng};origin=firstOrigin
   }
   const result:Stop[]=[]
   /**

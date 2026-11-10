@@ -9,6 +9,7 @@ import {
   GO_DESTS, MINUTES, TRANSPORTS, goDests, goKeep, goPasses, goRadius, goTransportSteps, goTrip, isGoDestination, mentionsTransport,
   type Minutes, type Transport,
 } from '../../src/go.ts'
+import { bodyText, urlText, type PlacesRequestBody } from './mockFetch.ts'
 import { pickLane, widenPlan, type LanePlan } from '../../src/lanes.ts'
 import { placesLanguage, placesRequest } from '../../src/orderHandler.ts'
 import type { RawPlace } from '../../src/places.ts'
@@ -66,7 +67,7 @@ describe('查詢（pickLane → Text Search）', () => {
           const p = goLane(t, m, 'TW', 14, seed)
           expect(p.radius).toBe(goRadius(t, m))
           expect(p.kind).toBe('text')
-          expect(JSON.parse(bodies[i]!).locationRestriction.rectangle).toBeDefined() // 限在半徑的方框內（handler 再切回圓）
+          expect((JSON.parse(bodies[i]!) as PlacesRequestBody).locationRestriction?.rectangle).toBeDefined() // 限在半徑的方框內（handler 再切回圓）
         }
       }
     }
@@ -190,9 +191,9 @@ const MODEL = JSON.stringify({
 
 function goFetch(places: RawPlace[] = [...DECOYS, ...PARKS]) {
   const bodies: Record<string, unknown>[] = []
-  const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    if (String(url).includes('anthropic')) return new Response(JSON.stringify({ content: [{ type: 'text', text: MODEL }] }), { status: 200 })
-    bodies.push(JSON.parse(String(init?.body)))
+  const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+    if (urlText(url).includes('anthropic')) return new Response(JSON.stringify({ content: [{ type: 'text', text: MODEL }] }), { status: 200 })
+    bodies.push(JSON.parse(bodyText(init?.body)) as Record<string, unknown>)
     return new Response(JSON.stringify({ places }), { status: 200 })
   })
   return { f, bodies }
@@ -257,10 +258,10 @@ describe('/api/order：去卡', () => {
     // Round 10：超商不是去處，而且救援固定 3 km 會超過使用者選的單程時間（B 線回報）。
     const store: RawPlace = { id: 's7', displayName: { text: '7-ELEVEN 測試門市' }, location: near(0), currentOpeningHours: { openNow: true }, primaryType: 'convenience_store', rating: 4, userRatingCount: 50 }
     const bodies: string[] = []
-    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      if (String(url).includes('anthropic')) return new Response(JSON.stringify({ content: [{ type: 'text', text: MODEL }] }), { status: 200 })
-      bodies.push(String(init?.body))
-      const rescue = String(init?.body).includes('便利商店')
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('anthropic')) return new Response(JSON.stringify({ content: [{ type: 'text', text: MODEL }] }), { status: 200 })
+      bodies.push(bodyText(init?.body))
+      const rescue = bodyText(init?.body).includes('便利商店')
       return new Response(JSON.stringify({ places: rescue ? [store] : DECOYS.slice(0, 2) }), { status: 200 })
     })
     vi.stubGlobal('fetch', f)
@@ -291,9 +292,9 @@ describe('api/probe：mode=lanes／mode=go', () => {
 
   it('lanes：每條 lane 一列（含 verified:false 與去的 lane），回 HTTP 狀態與筆數；只要 places.id', async () => {
     const masks = new Set<string>()
-    const fetchFn = vi.fn(async (_u: string | URL | Request, init?: RequestInit) => {
+    const fetchFn = vi.fn((_u: string | URL | Request, init?: RequestInit) => {
       masks.add(String((init?.headers as Record<string, string>)['X-Goog-FieldMask']))
-      const body = String(init?.body)
+      const body = bodyText(init?.body)
       if (body.includes('noodle_shop')) return new Response('{"error":{"code":400}}', { status: 400 })
       return new Response(JSON.stringify({ places: body.includes('美術館') ? [] : [{ id: 'a' }, { id: 'b' }] }), { status: 200 })
     }) as unknown as typeof fetch
