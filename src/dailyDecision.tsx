@@ -7,7 +7,7 @@ import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from './venueCheck.ts'
 import { AREA_NAMES, withinArea } from './areas.ts'
 
-export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是結構化日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。結構化日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied' }
+export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是結構化日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。結構化日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; /** 跨日偏移（PR-4 修正輪）：錨點當日 0，跨過午夜 1，依此類推；與 eta／departure 同一束，清掉 ETA 時一起清。舊存檔／舊回應沒有此欄位時視為 0（當天）。 */ etaDayOffset?:number;departureDayOffset?:number; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied' }
 /** 可被意圖指定的站：5 個可搜尋站。rest 不在內——rest 是純文字站，永遠不是搜尋目標。 */
 export type IntentStationId = 'gym' | 'meal' | 'creative' | 'coffee' | 'shopping'
 /** 5 個可搜尋站的 catalog 順序（活動顯示與存放順序）。 */
@@ -68,6 +68,13 @@ export function sameIntent(a: DailyIntent, b: DailyIntent): boolean {
 export function copyIntent(intent: DailyIntent): DailyIntent {
   return { destination: intent.destination, destinationStation: intent.destinationStation, activities: [...intent.activities] }
 }
+/** 開始時間正規化（PR-4；唯一規則，所有寫入點共用）：合法 HH:MM 原樣留著，
+ * 其餘一律 ''（未指定）。不猜、不補、不修——'9:00'（單位數）、'24:00'、
+ * '15:00:00'（帶秒）、非字串，一律視為未指定，伺服器端用當下時間。
+ * 正則與 addFixedTask 的 start 驗證是同一個。 */
+export function normalizeStartTime(v: unknown): string {
+  return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : ''
+}
 export type DailyState = {
   day: string; area: string; currentPlace: string
   /** 當日結構化意圖。必填（不再是可選字串）：沒有意圖就是 EMPTY_INTENT，不用 undefined 表示。 */
@@ -78,6 +85,10 @@ export type DailyState = {
    * 換天歸零（與 intent 同規則）；舊存檔沒有此欄位時沿用當日 intent（移轉——
    * 任務本來就是那份意圖長出來的，不是猜測）。 */
   appliedIntent: DailyIntent
+  /** 今日開始時間（PR-4；HH:MM，''＝未指定，用伺服器當下時間當錨點）。
+   * 只在當日有效：換天歸零（與 intent 同規則）。可選欄位：既有字面量
+   * state 工廠不含它，仍須編譯通過；未指定時讀成 ''（`?? ''`）。 */
+  startTime?: string
   tasks: DailyTask[]; notes: string[]; avoid: string[]
   /** 地區偏好（F7）：只在所選地區中心 1 公里內找店。預設開啟；關掉＝不限區域。 */
   areaOnly?: boolean
@@ -99,7 +110,7 @@ const KEY = 'decide.daily.v1'
 const CROSS_AREA_NOTE = '以澀谷為生活基地，避免不必要跨區'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
-  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: { ...EMPTY_INTENT, activities: [] }, appliedIntent: { ...EMPTY_INTENT, activities: [] },
+  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: { ...EMPTY_INTENT, activities: [] }, appliedIntent: { ...EMPTY_INTENT, activities: [] }, startTime: '',
   tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: [],
   seen: {}, disliked: [], dislikedKinds: [],
 })
@@ -151,9 +162,9 @@ export function clearStaleCandidate(t: DailyTask, ctx: StaleContext = { disliked
   // 不動標題（round 9 F1a：round 8 把標題還原套到所有清掉原因，DENY／評論數／
   // 跨區／rest 也換標題，舊存檔的行程標題被洗成目錄標題）。
   // 指定／固定站走 clearedKeepPlace，title 是使用者自己寫的，不動。
-  const cleared = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, title: catalogTitle(t.id) ?? t.title }
-  const clearedKeepTitle = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
-  const clearedKeepPlace = { ...t, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined }
+  const cleared = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, etaDayOffset: undefined, departureDayOffset: undefined, title: catalogTitle(t.id) ?? t.title }
+  const clearedKeepTitle = { ...t, candidate: undefined, place: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, etaDayOffset: undefined, departureDayOffset: undefined }
+  const clearedKeepPlace = { ...t, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, etaDayOffset: undefined, departureDayOffset: undefined }
   if (ctx.disliked.includes(t.candidate.id)) return t.locked || t.custom || t.specified ? clearedKeepPlace : cleared
   const kind = kindOfCandidate(t.candidate)
   if (kind && ctx.dislikedKinds.includes(kind)) return t.locked || t.custom || t.specified ? clearedKeepPlace : cleared
@@ -225,6 +236,8 @@ export function loadDaily(): DailyState {
         : copyIntent(intent))
       : { ...EMPTY_INTENT, activities: [] }
     return { ...fresh, ...rest, day: fresh.day, intent, appliedIntent,
+      // 開始時間（PR-4）：只留今天，換天歸零（與 intent 同規則）；同日不合法值 → ''。
+      startTime: raw.day === fresh.day ? normalizeStartTime((raw as { startTime?: unknown }).startTime) : '',
       // 地區偏好移轉（F7）：舊資料的跨區自由文字偏好對應成 area='澀谷'＋areaOnly 開啟；
       // 舊資料沒有 areaOnly 欄位時預設開啟（當時沒有關掉的辦法，開啟才是忠實轉換）。
       area, areaOnly,
@@ -304,10 +317,10 @@ export function buildDaily(s: DailyState): DailyTask[] {
     // 舊候選連同 noCandidate 一起清掉（noCandidate 是舊查詢的結果）。
     if (id === destStation) {
       if (prev?.intentSpecified && sameIntent(applied, intent) && prev.candidate) return { ...base, specified: true, intentSpecified: true }
-      return { ...base, place: dest, specified: true, intentSpecified: true, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, noCandidate: undefined, noCandidateReason: undefined }
+      return { ...base, place: dest, specified: true, intentSpecified: true, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, etaDayOffset: undefined, departureDayOffset: undefined, noCandidate: undefined, noCandidateReason: undefined }
     }
     // (4) 本站曾是目的地站，現在只是被選活動站：變回普通自動站。
-    if (prev?.intentSpecified && covered(id)) return { ...base, place: undefined, specified: false, intentSpecified: false, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, noCandidate: undefined, noCandidateReason: undefined }
+    if (prev?.intentSpecified && covered(id)) return { ...base, place: undefined, specified: false, intentSpecified: false, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, etaDayOffset: undefined, departureDayOffset: undefined, noCandidate: undefined, noCandidateReason: undefined }
     // (5) 未被意圖覆蓋的站：維持現有 previous 合併行為不變。
     return base
   })
@@ -449,6 +462,11 @@ export function clearSeen(s: DailyState): DailyState {
   return { ...s, seen: {} }
 }
 
+/** 跨日標記（PR-4 修正輪）：eta／departure 的 day offset 轉顯示前綴。
+ * 0（或缺欄位＝舊回應／舊存檔）→ 當天，不標；1 →「翌日」；2 以上寫「＋N 日」。
+ * eta 與 departure 各標各的：同一站可能 eta 當天、離開翌日。 */
+const dayMark = (offset?: number): string => !offset ? '' : offset === 1 ? '翌日 ' : `＋${offset}日 `
+
 export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [state,setState] = useState(loadDaily)
   const [feedback,setFeedback] = useState('')
@@ -464,10 +482,15 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [fixedTime,setFixedTime] = useState('15:00')
   const [fixedMinutes,setFixedMinutes] = useState('60')
   const change = (fn:(s:DailyState)=>DailyState) => setState(s=>{ const next=fn(s); saveDaily(next); return next })
-  const clearRoute = () => {setRouteKm(null);setTravelMin(null);setConflicts([])}
+  /** 路線顯示清除（PR-4 修正輪 F2）：路線距離／步行分鐘／衝突橫幅之外，各站卡片上
+   * 的舊 eta／departure／travelMin／conflict（含跨日偏移）也一起清掉——只清橫幅、
+   * 留著逐站舊值，畫面會自相矛盾（橫幅說沒衝突、卡片卻說晚到）。改時間／改地區／
+   * 改起點都走這裡，路線過期時整束一起清，不留一半。 */
+  const clearRoute = () => {setRouteKm(null);setTravelMin(null);setConflicts([]);change(s=>({...s,tasks:s.tasks.map(t=>({...t,eta:undefined,departure:undefined,travelMin:undefined,conflict:undefined,etaDayOffset:undefined,departureDayOffset:undefined}))}))}
   /** /api/daily-route 的回應形狀（前端只讀這些欄位；未知欄位不讀）。partial／missingStops
-   * 是 2.1 O1 的頂層契約（伺服器明確標示缺站）；舊形狀回應沒有這兩個欄位時退回逐站掃描。 */
-  type DailyRouteResponse={message?:string;stops?:DailyTask[];routeVerified?:boolean;distanceKm?:number;travelMinutes?:number;conflicts?:string[];partial?:boolean;missingStops?:{id:string;reason?:string}[]}
+   * 是 2.1 O1 的頂層契約（伺服器明確標示缺站）；舊形狀回應沒有這兩個欄位時退回逐站掃描。
+   * anchorTime 是伺服器實際用的錨點（PR-4 修正輪 O2；舊回應沒有此欄位時視為未提供）。 */
+  type DailyRouteResponse={message?:string;stops?:DailyTask[];routeVerified?:boolean;distanceKm?:number;travelMinutes?:number;conflicts?:string[];partial?:boolean;missingStops?:{id:string;reason?:string}[];anchorTime?:string}
   const searchRoute = async (shuffle?:string, s:DailyState=state) => {
     if(busy)return
     setBusy(shuffle??'all')
@@ -502,7 +525,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       // 不進伺服器的 retention 重驗。完整重新生成不送 others（沒有要換的站，也沒有「其他站」），
       // 改送 seen（round 11：各站換掉過的店全部合併，剛被換掉的店在完整重新生成時也不回來；
       // seen 同樣只擋自動站的新搜尋、不進 retention，見 seenFor）。
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,startTime:s.startTime??'',stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
       const data=(await response.json()) as DailyRouteResponse
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       change(old=>({...old,tasks:restoreIntentSpecified(data.stops??old.tasks, old.tasks),appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
@@ -528,8 +551,12 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       // F2（修正輪）：沒有任何站有候選時（空行程，或全站缺站），「店家已確認」是假陳述，
       // 不寫。空行程只說今天還沒有行程；全站缺站只說缺站（noCandNote 已含「部分行程：」）。
       const hasCandidate=(data.stops??[]).some((t: DailyTask)=>!!t.candidate)
-      if(!hasCandidate)setStatus((data.stops??[]).length===0?'今天還沒有行程。':`沒有找到符合條件的店家${noCandNote}`)
-      else setStatus(data.routeVerified?'店家已確認 · 已更新 Google Routes 步行路線'+(data.conflicts?.length?'；請留意時間衝突':'')+noCandNote:'店家已確認，但步行路線目前無法驗證。請用 Google Maps 導航確認。'+noCandNote)
+      // O2（PR-4 修正輪）：過去時間被 clamp 後，狀態列寫明實際用的錨點。不改 clamp
+      // 規則；只有「使用者填了合法時間、伺服器卻用了另一個時間」時才顯示——未指定／
+      // 不合法／未來時間時不顯示。路線沒驗證成功時也沒有排程，不顯示。
+      const anchorNote=data.routeVerified&&data.anchorTime&&normalizeStartTime(s.startTime)!==''&&data.anchorTime!==s.startTime?`；已以現在 ${data.anchorTime} 開始排`:''
+      if(!hasCandidate)setStatus((data.stops??[]).length===0?'今天還沒有行程。':`沒有找到符合條件的店家${noCandNote}${anchorNote}`)
+      else setStatus(data.routeVerified?'店家已確認 · 已更新 Google Routes 步行路線'+(data.conflicts?.length?'；請留意時間衝突':'')+noCandNote+anchorNote:'店家已確認，但步行路線目前無法驗證。請用 Google Maps 導航確認。'+noCandNote+anchorNote)
     }catch(e){setStatus('無法更新：'+(e instanceof Error?e.message:'未知錯誤')+'；原行程已保留')}
     finally{setBusy(null)}
   }
@@ -636,6 +663,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
             ?<button className="dd-secondary" data-testid="daily-origin-typed" disabled={busy!==null} onClick={pickTyped}>改用輸入地點</button>
             :<button className="dd-secondary" data-testid="daily-origin-here" disabled={busy!==null} onClick={pickHere}>📍 用目前位置</button>}
           <small>{state.useHere?'每次搜尋都重新定位；座標只送去查店、排路線，不存在手機。':'預設以澀谷站為出發點；可輸入確切地點，或按「用目前位置」。'}</small>
+          <label htmlFor="daily-start-time">幾點開始</label>
+          <input id="daily-start-time" data-testid="daily-start-time" aria-label="幾點開始" type="time" value={state.startTime ?? ''} disabled={busy!==null} onChange={e=>{change(s=>({...s,startTime:normalizeStartTime(e.target.value)}));clearRoute();setStatus('開始時間變更，請重新搜尋路線')}} />
+          <small>留空＝現在就出發；填了就從那個時間開始排（比現在早的時間以現在為準）。時間以東京時間為準。</small>
           <fieldset className="dd-intent">
             <legend>今天想去哪裡／想做什麼</legend>
             <label htmlFor="daily-intent-destination">想去哪裡</label>
@@ -715,7 +745,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                   {t.noCandidateReason === 'area' && <> <a className="dd-place-link" href="#daily-area">前往地區偏好設定</a></>}
                   {t.noCandidateReason === 'filtered' && <> <button className="dd-muted" disabled={busy !== null} onClick={clearDisliked}>清除「不喜歡」的紀錄</button></>}
                 </div> : t.kind==='rest' ? <div className="dd-place-meta"><span>散步回家，不用找店家。</span></div> : <div className="dd-place-unresolved" role="status">⚠ 地點尚未確認。請搜尋行程後再導航。</div>}
-                {t.eta&&<p className="dd-eta">{t.eta} 抵達｜{t.departure} 離開｜步行 {t.travelMin} 分鐘</p>}
+                {t.eta&&<p className="dd-eta">{dayMark(t.etaDayOffset)}{t.eta} 抵達｜{dayMark(t.departureDayOffset)}{t.departure} 離開｜步行 {t.travelMin} 分鐘</p>}
                 {t.conflict&&<p className="dd-stop-conflict" role="alert">⚠ {t.conflict}</p>}
                 <p className="dd-description">{t.detail||'預計停留 '+t.minutes+' 分鐘；請出發前確認店家資訊。'}</p>
                 <div className="dd-actions">
@@ -733,7 +763,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 </div>
                 {!t.done&&<details className="dd-change-place"><summary>⌖ 指定／修改這一站的地點</summary>
                   <label>輸入店家名稱或地址
-                    <input aria-label={t.title+' 指定地點'} value={t.specified?t.place||'':''} placeholder="例如：Fuglen Tokyo" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value,specified:!!e.target.value.trim(),intentSpecified:e.target.value.trim()?false:undefined,candidate:undefined,eta:undefined,departure:undefined,travelMin:undefined,conflict:undefined}:x)}))} />
+                    <input aria-label={t.title+' 指定地點'} value={t.specified?t.place||'':''} placeholder="例如：Fuglen Tokyo" onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,place:e.target.value,specified:!!e.target.value.trim(),intentSpecified:e.target.value.trim()?false:undefined,candidate:undefined,eta:undefined,departure:undefined,travelMin:undefined,conflict:undefined,etaDayOffset:undefined,departureDayOffset:undefined}:x)}))} />
                   </label>
                   <button className="dd-secondary" disabled={busy!==null||!t.place?.trim()} onClick={()=>{void searchRoute(t.id)}}>確認這個地點並更新路線</button>
                 </details>}

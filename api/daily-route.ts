@@ -1,4 +1,4 @@
-import { travelMatrix, scheduleRoute, validPoint } from '../src/dailyRouting.ts'
+import { travelMatrix, scheduleRoute, validPoint, effectiveStartTime } from '../src/dailyRouting.ts'
 import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from '../src/venueCheck.ts'
 import { areaCenter, AREA_RADIUS_M, distanceKm } from '../src/areas.ts'
@@ -277,7 +277,11 @@ async function handler(req:Request):Promise<Response>{
    result.push({...stop,title:preserve?stop.title:selected.name,place:selected.address,candidate:selected,noCandidate:undefined,noCandidateReason:undefined})
   }
   const ordered=order(result,center)
-  const now=new Date().toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'})
+  // 開始時間（PR-4）：使用者開始時間合法且比當下晚才取代伺服器當下時間；
+  // 未指定／不合法／已過去時就是伺服器當下時間——跟今天完全相同。
+  // 09:00 不是這裡的預設值（見 src/dailyRouting.ts scheduleRoute 的防禦 fallback）。
+  const serverNow=new Date().toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'})
+  const now=effectiveStartTime(input.startTime,serverNow)
   const located=ordered.stops.filter(s=>s.candidate)
   // 無候選站不是未解決：它已有 noCandidate 標記與原因，前端照原因顯示；只有
   // 「沒候選又沒標記」的站才算未解決（防禦檢查，正常流程走不到）。
@@ -296,7 +300,9 @@ async function handler(req:Request):Promise<Response>{
    // 站），rest 純文字站與無候選站在 Routes 成功時會整站消失（實測確認；這
    // 也是 live 三輪從沒看到休息站的原因）。失敗路徑本來就回 ordered 全單，不用改。
    const merged=mergeScheduled(ordered.stops,schedule.stops)
-   return respond({origin,...schedule,stops:merged,partial,missingStops,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
+   // anchorTime（PR-4 修正輪，O2）：回傳實際用的錨點——過去時間被 clamp 時，
+   // 前端才能在狀態列寫明「已以現在 HH:MM 開始排」。新欄位，舊客戶端不讀就忽略。
+   return respond({origin,...schedule,stops:merged,partial,missingStops,anchorTime:now,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
   }catch(e){
    console.warn('[daily-route] Routes matrix unavailable:', e instanceof Error?e.message:'unknown')
    // Keep verified names, photos and navigation functional even if the separate Routes API is not enabled.

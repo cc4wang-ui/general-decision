@@ -827,3 +827,97 @@ describe('PR-2 修正輪：F1 指定 rest 缺站渲染 ＋ F2 空行程 ＋ F3 p
     await waitFor(() => expect(screen.getByText(/部分行程：定食沒有符合條件的店家/)).toBeTruthy())
   })
 })
+
+describe('開始時間輸入（PR-4）', () => {
+  const seedEmpty = () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+  }
+  const routeFetch = () => {
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: [], routeVerified: false, conflicts: [] }) }
+      : { ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+  const lastBody = (mock: ReturnType<typeof vi.fn>) => {
+    const call = mock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route')) as [unknown, RequestInit | undefined] | undefined
+    return JSON.parse(bodyText(call?.[1]?.body, '{}')) as Record<string, unknown>
+  }
+  it('開始時間欄位存在、初始為空；改為 15:00 後 localStorage 存下 15:00', async () => {
+    seedEmpty()
+    render(<DailyDecision onBack={() => {}} />)
+    const { fireEvent } = await import('@testing-library/react')
+    const input = screen.getByTestId<HTMLInputElement>('daily-start-time')
+    expect(input.value).toBe('')
+    fireEvent.change(input, { target: { value: '15:00' } })
+    expect(screen.getByTestId('daily-start-time')).toBeTruthy()
+    expect(screen.getByTestId<HTMLInputElement>('daily-start-time').value).toBe('15:00')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { startTime?: string }
+    expect(saved.startTime).toBe('15:00')
+  })
+  it('清空開始時間後 localStorage 的 startTime 回到空字串（未指定＝伺服器當下）', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], startTime: '15:00',
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    const { fireEvent } = await import('@testing-library/react')
+    expect(screen.getByTestId<HTMLInputElement>('daily-start-time').value).toBe('15:00')
+    fireEvent.change(screen.getByTestId('daily-start-time'), { target: { value: '' } })
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { startTime?: string }
+    expect(saved.startTime).toBe('')
+  })
+  it('按生成時請求體含 startTime；改時間本身不觸發 /api/daily-route', async () => {
+    const fetchMock = routeFetch()
+    seedEmpty()
+    render(<DailyDecision onBack={() => {}} />)
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(screen.getByTestId('daily-start-time'), { target: { value: '15:00' } })
+    expect(fetchMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(lastBody(fetchMock).startTime).toBe('15:00')
+  })
+  it('F2（修正輪；來源：紅隊 RT-UI）：改開始時間後，各站舊 ETA／舊逐站衝突一起清掉，不再與已清的橫幅矛盾', async () => {
+    const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('s1', '某食堂'), eta: '09:10', departure: '09:55', travelMin: 10, conflict: '預計晚到 10 分鐘' }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], startTime: '',
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.getByText('09:10 抵達｜09:55 離開｜步行 10 分鐘')).toBeTruthy()
+    expect(screen.getByText('⚠ 預計晚到 10 分鐘')).toBeTruthy()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(screen.getByTestId('daily-start-time'), { target: { value: '15:00' } })
+    expect(screen.getByText('開始時間變更，請重新搜尋路線')).toBeTruthy()
+    expect(screen.queryByText('09:10 抵達｜09:55 離開｜步行 10 分鐘')).toBeNull()
+    expect(screen.queryByText('⚠ 預計晚到 10 分鐘')).toBeNull()
+  })
+  it('O1（修正輪）：開始時間說明文字寫明是東京時間', () => {
+    seedEmpty()
+    render(<DailyDecision onBack={() => {}} />)
+    expect(screen.getByText(/東京時間/)).toBeTruthy()
+  })
+  it('O2（修正輪）：過去時間被 clamp 後，搜尋成功時狀態列寫明實際用的錨點', async () => {
+    // 合併後（PR-2 F2）：空行程（stops:[]）狀態列寫「今天還沒有行程」，不顯示錨點——
+    // 錨點只對「真的有行程」有意義；故此案用有一站有候選的回應，測 clamp 顯示本身。
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('s1', '某食堂') }], routeVerified: true, distanceKm: 0.5, travelMinutes: 10, conflicts: [], anchorTime: '09:00' }) }
+      : { ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], startTime: '08:00',
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    const { fireEvent } = await import('@testing-library/react')
+    expect(screen.getByTestId<HTMLInputElement>('daily-start-time').value).toBe('08:00')
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(screen.getByText(/已以現在 09:00 開始排/)).toBeTruthy())
+  })
+})
