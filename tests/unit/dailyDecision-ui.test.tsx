@@ -10,7 +10,7 @@ vi.mock('../../src/placeMem.ts', () => ({
   migrateDailyDislike: vi.fn(async () => {}),
   clearDislike: vi.fn(() => Promise.resolve({ sharedRemains: false })),
 }))
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { DailyDecision } from '../../src/dailyDecision.tsx'
 
 const KEY = 'decide.daily.v1'
@@ -428,6 +428,41 @@ describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () =
     await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
     fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃壽司' } })
     expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('想吃壽司')
+  })
+  it('R2-F3：搜尋後同一意圖重跑，候選與店家地址保留（appliedIntent 在 state 層、伺服器洗不掉）', async () => {
+    // 搜尋後形狀：place 是店家地址、有候選、標記在。意圖不變、按別站的「今天略過」
+    // （只觸發 replanDaily，不改意圖），候選不得被清掉——舊規則 prev.place === intent
+    // 在搜尋後永不成立，意圖框每敲一個字、按「今天略過」都會靜默清掉候選。
+    // 注意：意圖框重打一次「同樣的意圖」測不到——React 會去重值沒變的 onChange，
+    // 根本不觸發 replan；按「今天略過」才是真實觸發點。
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: '想吃拉麵',
+    }))
+    const serverMeal = { id: 'meal', title: '拉麵店', minutes: 45, kind: 'meal', done: false, specified: true, place: '東京都渋谷区道玄坂1-2-3', candidate: cand('m1', '拉麵店') }
+    const plainStop = (id: string, title: string, kind: 'gym' | 'meal' | 'creative' | 'shopping' | 'rest', minutes: number) => ({ id, title, minutes, kind, done: false })
+    const serverStops = [plainStop('gym', 'FIT-EASY', 'gym', 80), serverMeal, plainStop('creative', '探索站', 'creative', 65), plainStop('coffee', '咖啡站', 'creative', 60), plainStop('shopping', '購物站', 'shopping', 55), plainStop('rest', '休息站', 'rest', 75)]
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: serverStops, routeVerified: false, conflicts: [] }) }
+      : { ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
+    // 搜尋後 place 是地址、候選在卡片上（「不喜歡這間店」只在有候選時出現）
+    expect(screen.getByLabelText<HTMLInputElement>('拉麵店 指定地點').value).toBe('東京都渋谷区道玄坂1-2-3')
+    expect(screen.getByText('不喜歡這間店')).toBeTruthy()
+    // 意圖不變、按購物站的「今天略過」：只重排，不改意圖——候選與地址都留著
+    const shoppingCard = screen.getByText('購物站').closest('article')!
+    fireEvent.click(within(shoppingCard).getByText('今天略過'))
+    expect(screen.getByLabelText<HTMLInputElement>('拉麵店 指定地點').value).toBe('東京都渋谷区道玄坂1-2-3')
+    expect(screen.getByText('不喜歡這間店')).toBeTruthy()
+    // localStorage 的 appliedIntent 跟著意圖走
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { appliedIntent?: string }
+    expect(saved.appliedIntent).toBe('想吃拉麵')
   })
   it('長意圖往返：101 字意圖經伺服器截斷到 100 字後，標記仍在、換意圖仍能更新', async () => {
     // 伺服器 sanitize 把 place 截到 100 字（api/daily-route.ts:156）：101–120 字意圖

@@ -126,7 +126,8 @@ describe('buildDaily：意圖驅動（mode 已刪）', () => {
     const prev = buildDaily(state('想吃拉麵')).map(t => t.id === 'meal'
       ? { ...t, candidate: cand('m1', '拉麵店'), eta: '12:00 抵達', departure: '11:30 離開', travelMin: 30, conflict: '時間衝突' }
       : t)
-    const tasks = buildDaily({ ...state('想吃壽司'), tasks: prev })
+    // 前一站是從「想吃拉麵」長出來的（appliedIntent），現在意圖換成壽司 → 清掉
+    const tasks = buildDaily({ ...state('想吃壽司'), appliedIntent: '想吃拉麵', tasks: prev })
     const meal = tasks.find(t => t.id === 'meal')!
     expect(meal.specified).toBe(true)
     expect(meal.place).toBe('想吃壽司')
@@ -136,15 +137,30 @@ describe('buildDaily：意圖驅動（mode 已刪）', () => {
     expect(meal.travelMin).toBeUndefined()
     expect(meal.conflict).toBeUndefined()
   })
-  it('同一意圖重跑 → 已找到的候選保留', () => {
+  it('同一意圖重跑（搜尋後形狀）→ 已找到的候選與 eta 保留、place 留著店家地址', () => {
+    // R2-F3：搜尋後 place 是店家地址，舊條件 prev.place === intent 永不成立。
+    // 保留與否只看 state.appliedIntent === intent（state 層，伺服器洗不掉）。
     const prev = buildDaily(state('想吃拉麵')).map(t => t.id === 'meal'
-      ? { ...t, candidate: cand('m1', '拉麵店'), eta: '12:00 抵達', departure: '11:30 離開', travelMin: 30 }
+      ? { ...t, place: '東京都渋谷区道玄坂1-2-3', candidate: cand('m1', '拉麵店'), eta: '12:00 抵達', departure: '11:30 離開', travelMin: 30 }
       : t)
-    const tasks = buildDaily({ ...state('想吃拉麵'), tasks: prev })
+    const tasks = buildDaily({ ...state('想吃拉麵'), appliedIntent: '想吃拉麵', tasks: prev })
     const meal = tasks.find(t => t.id === 'meal')!
     expect(meal.candidate?.id).toBe('m1')
     expect(meal.eta).toBe('12:00 抵達')
     expect(meal.travelMin).toBe(30)
+    expect(meal.place).toBe('東京都渋谷区道玄坂1-2-3')
+    expect(meal.intentSpecified).toBe(true)
+  })
+  it('搜尋後＋appliedIntent 不符 → 候選清掉（比的是 appliedIntent，不是 place）', () => {
+    const prev = buildDaily(state('想吃壽司')).map(t => t.id === 'meal'
+      ? { ...t, place: '東京都渋谷区道玄坂1-2-3', candidate: cand('m1', '拉麵店'), eta: '12:00 抵達' }
+      : t)
+    // 任務是從「想吃壽司」長出來的，現在意圖是「想吃拉麵」：就算 place 是地址，也要清掉重找
+    const tasks = buildDaily({ ...state('想吃拉麵'), appliedIntent: '想吃壽司', tasks: prev })
+    const meal = tasks.find(t => t.id === 'meal')!
+    expect(meal.place).toBe('想吃拉麵')
+    expect(meal.candidate).toBeUndefined()
+    expect(meal.eta).toBeUndefined()
   })
   it('展覽意圖只指定探索站：咖啡站維持預設（不再共站）', () => {
     const tasks = buildDaily(state('去看展覽'))
@@ -195,7 +211,7 @@ describe('buildDaily：逐站指定優先於日意圖（intentSpecified 標記�
     expect(meal.travelMin).toBe(30)
   })
   it('日意圖站換意圖 → place 更新、舊候選清掉、標記仍在', () => {
-    const tasks = buildDaily({ ...state('想吃壽司'), tasks: intentPrev('想吃拉麵') })
+    const tasks = buildDaily({ ...state('想吃壽司'), appliedIntent: '想吃拉麵', tasks: intentPrev('想吃拉麵') })
     const meal = tasks.find(t => t.id === 'meal')!
     expect(meal.place).toBe('想吃壽司')
     expect(meal.specified).toBe(true)
@@ -203,12 +219,20 @@ describe('buildDaily：逐站指定優先於日意圖（intentSpecified 標記�
     expect(meal.candidate).toBeUndefined()
     expect(meal.eta).toBeUndefined()
   })
-  it('同一意圖重跑 → 候選保留、標記仍在', () => {
-    const tasks = buildDaily({ ...state('想吃拉麵'), tasks: intentPrev('想吃拉麵') })
+  it('同一意圖重跑（搜尋前形狀，對照）→ 候選保留、標記仍在', () => {
+    const tasks = buildDaily({ ...state('想吃拉麵'), appliedIntent: '想吃拉麵', tasks: intentPrev('想吃拉麵') })
     const meal = tasks.find(t => t.id === 'meal')!
     expect(meal.candidate?.id).toBe('m1')
     expect(meal.eta).toBe('12:00 抵達')
     expect(meal.intentSpecified).toBe(true)
+  })
+  it('replanDaily：appliedIntent 跟著當次意圖走（下次重跑比的就是它）', () => {
+    const result = replanDaily(state('想吃拉麵'))
+    expect(result.appliedIntent).toBe('想吃拉麵')
+    expect(result.tasks.find(t => t.id === 'meal')?.place).toBe('想吃拉麵')
+    const changed = replanDaily({ ...result, intent: '去看展覽' })
+    expect(changed.appliedIntent).toBe('去看展覽')
+    expect(changed.tasks.find(t => t.id === 'creative')?.place).toBe('去看展覽')
   })
   it('意圖清空 → 日意圖站回復預設、逐站指定站不受影響', () => {
     const prev = intentPrev('想吃拉麵').map(t => t.id === 'coffee'
@@ -241,6 +265,93 @@ describe('buildDaily：逐站指定優先於日意圖（intentSpecified 標記�
     const tasks = buildDaily({ ...state('想吃壽司'), tasks: prev })
     expect(tasks.find(t => t.id === 'meal')?.place).toBe('某定食店')
     expect(tasks.find(t => t.id === 'meal')?.candidate?.id).toBe('m1')
+  })
+})
+
+describe('否定邏輯（R2-F1）：雙向否定＋日文否定形——後置否定與接尾辭形不再當肯定', () => {
+  it('後置否定：關鍵字後面的「不要」同樣否定', () => {
+    expect(parseIntent('拉麵不要')).toEqual([])
+    expect(parseIntent('咖啡不要')).toEqual([])
+    expect(parseIntent('ラーメン不要')).toEqual([])
+    expect(parseIntent('ラーメン不要、寿司が食べたい')).toEqual(['meal'])
+  })
+  it('日文否定形：〜たくない／〜じゃない／〜いらない／〜なし／〜抜き', () => {
+    expect(parseIntent('食べたくない')).toEqual([])
+    expect(parseIntent('ラーメンじゃない')).toEqual([])
+    expect(parseIntent('コーヒーいらない')).toEqual([])
+    expect(parseIntent('ラーメンなしで')).toEqual([])
+    expect(parseIntent('今日はラーメン抜き')).toEqual([])
+    expect(parseIntent('ジムに行きたくない')).toEqual([])
+    expect(parseIntent('ラーメンを食べたくない')).toEqual([])
+    // 提示同樣不顯示被否定的站
+    expect(intentHintText('拉麵不要')).toBeNull()
+    expect(intentHintText('ジムに行きたくない')).toBeNull()
+  })
+  it('動詞否定形：〜ない／〜ません——食べない／行かない／がない', () => {
+    expect(parseIntent('食べない')).toEqual([])
+    expect(parseIntent('ジムに行かない')).toEqual([])
+    expect(parseIntent('食べません')).toEqual([])
+    expect(parseIntent('ラーメンがない')).toEqual([])
+  })
+  it('前置的「不想＋動詞」：受詞前置時否定該受詞；否定動詞後面有別的關鍵字時，否定歸後者', () => {
+    expect(parseIntent('拉麵不想吃')).toEqual([])
+    expect(parseIntent('拉麵不吃')).toEqual([])
+    expect(parseIntent('想吃拉麵不想喝咖啡')).toEqual(['meal'])
+    expect(parseIntent('不想吃拉麵，只想喝咖啡')).toEqual(['coffee'])
+  })
+  it('雙重否定：不是不想吃＝想吃（兩個否定相抵）；「不是拉麵」仍是否定', () => {
+    expect(parseIntent('不是不想吃拉麵')).toEqual(['meal'])
+    expect(parseIntent('不是拉麵，是壽司')).toEqual(['meal'])
+    expect(parseIntent('並不是不想喝咖啡')).toEqual(['coffee'])
+  })
+  it('非否定詞（O-A）：不過／不然／不錯／別人不觸發否定', () => {
+    expect(parseIntent('不過想吃拉麵')).toEqual(['meal'])
+    expect(parseIntent('不然想吃拉麵')).toEqual(['meal'])
+    expect(parseIntent('不錯的拉麵')).toEqual(['meal'])
+    expect(parseIntent('別人想吃拉麵')).toEqual(['meal'])
+    expect(parseIntent('不過不想吃拉麵')).toEqual([])
+  })
+})
+
+describe('CJK 詞邊界（R2-F2）：最長匹配＋封閉複合詞表＋裸詞幹邊界', () => {
+  it('誤命中不再發生：關鍵字是別的詞的一部分時不命中', () => {
+    expect(parseIntent('ジムニーでドライブ')).toEqual([])
+    expect(parseIntent('アートメイクの予約')).toEqual([])
+    expect(parseIntent('すし詰めの電車は嫌だから車で行きたい')).toEqual([])
+    expect(parseIntent('食べ過ぎた')).toEqual([])
+    expect(parseIntent('美術史の本を読みたい')).toEqual([])
+  })
+  it('合法複合詞仍命中：複合詞表裡的詞是獨立詞條', () => {
+    expect(parseIntent('食べログで調べる')).toEqual(['meal'])
+    expect(parseIntent('食べ放題に行きたい')).toEqual(['meal'])
+    expect(parseIntent('ジム通いを再開したい')).toEqual(['gym'])
+    expect(parseIntent('美術部に行く')).toEqual(['creative'])
+    expect(parseIntent('晚餐會')).toEqual(['meal'])
+    expect(parseIntent('ブランチ')).toEqual(['meal'])
+    expect(parseIntent('ラーメン屋に行きたい')).toEqual(['meal'])
+    expect(parseIntent('寿司屋で食べる')).toEqual(['meal'])
+    expect(parseIntent('カフェ巡りしたい')).toEqual(['coffee'])
+    expect(parseIntent('展示会に行きたい')).toEqual(['creative'])
+    expect(parseIntent('食べ物が食べたい')).toEqual(['meal'])
+    expect(parseIntent('カフェインを摂りたい')).toEqual(['coffee'])
+  })
+  it('否定仍以複合詞為準：カフェイン不要＝不要咖啡因，不指定咖啡站', () => {
+    expect(parseIntent('カフェインを摂りたくない')).toEqual([])
+    expect(intentHintText('カフェインを摂りたい')).toBe('已辨識：カフェイン → 咖啡站')
+  })
+  it('詞尾仍是該物（head-final）：關鍵字在詞尾時命中——地名前綴／回転寿司／お寿司', () => {
+    expect(parseIntent('渋谷ラーメン')).toEqual(['meal'])
+    expect(parseIntent('回転寿司')).toEqual(['meal'])
+    expect(parseIntent('お寿司が食べたい')).toEqual(['meal'])
+    expect(parseIntent('猫カフェに行きたい')).toEqual(['coffee'])
+  })
+  it('動詞／連接詞接在關鍵字後面：關鍵字是受詞時命中', () => {
+    expect(parseIntent('ラーメン食べたい')).toEqual(['meal'])
+    expect(parseIntent('ジム行く')).toEqual(['gym'])
+    expect(parseIntent('想吃拉麵然後看展覽')).toEqual(['meal', 'creative'])
+    expect(parseIntent('去看展覽然後喝咖啡')).toEqual(['creative', 'coffee'])
+    expect(parseIntent('健身完去喝咖啡')).toEqual(['gym', 'coffee'])
+    expect(parseIntent('午餐吃定食')).toEqual(['meal'])
   })
 })
 
@@ -287,5 +398,17 @@ describe('loadDaily：舊存檔移轉（mode 剝掉）＋ 意圖跨天歸零', (
     expect(out.tasks).toEqual([])
     expect(out.seen).toEqual({})
     expect(JSON.stringify(out)).not.toContain('"mode"')
+  })
+  it('同一天：appliedIntent 照留（state 層，伺服器洗不掉）', () => {
+    seed({ intent: '想吃拉麵', appliedIntent: '想吃拉麵', tasks: [] })
+    expect(loadDaily().appliedIntent).toBe('想吃拉麵')
+  })
+  it('舊存檔沒有 appliedIntent：沿用當日 intent（移轉——任務本來就是那份意圖長出來的）', () => {
+    seed({ intent: '想吃拉麵', tasks: [] })
+    expect(loadDaily().appliedIntent).toBe('想吃拉麵')
+  })
+  it('換天存檔：appliedIntent 跟 intent 一起歸零', () => {
+    seed({ day: yesterdayTokyo(), intent: '想吃拉麵', appliedIntent: '想吃拉麵', tasks: [] })
+    expect(loadDaily().appliedIntent).toBe('')
   })
 })

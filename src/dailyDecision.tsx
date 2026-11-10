@@ -13,6 +13,12 @@ export type DailyState = {
   /** 當日意圖原文（2.0）：「今天想去哪裡／想做什麼」。每天重新問，換天歸零；
    * 同一天內存在於當日 state。舊存檔沒有此欄位時預設 ''。 */
   intent?: string
+  /** 目前這份任務是哪份意圖長出來的（fix round 3，R2-F3）：buildDaily／replanDaily
+   * 每次生成時記下當次意圖；候選保留只比 appliedIntent === intent。存在 state 層、
+   * 不在 stop 陣列裡，伺服器回應洗不掉（伺服器只回 stops，不回這個欄位）；
+   * 換天歸零（與 intent 同規則）；舊存檔沒有此欄位時沿用當日 intent（移轉——
+   * 任務本來就是那份意圖長出來的，不是猜測）。 */
+  appliedIntent?: string
   tasks: DailyTask[]; notes: string[]; avoid: string[]
   /** 地區偏好（F7）：只在所選地區中心 1 公里內找店。預設開啟；關掉＝不限區域。 */
   areaOnly?: boolean
@@ -34,7 +40,7 @@ const KEY = 'decide.daily.v1'
 const CROSS_AREA_NOTE = '以澀谷為生活基地，避免不必要跨區'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
-  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: '',
+  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: '', appliedIntent: '',
   tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: [],
   seen: {}, disliked: [], dislikedKinds: [],
 })
@@ -129,7 +135,13 @@ export function loadDaily(): DailyState {
     // 且只接受字串、截到 120 字（跟輸入框上限一致）。
     const { mode: _legacyMode, ...rest } = raw as Partial<DailyState> & { mode?: unknown }
     const intent = raw.day === fresh.day && typeof raw.intent === 'string' ? raw.intent.slice(0, 120) : ''
-    return { ...fresh, ...rest, day: fresh.day, intent,
+    // appliedIntent 與 intent 同規則：換天歸零；同一天沒有此欄位（舊存檔）時沿用當日
+    // intent——任務本來就是那份意圖長出來的，移轉不是猜測。
+    const appliedIntent = raw.day === fresh.day
+      ? (typeof raw.appliedIntent === 'string' ? raw.appliedIntent.slice(0, 120)
+        : typeof raw.intent === 'string' ? raw.intent.slice(0, 120) : '')
+      : ''
+    return { ...fresh, ...rest, day: fresh.day, intent, appliedIntent,
       // 地區偏好移轉（F7）：舊資料的跨區自由文字偏好對應成 area='澀谷'＋areaOnly 開啟；
       // 舊資料沒有 areaOnly 欄位時預設開啟（當時沒有關掉的辦法，開啟才是忠實轉換）。
       area, areaOnly,
@@ -166,53 +178,178 @@ export function catalogTitle(id: string): string | undefined {
  * （指定後伺服器 isTextOnlyRest 不成立，會拿整句去查 Places）；「想休息」
  * 本來就由預設目錄裡的 rest 站滿足。咖啡關鍵字獨立成 coffee 列（咖啡站的 kind 仍是
  * 'creative'——那是種類系統，PR-1 不碰；這裡只改意圖對應的鍵）。
- * 否定感知：每個關鍵字的每一次出現，檢查其前面最多 4 個字元；出現否定標記
- * （封閉集合：不／沒／別／勿）時該次出現視為被否定；一種類只在至少有一次
- * 未被否定的出現時才命中（「不想吃拉麵」→ []，「不要咖啡，想吃壽司」→ meal）。
- * 英文否定（don't／no／not）不在本次範圍（已接受的殘留，見 REPORT）。
- * CJK 關鍵字用子字串比對；羅馬字關鍵字一律 word-boundary regex
- * （case-insensitive），可選的複數 s（`coffees`／`gyms`／`cafes` 皆命中），
- * `art` 不命中 party／heart，`ramen` 不命中其他單字的一部分。回傳順序是 catalog 順序。 */
-type IntentEntry = { id: string; cjk: string[]; roman: string[] }
+ * 否定與詞邊界（fix round 3：結構性重做，見下方各段註解，不再是刪關鍵字）：
+ * - 句讀分節：否定只在同一分句內算（，。、；;！？!?\n 分節），上一分句的「不」
+ *   不得否定下一分句的關鍵字（「今天不想太累，想吃拉麵」→ meal）。
+ * - 否定雙向檢查：關鍵字前面 4 字內的否定標記（不／沒／別／勿），與關鍵字
+ *   後面的後置否定形（ない／ません／なし／抜き／不要／不用／不想＋動詞等），
+ *   任一成立即否定。英文否定（don't／no／not）不在本次範圍（已接受的殘留，見 REPORT）。
+ * - CJK 關鍵字不再用子字串比對：最長匹配優先（複合詞表裡的合法複合詞是獨立
+ *   詞條）＋裸詞幹邊界檢查（bareKeywordBoundaryOk）＋詞尾仍是該物（head-final：
+ *   日文複合詞詞尾才是語義中心，回転寿司／渋谷ラーメン仍命中）。羅馬字關鍵字一律
+ *   word-boundary regex（case-insensitive），可選的複數 s（`coffees`／`gyms`／
+ *   `cafes` 皆命中），`art` 不命中 party／heart，`ramen` 不命中其他單字的一部分。
+ * 回傳順序是 catalog 順序。 */
+type IntentEntry = { id: string; cjk: string[]; roman: string[]; compounds: string[] }
 const INTENT_KEYWORDS: IntentEntry[] = [
-  { id: 'gym', cjk: ['健身', '健身房', 'ジム', '筋トレ', 'トレーニング'], roman: ['gym'] },
-  { id: 'meal', cjk: ['拉麵', 'らーめん', 'ラーメン', '壽司', '寿司', 'すし', 'ご飯', 'ごはん', '定食', '午餐', '午饭', '晚餐', '晚饭', 'ランチ', 'ディナー', '食べ', '餐廳', 'レストラン'], roman: ['ramen', 'sushi', 'restaurant'] },
-  { id: 'creative', cjk: ['展覽', '展覧会', '展示', '美術館', '美術', '畫廊', 'ギャラリー', '博物館', 'アート'], roman: ['art'] },
-  { id: 'coffee', cjk: ['咖啡', 'コーヒー', '珈琲', 'カフェ'], roman: ['cafe', 'coffee'] },
-  { id: 'shopping', cjk: ['購物', '買い物', 'ショッピング'], roman: ['shopping'] },
+  { id: 'gym', cjk: ['健身', '健身房', 'ジム', '筋トレ', 'トレーニング'], roman: ['gym'], compounds: ['ジム通い'] },
+  { id: 'meal', cjk: ['拉麵', 'らーめん', 'ラーメン', '壽司', '寿司', 'すし', 'ご飯', 'ごはん', '定食', '午餐', '午饭', '晚餐', '晚饭', 'ランチ', 'ディナー', '食べ', '餐廳', 'レストラン'], roman: ['ramen', 'sushi', 'restaurant'], compounds: ['食べログ', '食べ放題', '食べ物', '食べ歩き', 'ブランチ', '晚餐會', '午餐會', 'ラーメン屋', '寿司屋', 'すし屋'] },
+  { id: 'creative', cjk: ['展覽', '展覧会', '展示', '美術館', '美術', '畫廊', 'ギャラリー', '博物館', 'アート'], roman: ['art'], compounds: ['美術部', '展示会', '展示場'] },
+  { id: 'coffee', cjk: ['咖啡', 'コーヒー', '珈琲', 'カフェ'], roman: ['cafe', 'coffee'], compounds: ['カフェ巡り', 'カフェイン'] },
+  { id: 'shopping', cjk: ['購物', '買い物', 'ショッピング'], roman: ['shopping'], compounds: [] },
 ]
+/** 全部 CJK 詞條（關鍵字＋複合詞），按長度由長到短排——掃描時先試長的，最長匹配優先。
+ * 複合詞是封閉表：合法的長詞（食べログ／ジム通い／美術部…）列為獨立詞條；
+ * 沒列進表的長詞（ジムニー／アートメイク／すし詰め／食べ過ぎ）不會被當成關鍵字命中，
+ * 由創意預設兜底（漏判、安全降級）。每個增減都要有測試覆蓋正反案例。 */
+const CJK_ENTRIES: { text: string; id: string; compound: boolean }[] = INTENT_KEYWORDS.flatMap(e => [
+  ...e.cjk.map(text => ({ text, id: e.id, compound: false })),
+  ...e.compounds.map(text => ({ text, id: e.id, compound: true })),
+]).sort((a, b) => b.text.length - a.text.length)
+const isHiragana = (ch: string): boolean => ch >= '\u3040' && ch <= '\u309f'
+const isKatakana = (ch: string): boolean => ch >= '\u30a0' && ch <= '\u30ff'
+const isKanji = (ch: string): boolean => (ch >= '\u4e00' && ch <= '\u9fff') || (ch >= '\u3400' && ch <= '\u4dbf')
+/** 接在裸關鍵字後面仍表示關鍵字是獨立詞的連接成分（封閉集合，三類）：
+ * 連接詞（和／與／或／及／跟／然／就／才／再／完／也／都）——「拉麵然後看展覽」
+ * 「健身完去喝咖啡」；助詞（的）——「拉麵的店」；動詞（吃／食／喝／飲／去／行／
+ * 看／見／觀／買）——關鍵字是動詞的受詞（「午餐吃定食」「ラーメン食べたい」「ジム行く」）。
+ * 不在集合裡的漢字（過ぎ／詰め／史…）表示關鍵字是更長的詞的詞頭（食べ過ぎ／
+ * すし詰め／美術史），該次出現不算命中；合法的長詞必須列進複合詞表。 */
+const FOLLOW_OK = new Set([...'和與或及跟然就才再完也都的吃食喝飲去行看見觀買'])
+/** 緊接在裸關鍵字後面、表示「下一個片語開始了」的字（封閉集合）：否定前綴
+ * （不／沒／別／勿——不想／不吃／沒有）與情態／繫詞／存在動詞（想／要／是／有／
+ * 無／會／能／可／來——「拉麵想吃」「拉麵是最好吃的」）。這些字不可能是一個詞的
+ * 詞內延續（沒有任何關鍵字＋這些字的合法複合詞），所以關鍵字仍是獨立詞；
+ * 否定與否由否定檢查另行判斷（「拉麵不想吃」在這裡過關，再由後置否定判為否定）。 */
+const PHRASE_START = new Set([...'不沒別勿想要是有無會能可來'])
+/** 裸關鍵字（非複合詞）的右邊界：下一個字元必須不是「詞內延續」。
+ * 平假名（助詞／活用語尾：に／を／る／たい…）與非 CJK（空白／標點／句末）表示
+ * 關鍵字是獨立詞 → 命中。片假名（ジムニー／アートメイク）與不在 FOLLOW_OK／
+ * PHRASE_START 裡的漢字（過ぎ／詰め／史）表示關鍵字是更長的詞的一部分 → 不命中。
+ * 詞尾（關鍵字在詞尾）不受此限：日文複合詞是 head-final，詞尾才是語義中心
+ * （回転寿司／渋谷ラーメン／猫カフェ），所以左邊界不檢查。 */
+const bareKeywordBoundaryOk = (clause: string, end: number): boolean => {
+  if (end >= clause.length) return true
+  const next = clause.charAt(end)
+  if (isHiragana(next)) return true
+  if (isKatakana(next)) return false
+  if (isKanji(next)) return FOLLOW_OK.has(next) || PHRASE_START.has(next)
+  return true
+}
+/** 意圖分句裡的一個詞條命中：站 id、匹配到的詞條文字（key 是詞條在表內的寫法；
+ * 羅馬字複數形時 text 是實際寫法、key 是原形）、在分句裡的位置。 */
+type IntentToken = { id: string; text: string; key: string; start: number; end: number; roman: boolean }
+/** 分句（，。、；;！？!?\n 分節）→ 詞條命中：CJK 用最長匹配掃描，羅馬字用
+ * word-boundary regex。裸關鍵字要過右邊界檢查；複合詞本身就是完整詞，不檢查。 */
+const CLAUSE_SPLIT = /[，。、；;！？!?\n]+/
+const tokenizeClause = (clause: string): IntentToken[] => {
+  const tokens: IntentToken[] = []
+  let i = 0
+  while (i < clause.length) {
+    const hit = CJK_ENTRIES.find(e => clause.startsWith(e.text, i))
+    if (hit) {
+      if (hit.compound || bareKeywordBoundaryOk(clause, i + hit.text.length)) {
+        tokens.push({ id: hit.id, text: hit.text, key: hit.text, start: i, end: i + hit.text.length, roman: false })
+        i += hit.text.length
+        continue
+      }
+    }
+    i += 1
+  }
+  // 羅馬字關鍵字：word-boundary regex（可選複數 s），與 CJK 命中合併後按位置排序。
+  for (const e of INTENT_KEYWORDS) {
+    for (const k of e.roman) {
+      const re = new RegExp(`\\b${k}s?\\b`, 'gi')
+      let m: RegExpExecArray | null
+      while ((m = re.exec(clause)) !== null) {
+        tokens.push({ id: e.id, text: m[0], key: k, start: m.index, end: m.index + m[0].length, roman: true })
+      }
+    }
+  }
+  return tokens.sort((a, b) => a.start - b.start)
+}
 /** 否定標記（封閉集合）：關鍵字出現前最多 4 個字元內出現任一標記，該次出現視為被否定。 */
 const NEGATION_MARKERS = ['不', '沒', '別', '勿']
-const isNegatedAt = (text: string, index: number): boolean => {
-  const before = text.slice(Math.max(0, index - 4), index)
-  return NEGATION_MARKERS.some(m => before.includes(m))
+/** 非否定詞（封閉集合）：標記字元是這些詞的一部分時不是否定——不過／不然／不如／
+ * 不管／不論／不但／不僅／不只／不止是連接詞，不過是「但是」的意思；不錯／不少是
+ * 「不壞／不少」的固定評價；別的／別人／別處／別樣是人稱／指示詞。
+ * 檢查前先把窗口裡的這些詞抹掉（結構性排除，不是逐案反向規則）。 */
+const NON_NEGATION_WORDS = ['不過', '不然', '不如', '不管', '不論', '不但', '不僅', '不只', '不止', '不錯', '不少', '別的', '別人', '別處', '別樣']
+/** 雙重否定（封閉模式）：「不是／並不是／並非」後面再接否定標記，兩個否定相抵
+ * （「不是不想吃拉麵」＝想吃）；只有一個否定的「不是拉麵」仍是否定。 */
+const DOUBLE_NEGATION = /(?:不是|並不是|並非)(?:不|沒|別)/
+const blankNonNegationWords = (s: string): string => {
+  let out = s
+  for (const w of NON_NEGATION_WORDS) out = out.split(w).join('□'.repeat(w.length))
+  return out
 }
-/** 關鍵字在 text 裡第一次「未被否定」的出現位置（-1＝沒有未被否定的出現）。
- * roman 時用 word-boundary regex（可選複數 s）；CJK 時用子字串逐一找。 */
-const firstUnnegatedIndex = (text: string, keyword: string, roman: boolean): number => {
-  if (roman) {
-    const re = new RegExp(`\\b${keyword}s?\\b`, 'gi')
-    let m: RegExpExecArray | null
-    while ((m = re.exec(text)) !== null) {
-      if (!isNegatedAt(text, m.index)) return m.index
+/** 前置否定：分句內、關鍵字出現前最多 4 字元內有否定標記（非否定詞已抹掉），
+ * 且不是雙重否定（前 6 字元內有「不是＋否定」模式時相抵）。 */
+const isNegatedBefore = (clause: string, start: number): boolean => {
+  const before6 = clause.slice(Math.max(0, start - 6), start)
+  if (DOUBLE_NEGATION.test(before6)) return false
+  const before4 = clause.slice(Math.max(0, start - 4), start)
+  return NEGATION_MARKERS.some(m => blankNonNegationWords(before4).includes(m))
+}
+/** 後置否定形（封閉集合，分三組——都在同一分句內、關鍵字結束後算起）：
+ * (a) 動詞否定 ない／ません：5 字以內出現（食べない／行かない／がない——
+ *     じゃない／いらない／たくない都含有 ない，所以一條規則全蓋住；
+ *     ジムに行きたくない的 ない在 5 字處，ラーメンを食べたくない同理）；
+ * (b) 直貼否定 なし／抜き／ぬき／不要／不用：2 字以內（ラーメンなしで／
+ *     今日はラーメン抜き／拉麵不要／ラーメンは不要）；
+ * (c) 不＋動詞（不想／不吃／不喝／不去／不買／不看／沒吃／沒喝）：2 字以內，
+ *     但若否定動詞後 6 字內有別的詞條（該否定動詞自己的受詞），否定歸後者、
+ *     不歸前者（「想吃拉麵不想喝咖啡」的拉麵不否定；「拉麵不想吃」的拉麵否定）。
+ * 沒有「關鍵字後面出現裸 不／沒 就否定」的規則：裸標記是下一個動詞片語的
+ * 前綴（不想喝咖啡），歸那個片語管——否則「想吃拉麵不想喝咖啡」會連拉麵一起殺掉。 */
+const AFTER_NEGATION_NAI = ['ない', 'ません']
+const AFTER_NEGATION_DIRECT = ['なし', '抜き', 'ぬき', '不要', '不用']
+const AFTER_NEGATION_VERB = ['不想', '不吃', '不喝', '不去', '不買', '不看', '沒吃', '沒喝']
+const isNegatedAfter = (clause: string, end: number, allTokens: IntentToken[]): boolean => {
+  const rest = clause.slice(end)
+  for (const form of AFTER_NEGATION_NAI) {
+    const at = rest.indexOf(form)
+    if (at !== -1 && at <= 5) return true
+  }
+  for (const form of AFTER_NEGATION_DIRECT) {
+    const at = rest.indexOf(form)
+    if (at !== -1 && at <= 2) return true
+  }
+  for (const form of AFTER_NEGATION_VERB) {
+    const at = rest.indexOf(form)
+    if (at !== -1 && at <= 2) {
+      // 否定動詞自己的受詞在後面 → 否定歸後者
+      const afterVerb = end + at + form.length
+      if (!allTokens.some(t => t.start >= afterVerb && t.start < afterVerb + 6)) return true
     }
-    return -1
   }
-  let from = 0
-  for (;;) {
-    const idx = text.indexOf(keyword, from)
-    if (idx === -1) return -1
-    if (!isNegatedAt(text, idx)) return idx
-    from = idx + 1
-  }
+  return false
 }
-/** 第一個命中的關鍵字（parseIntent 與提示共用）：CJK 關鍵字按表內順序找，羅馬字同理。
- * 只認「未被否定」的出現——被否定的關鍵字在提示裡也不出現。 */
-const firstHitKeyword = (text: string, e: IntentEntry): string | undefined =>
-  e.cjk.find(k => firstUnnegatedIndex(text, k, false) !== -1) ?? e.roman.find(k => firstUnnegatedIndex(text, k, true) !== -1)
+/** 某一詞條出現是否被否定：分句內前置檢查或後置檢查任一成立即否定。 */
+const isTokenNegated = (clause: string, token: IntentToken, allTokens: IntentToken[]): boolean =>
+  isNegatedBefore(clause, token.start) || isNegatedAfter(clause, token.end, allTokens)
+/** 第一個命中的關鍵字（parseIntent 與提示共用）：表內順序找（CJK 關鍵字→
+ * 複合詞→羅馬字），只認「未被否定」的出現——被否定的關鍵字在提示裡也不出現。 */
+const firstHitKeyword = (text: string, e: IntentEntry): string | undefined => {
+  const candidates = [...e.cjk, ...e.compounds, ...e.roman]
+  const clauseTokens = text.split(CLAUSE_SPLIT).map(clause => ({ clause, tokens: tokenizeClause(clause) }))
+  for (const keyword of candidates) {
+    for (const { clause, tokens } of clauseTokens) {
+      if (tokens.some(t => t.key === keyword && !isTokenNegated(clause, t, tokens))) return keyword
+    }
+  }
+  return undefined
+}
 export function parseIntent(text: string): string[] {
   if (!text.trim()) return []
-  return INTENT_KEYWORDS.filter(e => firstHitKeyword(text, e) !== undefined).map(e => e.id)
+  const hits = new Set<string>()
+  for (const clause of text.split(CLAUSE_SPLIT)) {
+    const tokens = tokenizeClause(clause)
+    for (const t of tokens) {
+      if (!isTokenNegated(clause, t, tokens)) hits.add(t.id)
+    }
+  }
+  return INTENT_KEYWORDS.filter(e => hits.has(e.id)).map(e => e.id)
 }
 /** 意圖解析提示（UI 用）：逐字反映 parseIntent 的輸出——每站取第一個
  * 命中的關鍵字，列出該站。探索站與咖啡站分開顯示。無命中回 null。 */
@@ -246,10 +383,14 @@ export function buildDaily(s: DailyState): DailyTask[] {
     if (prev?.specified && !prev.intentSpecified) return base
     // 日意圖命中的站：place＝意圖原文、specified＋intentSpecified（走既有
     // specified 語意：查詢字串＝原話、不套類型／地區／評論門檻、完整重生時保留）。
-    // 舊候選只在「同一意圖、已是日意圖指定站」時保留；意圖換了，舊候選就是過期的，
-    // 連同 eta／departure／travelMin／conflict／noCandidate 一起清掉
+    // 舊候選只在「同一意圖、已是日意圖指定站」時保留——同一意圖的判斷是 state 層的
+    // appliedIntent（這份任務是哪份意圖長出來的），不是 prev.place：搜尋成功後 place
+    // 永遠是店家地址（api/daily-route.ts:277），拿 place 比 intent 在搜尋後永不成立，
+    // 每敲一個字、按「今天略過」都會靜默清掉已搜到的候選（R2-F3）。保留時 place 留著
+    // 店家地址（base 帶著 prev 的 place／candidate／eta），不重設為意圖原文；意圖換了，
+    // 舊候選就是過期的，連同 eta／departure／travelMin／conflict／noCandidate 一起清掉
     // （noCandidate 是舊查詢的結果，留著會在新查詢下顯示過期的「沒有店」原因）。
-    if (prev?.intentSpecified && prev.place === intent && prev.candidate) return { ...base, place: intent, specified: true, intentSpecified: true }
+    if (prev?.intentSpecified && s.appliedIntent === intent && prev.candidate) return { ...base, specified: true, intentSpecified: true }
     return { ...base, place: intent, specified: true, intentSpecified: true, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, noCandidate: undefined, noCandidateReason: undefined }
   })
 }
@@ -269,7 +410,8 @@ export function replanDaily(s: DailyState): DailyState {
   // Keep completed tasks and their state. Only uncompleted tasks are rebuilt.
   const done = s.tasks.filter(t=>t.done || t.locked || t.custom)
   const pending = buildDaily(s).filter(t=>!t.done && !done.some(d=>d.id===t.id))
-  return { ...s, tasks: [...done,...pending] }
+  // 這份任務是當次意圖長出來的：記下 appliedIntent，下次重跑比的就是它（R2-F3）。
+  return { ...s, appliedIntent: (s.intent ?? '').trim(), tasks: [...done,...pending] }
 }
 /** 出發地的身分：目前位置，或輸入的地名。 */
 export const originKey = (s: DailyState): string => s.useHere ? 'here' : 'text:' + s.currentPlace.trim()
@@ -281,7 +423,7 @@ export const originKey = (s: DailyState): string => s.useHere ? 'here' : 'text:'
 export function routeProposal(s: DailyState): DailyState {
   const from = s.routedFrom ?? 'text:' + s.currentPlace.trim()
   const base = from === originKey(s) ? s : { ...s, tasks: s.tasks.filter(t => t.done || t.locked || t.custom || t.specified) }
-  return base.tasks.length ? replanDaily(base) : { ...base, tasks: buildDaily(base) }
+  return base.tasks.length ? replanDaily(base) : { ...base, appliedIntent: (base.intent ?? '').trim(), tasks: buildDaily(base) }
 }
 /** 定位拿不到的原因（畫面文字）。 */
 export const GEO_FAIL_TEXT: Record<GeoReason, string> = {
@@ -415,7 +557,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
       const data=(await response.json()) as DailyRouteResponse
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
-      change(old=>({...old,tasks:restoreIntentSpecified(data.stops??old.tasks, old.tasks),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
+      change(old=>({...old,tasks:restoreIntentSpecified(data.stops??old.tasks, old.tasks),appliedIntent:proposed.appliedIntent ?? (proposed.intent ?? '').trim(),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
       setRouteKm(data.routeVerified?data.distanceKm??null:null)
       setTravelMin(data.routeVerified?data.travelMinutes??null:null)
       setConflicts(data.conflicts??[])
