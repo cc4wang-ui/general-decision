@@ -1852,3 +1852,149 @@ describe('round 13：回歸 20x（架構重構後種類排除仍有效）', () =
     }
   })
 })
+
+describe('PR-2：2.1 O1 部分行程標示 ＋ creative 活碼（a）＋ intent 不需新欄位（b）＋ seen 弱於指定（d）', () => {
+  type StopOut = { id: string; title?: string; candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }
+  type RouteOut = { routeVerified?: boolean; partial?: boolean; missingStops?: { id: string; reason?: string }[]; stops: StopOut[] }
+  const readOut = async (res: Response) => (await res.json()) as RouteOut
+  const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
+  /** Places 依查詢回固定池子；Routes 一律 403（跟正式環境一樣，走 fallback 回應）。 */
+  function mockPlaces(places: unknown[] | ((q: string) => unknown[])) {
+    const calls: { url: string; body: Record<string, unknown> }[] = []
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+      calls.push({ url: urlText(url), body })
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      const pool = typeof places === 'function' ? places(String(body.textQuery)) : places
+      return new Response(JSON.stringify({ places: pool }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    return { f, calls, placesCalls: () => calls.filter((c) => c.url.includes('places:searchText')) }
+  }
+  const gallery = place('gallery-1', 35.69, 139.70, {
+    displayName: { text: '某藝廊' }, rating: 4.5, userRatingCount: 120,
+    types: ['art_gallery'], primaryType: 'art_gallery',
+  })
+
+  it('(a) creative 站是活碼：完整請求真的查 creative 目錄（查詢字串＋includedType 都走 creative 項目），不是死碼', async () => {
+    const g = mockPlaces([gallery])
+    const res = await handler(post({ origin: HERE, stops: [{ id: 'creative', kind: 'creative', title: '探索', minutes: 65 }] }))
+    expect(res.status).toBe(200)
+    expect(g.placesCalls()).toHaveLength(1)
+    expect(g.placesCalls()[0]!.body.textQuery).toBe('art gallery exhibition')
+    expect(g.placesCalls()[0]!.body.includedType).toBe('art_gallery')
+    expect(stopOf((await readOut(res)).stops, 'creative').candidate?.id).toBe('gallery-1')
+  })
+
+  it('(b) 目的地走既有 specified 站，不需新意圖欄位：指定 creative 站時查詢字串＝目的地原文、不套 includedType', async () => {
+    const g = mockPlaces([gallery])
+    const res = await handler(post({ origin: HERE, stops: [{ id: 'creative', kind: 'creative', title: '探索', minutes: 65, specified: true, place: '国立新美術館' }] }))
+    expect(res.status).toBe(200)
+    expect(g.placesCalls()).toHaveLength(1)
+    expect(g.placesCalls()[0]!.body.textQuery).toBe('国立新美術館')
+    expect(g.placesCalls()[0]!.body.includedType).toBeUndefined()
+    expect(stopOf((await readOut(res)).stops, 'creative').candidate?.id).toBe('gallery-1')
+  })
+
+  it('(c) 薄池完整重生：200＋部分行程，missingStops 明確列出缺的站與原因（empty），rest 純文字站不在內', async () => {
+    mockPlaces([])
+    const res = await handler(post({ origin: HERE, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60 },
+      { id: 'rest', kind: 'rest', title: '散步回家', minutes: 75 },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await readOut(res)
+    expect(data.partial).toBe(true)
+    expect(data.missingStops).toEqual([{ id: 'meal', reason: 'empty' }, { id: 'coffee', reason: 'empty' }])
+    expect(data.stops.map((s) => s.id)).toEqual(['meal', 'coffee', 'rest'])
+    expect(stopOf(data.stops, 'meal').noCandidate).toBe(true)
+    expect(stopOf(data.stops, 'coffee').noCandidate).toBe(true)
+    expect(stopOf(data.stops, 'rest').noCandidate).toBeUndefined()
+  })
+
+  it('(c) 混合：只缺一站時 partial 為真、missingStops 只有那一站；找到的站照常有候選', async () => {
+    mockPlaces((q) => (q.includes('drugstore') ? [] : [validShop('m1', 0)]))
+    const res = await handler(post({ origin: HERE, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+      { id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30 },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await readOut(res)
+    expect(data.routeVerified).toBe(false) // Routes 403 → fallback 回應也要帶 partial
+    expect(data.partial).toBe(true)
+    expect(data.missingStops).toEqual([{ id: 'shopping', reason: 'empty' }])
+    expect(stopOf(data.stops, 'meal').candidate?.id).toBe('m1')
+    expect(stopOf(data.stops, 'shopping').candidate).toBeUndefined()
+  })
+
+  it('(c) 全部找到：partial 為假、missingStops 為空陣列（不是 undefined，契約明確）', async () => {
+    mockPlaces((q) => (q.includes('coffee') ? [validShop('cafe-1', 0)] : [validShop('m1', 0)]))
+    const res = await handler(post({ origin: HERE, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+      { id: 'coffee', kind: 'coffee', title: '咖啡', minutes: 60 },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await readOut(res)
+    expect(data.partial).toBe(false)
+    expect(data.missingStops).toEqual([])
+    expect(stopOf(data.stops, 'meal').candidate?.id).toBe('m1')
+    expect(stopOf(data.stops, 'coffee').candidate?.id).toBe('cafe-1')
+  })
+
+  it('(c) Routes 成功路徑也帶 partial：缺站時 routeVerified 為真、partial 仍為真', async () => {
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) {
+        const elements = [
+          { originIndex: 0, destinationIndex: 1, duration: '300s', distanceMeters: 400 },
+          { originIndex: 1, destinationIndex: 0, duration: '300s', distanceMeters: 400 },
+        ]
+        return new Response(JSON.stringify(elements), { status: 200 })
+      }
+      const body = JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>
+      const places = String(body.textQuery).includes('drugstore') ? [] : [validShop('m1', 0)]
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const res = await handler(post({ origin: HERE, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+      { id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30 },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await readOut(res)
+    expect(data.routeVerified).toBe(true)
+    expect(data.partial).toBe(true)
+    expect(data.missingStops).toEqual([{ id: 'shopping', reason: 'empty' }])
+  })
+
+  it('(c) 地區擋住的缺站：missingStops 的 reason 是 area，不是籠統的 empty', async () => {
+    const harajukuDrug = place('sugi-harajuku', 35.6704, 139.7030, {
+      displayName: { text: 'スギ薬局 原宿店' }, rating: 4.0, userRatingCount: 150,
+      types: ['drugstore'], primaryType: 'drugstore',
+    })
+    mockPlaces([harajukuDrug])
+    const res = await handler(post({ origin: { lat: 35.6595, lng: 139.7005 }, area: '澀谷', areaOnly: true, stops: [{ id: 'shopping', kind: 'shopping', title: '藥局', minutes: 30 }] }))
+    expect(res.status).toBe(200)
+    const data = await readOut(res)
+    expect(data.partial).toBe(true)
+    expect(data.missingStops).toEqual([{ id: 'shopping', reason: 'area' }])
+  })
+
+  it('(d) seen 弱於使用者指定：指定站重找時 seen 不擋（查回同一間照樣當候選）；自動站同池同 seen 則變無候選', async () => {
+    const xShop = place('x-1', 35.691, 139.701, {
+      displayName: { text: 'X食堂' }, rating: 4.5, userRatingCount: 120,
+      types: ['restaurant'], primaryType: 'restaurant',
+    })
+    mockPlaces([xShop])
+    const specified = await handler(post({ origin: HERE, seen: ['x-1'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45, specified: true, place: 'X食堂' }] }))
+    expect(specified.status).toBe(200)
+    expect(stopOf((await readOut(specified)).stops, 'meal').candidate?.id).toBe('x-1')
+    mockPlaces([xShop])
+    const auto = await handler(post({ origin: HERE, seen: ['x-1'], stops: [{ id: 'meal', kind: 'meal', title: '定食', minutes: 45 }] }))
+    expect(auto.status).toBe(200)
+    const autoStop = stopOf((await readOut(auto)).stops, 'meal')
+    expect(autoStop.candidate).toBeUndefined()
+    expect(autoStop.noCandidate).toBe(true)
+    expect(autoStop.noCandidateReason).toBe('filtered')
+  })
+})

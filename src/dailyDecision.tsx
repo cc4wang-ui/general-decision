@@ -423,6 +423,31 @@ export function seenFor(s: DailyState): string[] {
   const current = s.tasks.map(t => t.candidate?.id).filter((x): x is string => !!x)
   return [...new Set([...Object.values(s.seen ?? {}).flat(), ...current])].slice(0, 200)
 }
+/**
+ * 完整重新生成時，把被換掉的自動站現任候選記進 seen（2.2 O2：跨請求留存）。
+ * 缺口（ROADMAP 2.2「seen 未持久化到 state.seen」的確切位置）：searchRoute 的完整重生
+ * 路徑只在請求當下用 seenFor 把現任候選送進 seen，從不寫回 state.seen——換掉的店
+ * 只被擋一次，下一次重生就可能馬上回來。單站 shuffle（withSeen）與「不喜歡」
+ * （dislikeStop）本來就會寫，只有完整重生這條路徑漏了，補在這裡。
+ * 只記自動站（!done／!locked／!custom／!specified）：指定／固定／已完成站完整重生
+ * 時照留，不是被換掉；seen 也只擋自動站的新搜尋（api/daily-route.ts:258 的
+ * !auto 守衛），兩邊同一條 auto 定義。
+ * seen 弱於 disliked：這裡只寫 seen，disliked／dislikedKinds 一字不動；清除 seen
+ * 也不動 disliked（見 clearSeen）。
+ */
+export function withCurrentAsSeen(s: DailyState): DailyState {
+  return s.tasks.reduce((acc, t) => {
+    const id = t.candidate?.id
+    const auto = !t.done && !t.locked && !t.custom && !t.specified
+    return id && auto ? withSeen(acc, t.id, id) : acc
+  }, s)
+}
+/** 清除今天換掉的店紀錄（2.2 O2「可清除」的使用者操作）：只清 seen，不動
+ * disliked／dislikedKinds（那是明確封鎖，比 seen 強，不能跟著清掉）。換天時
+ * loadDaily 另有過期機制（seen 歸零、disliked 保留），兩條清除路徑互補。 */
+export function clearSeen(s: DailyState): DailyState {
+  return { ...s, seen: {} }
+}
 
 export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [state,setState] = useState(loadDaily)
@@ -440,8 +465,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [fixedMinutes,setFixedMinutes] = useState('60')
   const change = (fn:(s:DailyState)=>DailyState) => setState(s=>{ const next=fn(s); saveDaily(next); return next })
   const clearRoute = () => {setRouteKm(null);setTravelMin(null);setConflicts([])}
-  /** /api/daily-route 的回應形狀（前端只讀這些欄位；未知欄位不讀）。 */
-  type DailyRouteResponse={message?:string;stops?:DailyTask[];routeVerified?:boolean;distanceKm?:number;travelMinutes?:number;conflicts?:string[]}
+  /** /api/daily-route 的回應形狀（前端只讀這些欄位；未知欄位不讀）。partial／missingStops
+   * 是 2.1 O1 的頂層契約（伺服器明確標示缺站）；舊形狀回應沒有這兩個欄位時退回逐站掃描。 */
+  type DailyRouteResponse={message?:string;stops?:DailyTask[];routeVerified?:boolean;distanceKm?:number;travelMinutes?:number;conflicts?:string[];partial?:boolean;missingStops?:{id:string;reason?:string}[]}
   const searchRoute = async (shuffle?:string, s:DailyState=state) => {
     if(busy)return
     setBusy(shuffle??'all')
@@ -457,6 +483,10 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     // shuffle 先把被換掉的那間記進 seen：這次請求就要排除它，否則下一輪它又回來。
     const replacedId=shuffle?proposed.tasks.find(t=>t.id===shuffle)?.candidate?.id:undefined
     if(shuffle&&replacedId)proposed=withSeen(proposed,shuffle,replacedId)
+    // 2.2 O2：完整重新生成也要把被換掉的店寫進 seen（不只送、不存）。withCurrentAsSeen
+    // 只記自動站現任候選；下面合併處的 seen:{...old.seen,...proposed.seen} 隨後把它存進 state，
+    // 下一次重生才擋得住。單站 shuffle 另有 withSeen，不走這裡。
+    if(!shuffle)proposed=withCurrentAsSeen(proposed)
     // F8：換單一站時不說成整條路線重找——伺服器只重找那一站，狀態列說清楚。
     setStatus(shuffle ? '正在找這一站的替代地點…' : '正在搜尋真實店家並優化路線…')
     // placeMem 封鎖清單（核心班長 app 的「不要再來」）：讀不到（無痕模式等）就只用 localStorage，不讓整次搜尋失敗。
@@ -481,13 +511,25 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       setConflicts(data.conflicts??[])
       // 有站顯示「無候選」時狀態列要說清楚是哪一站——不要只說「店家已確認」。
       // 原因寫在每一站的卡片上（noCandidateText），狀態列只點名。
-      const noCand=(data.stops??[]).filter((t: DailyTask)=>t.noCandidate)
-      const noCandNote=noCand.length?`；${noCand.map((t: DailyTask)=>t.title||t.id).join('、')}沒有符合條件的店家`:''
+      // 2.1 O1：缺站清單優先讀伺服器的頂層 missingStops（partial 契約）；舊形狀回應
+      // 沒有這兩個欄位時退回逐站掃 noCandidate（同一份標示，不寫兩套文案）。
+      // partial 為真時狀態列明寫「部分行程」，讓使用者一眼知道這不是完整路線。
+      const noCand=data.missingStops
+        ? data.missingStops.map(m=>(data.stops??[]).find((t: DailyTask)=>t.id===m.id)).filter((t): t is DailyTask=>!!t)
+        : (data.stops??[]).filter((t: DailyTask)=>t.noCandidate)
+      const noCandNote=noCand.length?`；${data.partial===true?'部分行程：':''}${noCand.map((t: DailyTask)=>t.title||t.id).join('、')}沒有符合條件的店家`:''
       setStatus(data.routeVerified?'店家已確認 · 已更新 Google Routes 步行路線'+(data.conflicts?.length?'；請留意時間衝突':'')+noCandNote:'店家已確認，但步行路線目前無法驗證。請用 Google Maps 導航確認。'+noCandNote)
     }catch(e){setStatus('無法更新：'+(e instanceof Error?e.message:'未知錯誤')+'；原行程已保留')}
     finally{setBusy(null)}
   }
   const generate = () => {setNotice('');void searchRoute()}
+  /** 今天換掉的店有幾家（seen 各站 id 數總和）：清除按鈕只在有紀錄時出現。 */
+  const seenCount = Object.values(state.seen ?? {}).flat().length
+  /** 清除今天換掉的店紀錄（2.2 O2「可清除」）：只清 seen，disliked 不動（見 clearSeen）。 */
+  const clearSeenRecord = () => {
+    change(s => clearSeen(s))
+    setNotice(`已清除今天換掉的 ${seenCount} 家店紀錄，可以重新搜尋。`)
+  }
   // 按「用目前位置」＝切到目前位置並立刻搜尋（定位拿不到就只顯示原因）。
   const pickHere = () => {change(s=>({...s,useHere:true}));clearRoute();void searchRoute(undefined,{...state,useHere:true})}
   const pickTyped = () => {change(s=>({...s,useHere:false}));clearRoute();setStatus('起點變更，請重新搜尋路線')}
@@ -620,6 +662,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
           </div>
           <small>{state.areaOnly!==false?`只找 ${state.area} 中心 1 公里內的店；指定／固定／已完成的地點不受影響。`:'不限區域；任何地區的店都可能出現。'}</small>
           <button className="dd-primary" data-testid="daily-generate" disabled={busy!==null} onClick={generate}>{busy?(busy==='all'?'搜尋中…':'正在換這一站…'):state.tasks.length?'↻ 搜尋店家並優化路線':'✦ 搜尋店家並生成路線'}</button>
+          {seenCount > 0 && <button className="dd-secondary" data-testid="daily-clear-seen" disabled={busy!==null} onClick={clearSeenRecord}>清除今天換掉的店紀錄</button>}
           <p className="dd-live-status" role="status" aria-live="polite">{status||"搜尋將使用 Google Places 與 Google Routes"}</p>
           {notice&&<p className="dd-live-status" role="status" aria-live="polite">{notice}</p>}
           {conflicts.length>0&&<div className="dd-conflicts" role="alert">{conflicts.map((c,i)=><p key={i}>⚠ {c}</p>)}</div>}
