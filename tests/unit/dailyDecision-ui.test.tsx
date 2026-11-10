@@ -723,3 +723,107 @@ describe('PR-2：2.1 部分行程標示 ＋ 2.2 seen 跨請求留存', () => {
     expect(screen.queryByTestId('daily-clear-seen')).toBeNull()
   })
 })
+
+describe('PR-2 修正輪：F1 指定 rest 缺站渲染 ＋ F2 空行程 ＋ F3 partial 退回掃描（紅隊 RT-U1／RT-U4 轉用）', () => {
+  const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
+  const routeFetch = (respond: (body: Record<string, unknown>) => unknown) => {
+    const fetchMock = vi.fn((url: string | URL | Request, init?: RequestInit) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => respond(JSON.parse(bodyText(init?.body, '{}')) as Record<string, unknown>) }
+      : { ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+  const clickGenerate = async () => {
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-generate'))
+  }
+  it('F1（RT-C1 的 UI 面）：指定了地點的 rest 查無店家時，缺站卡片正常渲染通用無候選文案、不 crash，狀態列點名該站', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [
+        { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('s1', '某咖啡店') },
+        { id: 'rest', title: '散步回家、休息與晚餐', minutes: 75, kind: 'rest', done: false, specified: true, place: '不存在的地點xyz123' },
+      ],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+    routeFetch(() => ({
+      stops: [
+        { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('m1', '定食店') },
+        { id: 'rest', title: '散步回家、休息與晚餐', minutes: 75, kind: 'rest', done: false, specified: true, place: '不存在的地點xyz123', noCandidate: true, noCandidateReason: 'empty' },
+      ],
+      routeVerified: false, conflicts: [], partial: true, missingStops: [{ id: 'rest', reason: 'empty' }],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    await clickGenerate()
+    await waitFor(() => expect(screen.getByText(/部分行程：散步回家、休息與晚餐沒有符合條件的店家/)).toBeTruthy())
+    // 指定過地點的 rest 是真的去找店了，缺站卡片顯示通用無候選文案（不是純文字 rest 的「散步回家，不用找店家。」），也不 crash。
+    expect(screen.getByText(/這一站找不到店家/)).toBeTruthy()
+    expect(screen.queryByText('散步回家，不用找店家。')).toBeNull()
+  })
+  it('F2（RT-U1 轉用、斷言反轉）：六站全略過後按生成，空行程不顯示「店家已確認」', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [], notes: [], avoid: ['gym', 'meal', 'creative', 'coffee', 'shopping', 'rest'],
+      seen: {}, disliked: [], dislikedKinds: [],
+    }))
+    const fetchMock = routeFetch(() => ({ stops: [], routeVerified: false, conflicts: [], partial: false, missingStops: [] }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    await clickGenerate()
+    await waitFor(() => expect(fetchMock.mock.calls.filter((c) => urlText(c[0]).includes('/api/daily-route'))).toHaveLength(1))
+    await waitFor(() => expect(screen.getByText('今天還沒有行程')).toBeTruthy())
+    expect(screen.queryByText(/店家已確認/)).toBeNull()
+  })
+  it('F2 延伸：所有站都無候選時（非空行程），狀態列也不寫「店家已確認」，改寫缺站', async () => {
+    seed(cand('s1', '某咖啡店'))
+    routeFetch(() => ({
+      stops: [
+        { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, noCandidate: true, noCandidateReason: 'empty' },
+        { id: 'coffee', title: '咖啡店', minutes: 60, kind: 'coffee', done: false, noCandidate: true, noCandidateReason: 'empty' },
+      ],
+      routeVerified: false, conflicts: [], partial: true, missingStops: [{ id: 'meal', reason: 'empty' }, { id: 'coffee', reason: 'empty' }],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    await clickGenerate()
+    await waitFor(() => expect(screen.getByText(/部分行程：定食、咖啡店沒有符合條件的店家/)).toBeTruthy())
+    expect(screen.queryByText(/店家已確認/)).toBeNull()
+  })
+  it('F3（RT-U4 轉用、斷言反轉）：partial:true 但 missingStops 為空時，退回逐站掃描、缺站仍顯示', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('s1', '某咖啡店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+    routeFetch(() => ({
+      stops: [
+        { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, noCandidate: true, noCandidateReason: 'empty' },
+        { id: 'coffee', title: '咖啡店', minutes: 60, kind: 'coffee', done: false, candidate: cand('c1', '咖啡店') },
+      ],
+      routeVerified: false, conflicts: [], partial: true, missingStops: [],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    await clickGenerate()
+    await waitFor(() => expect(screen.getByText(/部分行程：定食沒有符合條件的店家/)).toBeTruthy())
+  })
+  it('F3 延伸：partial:true 但 missingStops 缺失（舊形狀混不一致形狀）時，同樣退回逐站掃描', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('s1', '某咖啡店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+    routeFetch(() => ({
+      stops: [
+        { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, noCandidate: true, noCandidateReason: 'empty' },
+        { id: 'coffee', title: '咖啡店', minutes: 60, kind: 'coffee', done: false, candidate: cand('c1', '咖啡店') },
+      ],
+      routeVerified: false, conflicts: [], partial: true,
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    await clickGenerate()
+    await waitFor(() => expect(screen.getByText(/部分行程：定食沒有符合條件的店家/)).toBeTruthy())
+  })
+})

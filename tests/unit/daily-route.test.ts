@@ -1998,3 +1998,30 @@ describe('PR-2：2.1 O1 部分行程標示 ＋ creative 活碼（a）＋ intent 
     expect(autoStop.noCandidateReason).toBe('filtered')
   })
 })
+
+describe('PR-2 修正輪：F1 指定 rest 是缺站（紅隊 RT-C1 轉用）', () => {
+  type StopOut = { id: string; title?: string; candidate?: { id: string }; noCandidate?: boolean; noCandidateReason?: string }
+  type RouteOut = { routeVerified?: boolean; partial?: boolean; missingStops?: { id: string; reason?: string }[]; stops: StopOut[] }
+  const readOut = async (res: Response) => (await res.json()) as RouteOut
+  const stopOf = (stops: StopOut[], id: string) => stops.find((s) => s.id === id)!
+  function mockPlaces(places: unknown[]) {
+    const f = vi.fn((url: string | URL | Request) => {
+      if (urlText(url).includes('routes.googleapis.com')) return new Response('{}', { status: 403 })
+      return new Response(JSON.stringify({ places }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+  }
+
+  it('F1（RT-C1 轉用）：被指定了地點的 rest 查無店家時，missingStops 列入 rest——純文字 rest 才排除', async () => {
+    mockPlaces([])
+    const res = await handler(post({ origin: HERE, stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+      { id: 'rest', kind: 'rest', title: '散步回家', minutes: 75, specified: true, place: '不存在的地點xyz123' },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await readOut(res)
+    expect(data.partial).toBe(true)
+    expect(data.missingStops).toEqual([{ id: 'meal', reason: 'empty' }, { id: 'rest', reason: 'empty' }])
+    expect(stopOf(data.stops, 'rest').noCandidate).toBe(true)
+  })
+})

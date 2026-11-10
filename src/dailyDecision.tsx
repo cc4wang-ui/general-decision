@@ -514,11 +514,22 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       // 2.1 O1：缺站清單優先讀伺服器的頂層 missingStops（partial 契約）；舊形狀回應
       // 沒有這兩個欄位時退回逐站掃 noCandidate（同一份標示，不寫兩套文案）。
       // partial 為真時狀態列明寫「部分行程」，讓使用者一眼知道這不是完整路線。
-      const noCand=data.missingStops
+      // F3（修正輪）：missingStops 為空陣列是 truthy，舊碼走 missingStops 分支、
+      // 對映結果為空就再也不掃逐站旗標。partial 為真卻對映不到缺站時，退回逐站掃
+      // noCandidate（沿用舊形狀回應的 fallback 邏輯，不另寫一套）。missingStops
+      // 缺失時本來就走逐站掃描，不變。
+      const mappedMissing=data.missingStops
         ? data.missingStops.map(m=>(data.stops??[]).find((t: DailyTask)=>t.id===m.id)).filter((t): t is DailyTask=>!!t)
+        : undefined
+      const noCand=mappedMissing!==undefined&&!(data.partial===true&&mappedMissing.length===0)
+        ? mappedMissing
         : (data.stops??[]).filter((t: DailyTask)=>t.noCandidate)
       const noCandNote=noCand.length?`；${data.partial===true?'部分行程：':''}${noCand.map((t: DailyTask)=>t.title||t.id).join('、')}沒有符合條件的店家`:''
-      setStatus(data.routeVerified?'店家已確認 · 已更新 Google Routes 步行路線'+(data.conflicts?.length?'；請留意時間衝突':'')+noCandNote:'店家已確認，但步行路線目前無法驗證。請用 Google Maps 導航確認。'+noCandNote)
+      // F2（修正輪）：沒有任何站有候選時（空行程，或全站缺站），「店家已確認」是假陳述，
+      // 不寫。空行程只說今天還沒有行程；全站缺站只說缺站（noCandNote 已含「部分行程：」）。
+      const hasCandidate=(data.stops??[]).some((t: DailyTask)=>!!t.candidate)
+      if(!hasCandidate)setStatus((data.stops??[]).length===0?'今天還沒有行程。':`沒有找到符合條件的店家${noCandNote}`)
+      else setStatus(data.routeVerified?'店家已確認 · 已更新 Google Routes 步行路線'+(data.conflicts?.length?'；請留意時間衝突':'')+noCandNote:'店家已確認，但步行路線目前無法驗證。請用 Google Maps 導航確認。'+noCandNote)
     }catch(e){setStatus('無法更新：'+(e instanceof Error?e.message:'未知錯誤')+'；原行程已保留')}
     finally{setBusy(null)}
   }
