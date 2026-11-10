@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildDaily, loadDaily, parseIntent, replanDaily, type DailyState } from '../../src/dailyDecision.tsx'
+import { buildDaily, intentHintText, loadDaily, parseIntent, replanDaily, type DailyState } from '../../src/dailyDecision.tsx'
 
 const KEY = 'decide.daily.v1'
 const todayTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -13,7 +13,6 @@ describe('parseIntent：一日級意圖 → 站 id（封閉關鍵字表）', () 
     expect(parseIntent('今天去健身房')).toEqual(['gym'])
     expect(parseIntent('go to the gym after work')).toEqual(['gym'])
     expect(parseIntent('ジムで筋トレ')).toEqual(['gym'])
-    expect(parseIntent('早上運動')).toEqual(['gym'])
   })
   it('meal：拉麵／ramen／壽司／定食都命中（羅馬字不分大小寫）', () => {
     expect(parseIntent('想吃拉麵')).toEqual(['meal'])
@@ -30,18 +29,24 @@ describe('parseIntent：一日級意圖 → 站 id（封閉關鍵字表）', () 
   })
   it('coffee：咖啡／カフェ／coffee 命中咖啡站 id（不再是 creative 種類）', () => {
     expect(parseIntent('想喝咖啡')).toEqual(['coffee'])
-    expect(parseIntent('カフェで休憩')).toEqual(['coffee', 'rest'])
+    expect(parseIntent('カフェで休憩')).toEqual(['coffee'])
     expect(parseIntent('have a coffee')).toEqual(['coffee'])
   })
   it('shopping：購物／買い物／shopping 都命中', () => {
     expect(parseIntent('去購物')).toEqual(['shopping'])
     expect(parseIntent('買い物に行く')).toEqual(['shopping'])
     expect(parseIntent('shopping for clothes')).toEqual(['shopping'])
-    expect(parseIntent('想買東西')).toEqual(['shopping'])
   })
-  it('rest：休息／休憩命中', () => {
-    expect(parseIntent('想休息一下')).toEqual(['rest'])
-    expect(parseIntent('休憩したい')).toEqual(['rest'])
+  it('rest：休息意圖不再是意圖目標——rest 是純文字站、沒有可拜訪的店家（F5）', () => {
+    // 「想休息」本來就由預設目錄裡的 rest 站滿足；意圖不該把它變成可搜尋站
+    // （伺服器 isTextOnlyRest 要求 !specified，指定後會拿整句去查 Places）。
+    expect(parseIntent('想休息一下')).toEqual([])
+    expect(parseIntent('休憩したい')).toEqual([])
+    const tasks = buildDaily(state('想休息一下'))
+    const rest = tasks.find(t => t.id === 'rest')!
+    expect(rest.specified).toBeFalsy()
+    expect(rest.place).toBeUndefined()
+    expect(rest.title).toBe('散步回家、休息與晚餐')
   })
   it('無命中：空字串／隨便／純地名都回 []（未知→走預設，不得猜測）', () => {
     expect(parseIntent('')).toEqual([])
@@ -56,6 +61,44 @@ describe('parseIntent：一日級意圖 → 站 id（封閉關鍵字表）', () 
     expect(parseIntent('heart')).toEqual([])
     expect(parseIntent('push the cart')).toEqual([])
     expect(parseIntent('ramenya')).toEqual([])
+  })
+  it('否定語境（F2）：否定標記前 4 字內的關鍵字不命中——「不要」就是不要', () => {
+    expect(parseIntent('不想吃拉麵')).toEqual([])
+    expect(parseIntent('不要咖啡')).toEqual([])
+    expect(parseIntent('不去健身房')).toEqual([])
+    // 混合句：只指定肯定部分
+    expect(parseIntent('我不吃拉麵，只想看展覽')).toEqual(['creative'])
+    expect(parseIntent('不要咖啡，想吃壽司')).toEqual(['meal'])
+    // 提示同樣逐字反映否定後的解析（不顯示被否定的站）
+    expect(intentHintText('不想吃拉麵')).toBeNull()
+    expect(intentHintText('不要咖啡，想吃壽司')).toBe('已辨識：壽司 → 午餐站')
+  })
+  it('否定語境對照組（F2）：肯定句仍命中；「不」離關鍵字超過 4 字不得否定', () => {
+    expect(parseIntent('想吃拉麵')).toEqual(['meal'])
+    expect(parseIntent('今天不想太累，想吃拉麵')).toEqual(['meal'])
+  })
+  it('CJK 單字子字串誤命中（F3）：吃藥／住飯店／運動會／買不到票皆不命中', () => {
+    expect(parseIntent('吃藥')).toEqual([])
+    expect(parseIntent('住飯店')).toEqual([])
+    expect(parseIntent('運動會')).toEqual([])
+    expect(parseIntent('買不到票')).toEqual([])
+  })
+  it('刻意的漏判取捨（F3）：單字關鍵字「運動」「買」已刪，合法命中靠多字詞——想吃拉麵仍經「拉麵」命中', () => {
+    // 「運動」已從關鍵字表刪除（運動會／運動員／運動場同類誤命中）：「想運動」不命中，
+    // 由創意預設兜底（預設目錄本來就有健身站）。「買」同理：「想買東西」不命中。
+    expect(parseIntent('想運動')).toEqual([])
+    expect(parseIntent('早上運動')).toEqual([])
+    expect(parseIntent('想買東西')).toEqual([])
+    expect(parseIntent('想吃拉麵')).toEqual(['meal'])
+    expect(parseIntent('午餐吃定食')).toEqual(['meal'])
+  })
+  it('羅馬字複數形（F4）：coffees／gyms／cafes／sushis／arts 皆命中', () => {
+    expect(parseIntent('two coffees please')).toEqual(['coffee'])
+    expect(parseIntent('go to gyms')).toEqual(['gym'])
+    expect(parseIntent('I love cafes')).toEqual(['coffee'])
+    expect(parseIntent('sushis for lunch')).toEqual(['meal'])
+    expect(parseIntent('arts and crafts')).toEqual(['creative'])
+    expect(parseIntent('restaurants nearby')).toEqual(['meal'])
   })
   it('多命中：按 catalog 順序回傳站 id（meal 在 creative 前，coffee 在 shopping 前）', () => {
     expect(parseIntent('我今天想去吃拉麵然後看展覽')).toEqual(['meal', 'creative'])

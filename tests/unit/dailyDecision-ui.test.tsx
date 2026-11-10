@@ -388,13 +388,59 @@ describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () =
     expect(screen.getByTestId('daily-intent-hint').textContent).toBe('已辨識：展覽 → 探索站')
   })
   it('伺服器回應洗掉標記後，換意圖仍能更新日意圖站（標記在合併時補回）', async () => {
-    // 種子：日意圖指定的 meal 站（帶標記＋候選），伺服器 sanitize 只回傳已知欄位、沒有標記
+    // 真實伺服器成功路徑形狀（api/daily-route.ts:277）：新搜尋成功時 place 一律是
+    // 店家地址、title 是店名，絕不是意圖原文。舊 mock 保留 place＝意圖原文，與真實
+    // 契約矛盾（紅隊 F6），該形狀下 restore 永遠不會被考驗。
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: '想吃拉麵',
+    }))
+    const serverStop = { id: 'meal', title: '拉麵店', minutes: 45, kind: 'meal', done: false, specified: true, place: '東京都渋谷区道玄坂1-2-3', candidate: cand('m1', '拉麵店') }
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: [serverStop], routeVerified: false, conflicts: [] }) }
+      : { ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
+    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃壽司' } })
+    expect(screen.getByLabelText<HTMLInputElement>('拉麵店 指定地點').value).toBe('想吃壽司')
+  })
+  it('保留路徑：伺服器回應 place 不變時，標記同樣補回、換意圖仍能更新', async () => {
+    // 保留路徑（api/daily-route.ts:226）：候選通過重驗時回應原樣推回該站，place 不變。
     localStorage.setItem(KEY, JSON.stringify({
       day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
       tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }],
       notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: '想吃拉麵',
     }))
     const serverStop = { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: [serverStop], routeVerified: false, conflicts: [] }) }
+      : { ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
+    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃壽司' } })
+    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('想吃壽司')
+  })
+  it('長意圖往返：101 字意圖經伺服器截斷到 100 字後，標記仍在、換意圖仍能更新', async () => {
+    // 伺服器 sanitize 把 place 截到 100 字（api/daily-route.ts:156）：101–120 字意圖
+    // 連保留路徑回應的 place 也是截斷版 ≠ 舊 state 的 place。restore 不得以 place
+    // 相等為準，否則長意圖第一次搜尋後標記就丟了。
+    const longIntent = '想吃拉麵' + '！'.repeat(97)
+    expect(longIntent).toHaveLength(101)
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: longIntent, candidate: cand('m1', '拉麵店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: longIntent,
+    }))
+    const serverStop = { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, place: longIntent.slice(0, 100), candidate: cand('m1', '拉麵店') }
     const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
       ? { ok: true, json: () => ({ stops: [serverStop], routeVerified: false, conflicts: [] }) }
       : { ok: false }))

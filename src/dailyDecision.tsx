@@ -159,30 +159,64 @@ export function catalogTitle(id: string): string | undefined {
  * 唯一鍵：catalog 裡探索站與咖啡站的 kind 都是 'creative'，回 kind 會讓「想喝咖啡」
  * 與「去看展覽」同時指定兩站。回傳命中的 catalog id，按 catalog 順序）。
  * 封閉關鍵字表——命中才有站，沒命中回 []（走創意預設），絕不猜測。裸字「展」不在
- * 表內（會誤命中「發展」）。咖啡關鍵字獨立成 coffee 列（咖啡站的 kind 仍是
+ * 表內（會誤命中「發展」）；單字 CJK 關鍵字「吃／飯／買」與「運動」同樣已刪
+ * （吃藥／住飯店／買不到票／運動會都是同類誤命中——誤判靠刪除猜測規則修，
+ * 絕不加反向規則；刪掉後的漏判由創意預設兜底，見測試「刻意的漏判取捨」）。
+ * rest 列已刪：休息站是純文字站、沒有可拜訪的店家，不該是意圖目標
+ * （指定後伺服器 isTextOnlyRest 不成立，會拿整句去查 Places）；「想休息」
+ * 本來就由預設目錄裡的 rest 站滿足。咖啡關鍵字獨立成 coffee 列（咖啡站的 kind 仍是
  * 'creative'——那是種類系統，PR-1 不碰；這裡只改意圖對應的鍵）。
+ * 否定感知：每個關鍵字的每一次出現，檢查其前面最多 4 個字元；出現否定標記
+ * （封閉集合：不／沒／別／勿）時該次出現視為被否定；一種類只在至少有一次
+ * 未被否定的出現時才命中（「不想吃拉麵」→ []，「不要咖啡，想吃壽司」→ meal）。
+ * 英文否定（don't／no／not）不在本次範圍（已接受的殘留，見 REPORT）。
  * CJK 關鍵字用子字串比對；羅馬字關鍵字一律 word-boundary regex
- * （case-insensitive），`art` 不命中 party／heart，`ramen` 不命中其他
- * 單字的一部分。回傳順序是 catalog 順序。 */
+ * （case-insensitive），可選的複數 s（`coffees`／`gyms`／`cafes` 皆命中），
+ * `art` 不命中 party／heart，`ramen` 不命中其他單字的一部分。回傳順序是 catalog 順序。 */
 type IntentEntry = { id: string; cjk: string[]; roman: string[] }
 const INTENT_KEYWORDS: IntentEntry[] = [
-  { id: 'gym', cjk: ['健身', '健身房', '運動', 'ジム', '筋トレ', 'トレーニング'], roman: ['gym'] },
-  { id: 'meal', cjk: ['拉麵', 'らーめん', 'ラーメン', '壽司', '寿司', 'すし', '吃', '飯', 'ご飯', 'ごはん', '定食', '午餐', '午饭', '晚餐', '晚饭', 'ランチ', 'ディナー', '食べ', '餐廳', 'レストラン'], roman: ['ramen', 'sushi', 'restaurant'] },
+  { id: 'gym', cjk: ['健身', '健身房', 'ジム', '筋トレ', 'トレーニング'], roman: ['gym'] },
+  { id: 'meal', cjk: ['拉麵', 'らーめん', 'ラーメン', '壽司', '寿司', 'すし', 'ご飯', 'ごはん', '定食', '午餐', '午饭', '晚餐', '晚饭', 'ランチ', 'ディナー', '食べ', '餐廳', 'レストラン'], roman: ['ramen', 'sushi', 'restaurant'] },
   { id: 'creative', cjk: ['展覽', '展覧会', '展示', '美術館', '美術', '畫廊', 'ギャラリー', '博物館', 'アート'], roman: ['art'] },
   { id: 'coffee', cjk: ['咖啡', 'コーヒー', '珈琲', 'カフェ'], roman: ['cafe', 'coffee'] },
-  { id: 'shopping', cjk: ['購物', '買い物', 'ショッピング', '買'], roman: ['shopping'] },
-  { id: 'rest', cjk: ['休息', '休憩'], roman: [] },
+  { id: 'shopping', cjk: ['購物', '買い物', 'ショッピング'], roman: ['shopping'] },
 ]
-/** 第一個命中的關鍵字（parseIntent 與提示共用）：CJK 關鍵字按表內順序找，羅馬字同理。 */
+/** 否定標記（封閉集合）：關鍵字出現前最多 4 個字元內出現任一標記，該次出現視為被否定。 */
+const NEGATION_MARKERS = ['不', '沒', '別', '勿']
+const isNegatedAt = (text: string, index: number): boolean => {
+  const before = text.slice(Math.max(0, index - 4), index)
+  return NEGATION_MARKERS.some(m => before.includes(m))
+}
+/** 關鍵字在 text 裡第一次「未被否定」的出現位置（-1＝沒有未被否定的出現）。
+ * roman 時用 word-boundary regex（可選複數 s）；CJK 時用子字串逐一找。 */
+const firstUnnegatedIndex = (text: string, keyword: string, roman: boolean): number => {
+  if (roman) {
+    const re = new RegExp(`\\b${keyword}s?\\b`, 'gi')
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      if (!isNegatedAt(text, m.index)) return m.index
+    }
+    return -1
+  }
+  let from = 0
+  for (;;) {
+    const idx = text.indexOf(keyword, from)
+    if (idx === -1) return -1
+    if (!isNegatedAt(text, idx)) return idx
+    from = idx + 1
+  }
+}
+/** 第一個命中的關鍵字（parseIntent 與提示共用）：CJK 關鍵字按表內順序找，羅馬字同理。
+ * 只認「未被否定」的出現——被否定的關鍵字在提示裡也不出現。 */
 const firstHitKeyword = (text: string, e: IntentEntry): string | undefined =>
-  e.cjk.find(k => text.includes(k)) ?? e.roman.find(k => new RegExp(`\\b${k}\\b`, 'i').test(text))
+  e.cjk.find(k => firstUnnegatedIndex(text, k, false) !== -1) ?? e.roman.find(k => firstUnnegatedIndex(text, k, true) !== -1)
 export function parseIntent(text: string): string[] {
   if (!text.trim()) return []
   return INTENT_KEYWORDS.filter(e => firstHitKeyword(text, e) !== undefined).map(e => e.id)
 }
 /** 意圖解析提示（UI 用）：逐字反映 parseIntent 的輸出——每站取第一個
  * 命中的關鍵字，列出該站。探索站與咖啡站分開顯示。無命中回 null。 */
-const INTENT_STATION_LABEL: Record<string, string> = { gym: '健身站', meal: '午餐站', creative: '探索站', coffee: '咖啡站', shopping: '購物站', rest: '休息站' }
+const INTENT_STATION_LABEL: Record<string, string> = { gym: '健身站', meal: '午餐站', creative: '探索站', coffee: '咖啡站', shopping: '購物站' }
 export function intentHintText(intent: string): string | null {
   const hits = parseIntent(intent)
   if (!hits.length) return null
@@ -220,12 +254,16 @@ export function buildDaily(s: DailyState): DailyTask[] {
   })
 }
 /** 伺服器回應的 stops 經 sanitize（api/daily-route.ts 只保留已知欄位），
- * intentSpecified 標記會被洗掉；回應裡 place 沒變的站，把標記從舊 state 補回來——
- * 否則下次換意圖時該站會被誤當成逐站指定、再也跟不上日意圖。api 檔本身不動。 */
+ * intentSpecified 標記會被洗掉；搜尋前是日意圖站、回應仍是指定站的，把標記
+ * 從舊 state 補回來——否則下次換意圖時該站會被誤當成逐站指定、再也跟不上日意圖。
+ * 標記只看「搜尋前是日意圖站」且「回應仍是指定站」：place 被伺服器改寫成店家
+ * 地址是正常的成功行為（api/daily-route.ts:277），不是意圖被改，所以 place
+ * 相等絕不能是條件——成功路徑下它永不相等，101–120 字意圖連保留路徑都會被
+ * sanitize 截到 100 字。api 檔本身不動。 */
 const restoreIntentSpecified = (stops: DailyTask[], old: DailyTask[]): DailyTask[] =>
   stops.map(t => {
     const prev = old.find(x => x.id === t.id)
-    return prev?.intentSpecified && t.specified && t.place === prev.place ? { ...t, intentSpecified: true } : t
+    return prev?.intentSpecified && t.specified ? { ...t, intentSpecified: true } : t
   })
 export function replanDaily(s: DailyState): DailyState {
   // Keep completed tasks and their state. Only uncompleted tasks are rebuilt.
