@@ -825,5 +825,57 @@ describe('PR-2 修正輪：F1 指定 rest 缺站渲染 ＋ F2 空行程 ＋ F3 p
     await settlePhoto()
     await clickGenerate()
     await waitFor(() => expect(screen.getByText(/部分行程：定食沒有符合條件的店家/)).toBeTruthy())
+describe('開始時間輸入（PR-4）', () => {
+  const seedEmpty = () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+  }
+  const routeFetch = () => {
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: [], routeVerified: false, conflicts: [] }) }
+      : { ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+  const lastBody = (mock: ReturnType<typeof vi.fn>) => {
+    const call = mock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route')) as [unknown, RequestInit | undefined] | undefined
+    return JSON.parse(bodyText(call?.[1]?.body, '{}')) as Record<string, unknown>
+  }
+  it('開始時間欄位存在、初始為空；改為 15:00 後 localStorage 存下 15:00', async () => {
+    seedEmpty()
+    render(<DailyDecision onBack={() => {}} />)
+    const { fireEvent } = await import('@testing-library/react')
+    const input = screen.getByTestId<HTMLInputElement>('daily-start-time')
+    expect(input.value).toBe('')
+    fireEvent.change(input, { target: { value: '15:00' } })
+    expect(screen.getByTestId('daily-start-time')).toBeTruthy()
+    expect(screen.getByTestId<HTMLInputElement>('daily-start-time').value).toBe('15:00')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { startTime?: string }
+    expect(saved.startTime).toBe('15:00')
+  })
+  it('清空開始時間後 localStorage 的 startTime 回到空字串（未指定＝伺服器當下）', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], startTime: '15:00',
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    const { fireEvent } = await import('@testing-library/react')
+    expect(screen.getByTestId<HTMLInputElement>('daily-start-time').value).toBe('15:00')
+    fireEvent.change(screen.getByTestId('daily-start-time'), { target: { value: '' } })
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { startTime?: string }
+    expect(saved.startTime).toBe('')
+  })
+  it('按生成時請求體含 startTime；改時間本身不觸發 /api/daily-route', async () => {
+    const fetchMock = routeFetch()
+    seedEmpty()
+    render(<DailyDecision onBack={() => {}} />)
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(screen.getByTestId('daily-start-time'), { target: { value: '15:00' } })
+    expect(fetchMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(lastBody(fetchMock).startTime).toBe('15:00')
   })
 })

@@ -1,4 +1,4 @@
-import { travelMatrix, scheduleRoute, validPoint } from '../src/dailyRouting.ts'
+import { travelMatrix, scheduleRoute, validPoint, effectiveStartTime } from '../src/dailyRouting.ts'
 import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from '../src/venueCheck.ts'
 import { areaCenter, AREA_RADIUS_M, distanceKm } from '../src/areas.ts'
@@ -277,7 +277,11 @@ async function handler(req:Request):Promise<Response>{
    result.push({...stop,title:preserve?stop.title:selected.name,place:selected.address,candidate:selected,noCandidate:undefined,noCandidateReason:undefined})
   }
   const ordered=order(result,center)
-  const now=new Date().toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'})
+  // 開始時間（PR-4）：使用者開始時間合法且比當下晚才取代伺服器當下時間；
+  // 未指定／不合法／已過去時就是伺服器當下時間——跟今天完全相同。
+  // 09:00 不是這裡的預設值（見 src/dailyRouting.ts scheduleRoute 的防禦 fallback）。
+  const serverNow=new Date().toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'})
+  const now=effectiveStartTime(input.startTime,serverNow)
   const located=ordered.stops.filter(s=>s.candidate)
   // 無候選站不是未解決：它已有 noCandidate 標記與原因，前端照原因顯示；只有
   // 「沒候選又沒標記」的站才算未解決（防禦檢查，正常流程走不到）。

@@ -12,6 +12,18 @@ export function validPoint(v:unknown):Point|null{
 export type ScheduledStop={id:string;title?:string;minutes?:number;start?:string;locked?:boolean;custom?:boolean;done?:boolean;candidate?:Point;eta?:string;departure?:string;travelMin?:number;conflict?:string}
 const clock=(m:number)=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0')
 const minute=(t:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t)?Number(t.slice(0,2))*60+Number(t.slice(3)):null
+/** 有效開始時間（PR-4）：使用者開始時間合法（HH:MM）且比伺服器當下時間晚 → 用
+ * 使用者的；其餘情況（未指定、不合法、等於或早於當下）→ 用伺服器當下時間。
+ * 錨點不能在過去（過去的 ETA 是假資訊）；比較只比同一天的 HH:MM 分鐘數。
+ * 伺服器值本身不合法時回它本身（防禦；呼叫端傳的一定是合法值）——本函式
+ * 不知道 09:00 的存在，09:00 fallback 只在 scheduleRoute 的 minute(now) ?? 9*60。 */
+export function effectiveStartTime(userStart: unknown, serverNow: string): string {
+  if (typeof userStart !== 'string') return serverNow
+  const userMin = minute(userStart)
+  const nowMin = minute(serverNow)
+  if (userMin === null || nowMin === null) return serverNow
+  return userMin > nowMin ? userStart : serverNow
+}
 /**
  * Round 11：403 要分得出「API 沒開」（SERVICE_DISABLED）還是「金鑰限制擋了」（API_KEY_SERVICE_BLOCKED），Cross 要做的事不一樣。
  * 只取 Google 錯誤的狀態、原因、專案編號、啟用網址；不含金鑰。只進伺服器 log，不回給使用者。

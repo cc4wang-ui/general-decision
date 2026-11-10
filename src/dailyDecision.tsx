@@ -68,6 +68,13 @@ export function sameIntent(a: DailyIntent, b: DailyIntent): boolean {
 export function copyIntent(intent: DailyIntent): DailyIntent {
   return { destination: intent.destination, destinationStation: intent.destinationStation, activities: [...intent.activities] }
 }
+/** 開始時間正規化（PR-4；唯一規則，所有寫入點共用）：合法 HH:MM 原樣留著，
+ * 其餘一律 ''（未指定）。不猜、不補、不修——'9:00'（單位數）、'24:00'、
+ * '15:00:00'（帶秒）、非字串，一律視為未指定，伺服器端用當下時間。
+ * 正則與 addFixedTask 的 start 驗證是同一個。 */
+export function normalizeStartTime(v: unknown): string {
+  return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : ''
+}
 export type DailyState = {
   day: string; area: string; currentPlace: string
   /** 當日結構化意圖。必填（不再是可選字串）：沒有意圖就是 EMPTY_INTENT，不用 undefined 表示。 */
@@ -78,6 +85,10 @@ export type DailyState = {
    * 換天歸零（與 intent 同規則）；舊存檔沒有此欄位時沿用當日 intent（移轉——
    * 任務本來就是那份意圖長出來的，不是猜測）。 */
   appliedIntent: DailyIntent
+  /** 今日開始時間（PR-4；HH:MM，''＝未指定，用伺服器當下時間當錨點）。
+   * 只在當日有效：換天歸零（與 intent 同規則）。可選欄位：既有字面量
+   * state 工廠不含它，仍須編譯通過；未指定時讀成 ''（`?? ''`）。 */
+  startTime?: string
   tasks: DailyTask[]; notes: string[]; avoid: string[]
   /** 地區偏好（F7）：只在所選地區中心 1 公里內找店。預設開啟；關掉＝不限區域。 */
   areaOnly?: boolean
@@ -99,7 +110,7 @@ const KEY = 'decide.daily.v1'
 const CROSS_AREA_NOTE = '以澀谷為生活基地，避免不必要跨區'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
-  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: { ...EMPTY_INTENT, activities: [] }, appliedIntent: { ...EMPTY_INTENT, activities: [] },
+  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: { ...EMPTY_INTENT, activities: [] }, appliedIntent: { ...EMPTY_INTENT, activities: [] }, startTime: '',
   tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: [],
   seen: {}, disliked: [], dislikedKinds: [],
 })
@@ -225,6 +236,8 @@ export function loadDaily(): DailyState {
         : copyIntent(intent))
       : { ...EMPTY_INTENT, activities: [] }
     return { ...fresh, ...rest, day: fresh.day, intent, appliedIntent,
+      // 開始時間（PR-4）：只留今天，換天歸零（與 intent 同規則）；同日不合法值 → ''。
+      startTime: raw.day === fresh.day ? normalizeStartTime((raw as { startTime?: unknown }).startTime) : '',
       // 地區偏好移轉（F7）：舊資料的跨區自由文字偏好對應成 area='澀谷'＋areaOnly 開啟；
       // 舊資料沒有 areaOnly 欄位時預設開啟（當時沒有關掉的辦法，開啟才是忠實轉換）。
       area, areaOnly,
@@ -502,7 +515,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       // 不進伺服器的 retention 重驗。完整重新生成不送 others（沒有要換的站，也沒有「其他站」），
       // 改送 seen（round 11：各站換掉過的店全部合併，剛被換掉的店在完整重新生成時也不回來；
       // seen 同樣只擋自動站的新搜尋、不進 retention，見 seenFor）。
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,startTime:s.startTime??'',stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
       const data=(await response.json()) as DailyRouteResponse
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       change(old=>({...old,tasks:restoreIntentSpecified(data.stops??old.tasks, old.tasks),appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
@@ -636,6 +649,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
             ?<button className="dd-secondary" data-testid="daily-origin-typed" disabled={busy!==null} onClick={pickTyped}>改用輸入地點</button>
             :<button className="dd-secondary" data-testid="daily-origin-here" disabled={busy!==null} onClick={pickHere}>📍 用目前位置</button>}
           <small>{state.useHere?'每次搜尋都重新定位；座標只送去查店、排路線，不存在手機。':'預設以澀谷站為出發點；可輸入確切地點，或按「用目前位置」。'}</small>
+          <label htmlFor="daily-start-time">幾點開始</label>
+          <input id="daily-start-time" data-testid="daily-start-time" aria-label="幾點開始" type="time" value={state.startTime ?? ''} disabled={busy!==null} onChange={e=>{change(s=>({...s,startTime:normalizeStartTime(e.target.value)}));clearRoute();setStatus('開始時間變更，請重新搜尋路線')}} />
+          <small>留空＝現在就出發；填了就從那個時間開始排（比現在早的時間以現在為準）。</small>
           <fieldset className="dd-intent">
             <legend>今天想去哪裡／想做什麼</legend>
             <label htmlFor="daily-intent-destination">想去哪裡</label>
