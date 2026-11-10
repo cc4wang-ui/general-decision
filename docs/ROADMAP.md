@@ -100,7 +100,7 @@
 | 10 | 試用起算日：10-30 決定 vs 11-01 上線（§1 已標 ⚠️） | `state/ROUND4-PROGRESS.md`；`state/HANDOFF-2026-11-03.md` §2 |
 | 11 | `DEV-PLAN.md` 寫 S10 部署 ❌、E2E 未過；兩者在 `DEV-PLAN-2.md` §0 起已過時 | `DEV-PLAN.md` 現況三分表；`DEV-PLAN-2.md` §0 |
 
-## 6. 狀態（2026-11-10，Round 14＋步驟 3）
+## 6. 狀態（2026-11-10，Round 14＋步驟 3＋核心迴圈 2.0）
 
 Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖做完」）。證據多在 `state/ROUND10-PROGRESS.md` 與 `state/evidence/r10/`。
 
@@ -134,7 +134,122 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 | 日記時區 | ✅ 2026-11-09 | PR #39（`8ffcbda2`）：日記顯示本地時間 |
 | CI | ✅ 2026-11-09 | PR #40（`02999c9a`）：CI＋分支保護上線（`check`／`e2e`／`required` 為 required check） |
 | 步驟 3 設定 | ✅ 2026-11-10 | PR #43（`eca366cc`）：tsconfig／ESLint／Husky／Stryker 設定落地 |
+| 衛生清理 | ✅ 2026-11-10 | PR #44（`f7d0fff`）：刪凍結快照與死碼，補 `.gitignore` 缺口 |
+| 步驟 3 修復 | ✅ 2026-11-10 | PR #45（`f8c1bbe`）：ESLint／tsc 修復；CI 5/5 綠（見 `docs/adr/adr-002-ci-gate.md:16`） |
+| Stryker 測試 | ✅ 2026-11-10 | PR #46（`5fa0a2e`）：`placeKind` 映射斷言補齊（`57de1ca`） |
+| Stryker 閾值 | ✅ 2026-11-10 | PR #47（`7ebb72d`）：`thresholds.break` 設為 95（`c6de73b`） |
+| ADR-001 | ✅ 2026-11-10 | PR #48（`25e9d9c`）：`docs/adr/adr-001-type-brand-only.md`（種類只留類型＋品牌，刪整條店名判斷） |
+| ADR-002 | ✅ 2026-11-10 | PR #49（`f289074`）：`docs/adr/adr-002-ci-gate.md`（CI 門檻＋分支保護） |
+| 核心迴圈 2.0・PR-1 | ✅ 2026-11-10 | PR #50（`5bf71a87`）：結構化意圖，刪 `mode`；見 §7 |
+| 2.1／2.2・PR-2 | ✅ 2026-11-10 | PR #51（`ce7827e5`）：部分行程標示＋seen 跨請求留存；production 已驗（bundle index-BtC-1r0b.js）；見 §7 |
+| 開始時間・PR-4 | ✅ 2026-11-10 | PR #52（`43a82820`）：開始時間輸入；rebase 後 head `09e8cd7`；production 已驗（bundle index-ScDXdLMo.js）；見 §7 |
+| 2.3 AKOMEYA 觀察 | ✅ 觀察完成 | Production bundle 與 main @ `5bf71a87` SHA-256 一致；按鈕今日文字未確認，文案待裁定；見 §7 |
+| 2.4 回饋迴圈設計 | ✅ 設計完成 | 設計稿待使用者核准（Q1–Q11），未實作；見 §7 |
+| 步驟 4 | ⏳ 進行中 | ADR-001／ADR-002 已合併（PR #48／#49）；錯誤分類統計在 workspace（`~/workspace/improvement-research/ERROR-TAXONOMY-STATS.md`），defect escape rate 追蹤未確認（repo 內無對應檔案） |
+| 分支清理 | ⏳ 部分 | PR #44／#45／#46 的分支已刪；遠端仍有 `feature/daily-intent-first`、`docs/adr-001`、`docs/adr-002`、`step3/stryker-threshold`（2026-11-10 查 `git branch -r`） |
 
 ~~已知未修：早上「約會吃好一點」常找不到 4.3★，改派附近最高分（4.1–4.2★），可能走 30 分以上（checker 第 2 輪）。~~ Round 11（2026-11-04 19:21 上線）：約會最多走 15 分；放寬評分時派 15 分內最高分。早上實測排在 11-05。
 
 下一步：Cross 處理表中「待 Cross」各項，並決定約會要不要加步行上限；日期未知。
+
+## 7. 核心迴圈重構 2.0（2026-11-10）
+
+> 範圍：取代「效率採買 vs 偵查探索」分支（使用者 2026-11-10 裁定：該分支是錯誤命題，丟掉）。一天從當下時間出發，由使用者決定今天想去哪裡或想做什麼；完全沒想法時，發揮最大創意探索東京（使用者在東京住 7 年，深主題探索，觀光客行程毫無興趣）。
+> 來源：映射報告 `~/workspace/general-decision-core-loop-2.0/mapping/REPORT.md`（快照 main `f2890748`，PR #49 合併點）；各 PR 歷程見本節所列報告路徑。
+
+### 7.1 映射結論：分支只有一個落點
+
+| 事實 | 來源 |
+|---|---|
+| 全 repo 唯一讀 `DailyState.mode` 的地方是 `src/dailyDecision.tsx:151` 的 `buildDaily` | mapping REPORT.md §1 S4 |
+| `mode` 不進伺服器：送往 `/api/daily-route` 的請求本體沒有 `mode`；`api/daily-route.ts` 全檔 grep `mode` 零命中；`src/dailyRouting.ts` 同樣零命中 | mapping REPORT.md §1 S7–S9 |
+| 兩個模式的差別只有兩件事：`creative` 站出現／消失、`coffee` 與 `shopping` 前後對調；`gym`／`meal`／`rest` 兩邊完全相同 | mapping REPORT.md §0 |
+| `notes`／備註不是意圖來源：`addFeedback` 只寫進 `notes`，從未送往伺服器，輸入框明寫「僅備註，不影響搜尋」 | mapping REPORT.md §3 R4 |
+| 文件裡這個 split 完全不存在：`docs/ROADMAP.md`（當時 140 行）無 2.0 項目；2.0 需新增一節，不是修改既有文字 | mapping REPORT.md §4 D1 |
+| 不動：`seen`／`disliked`（N1／N2）、地區偏好（N3）、隨機化（N4）、種類判斷 type＋brand only（N5）、`specified`／`custom`／出發地／`avoid`（R1–R3）、核心 app 的 `PickMode`（X1–X3） | mapping REPORT.md §2、§4 |
+
+### 7.2 已批准的 5 個決定（使用者，2026-11-10 12:40 JST）
+
+| # | 決定 | 備註 |
+|---|---|---|
+| (1) | 意圖＝結構化輸入（目的地欄位＋活動選項）；無意圖時預設＝創意探索 | 12:40 原裁定為「意圖＝一個自由文字欄位」；自由文字解析在紅隊第三輪觸及架構極限後，使用者 2026-11-10 16:46 JST 裁定改結構化輸入（見 §7.3）。解析器已刪除，不是現行方案 |
+| (2) | 意圖不跨天保留 | 換天歸零；開始時間（PR-4）同規則 |
+| (3) | 舊 `mode:'practical'` 存檔：該欄位忽略，現有行程保留原樣 | `loadDaily` 明確剝掉舊存檔的 `mode`，不因型別收緊丟掉整份行程 |
+| (4) | 重新探索＝完整重新生成（`fullRegen`） | 不另立混合語意 |
+| (5) | `specified`：地理重排維持現狀；有 `start` 時當時間錨點 | 映射 U5（specified 站是否為地理錨點）仍未裁定；PR-1 不碰伺服器 `order()` |
+
+來源：`~/workspace/general-decision-core-loop-2.0/pr1/pr-body.md`（Summary 決定清單）；16:46 結構化裁定見 `~/workspace/general-decision-core-loop-2.0/pr1/REPORT.md`「Structured input rework」一節。
+
+### 7.3 PR-1：結構化意圖，刪 `mode`（✅ 已合併）
+
+| 項目 | 內容 |
+|---|---|
+| PR | #50，merge commit `5bf71a87`（2026-11-10 18:24 JST），分支 `feature/daily-intent-first`，7 個 commits（`653de0c` → `da67c16`），head `da67c16` |
+| 改動 | `git diff f2890748..da67c16 --stat`：6 檔，934 insertions、46 deletions（`src/dailyDecision.tsx`、`src/dailyDecision.css`、`tests/unit/dailyDecision.test.ts`、`tests/unit/dailyDecision-ui.test.tsx`、`tests/unit/dailyDecision-intent.test.ts`（新）、`tests/e2e/daily-location.spec.ts`） |
+| 內容 | 刪 `mode` 欄位（舊存檔剝離）；意圖輸入＝目的地欄位（max 120 字）＋目的地站選單（5 個可搜尋站）＋5 個活動 checkbox（健身／吃飯／看展覽／喝咖啡／購物，rest 永遠不在選項內）；目的地站走既有 specified 語意（查詢字串＝原文、不套類型／地區／評論門檻、完整重生時保留）；`appliedIntent` state 層快照保留同一意圖重跑的候選；便利預設只在兩個 UI 輸入處理器觸發；選站選單會解除該站的 `avoid` |
+| 測試 | 全套 1125/1125（52 檔）；lint 0 errors／0 warnings；`npx tsc -b` exit 0；e2e `daily-location` 2 passed |
+| CI | 5/5 綠（check／e2e／required＋Vercel） |
+| Production 驗證 | 2026-11-10 ~18:27 JST：bundle `assets/index-VHua357e.js`；結構化輸入 testid 在、舊模式按鈕 gone、`parseIntent` absent |
+| 紅隊 | 第 5 輪 PASS（0 findings；聚焦重審 RT4 fix） |
+
+歷程（自由文字解析器已刪除，以下是歷史，不是現行方案）：
+
+| 階段 | 結果 | 關鍵點 |
+|---|---|---|
+| 自由文字解析（`parseIntent` 關鍵字表） | 紅隊第 1 輪 FAIL：3 blocking（F1 伺服器往返標記失效、F2 否定語境當肯定、F3 CJK 單字子字串誤命中）＋3 non-blocking | 見 `pr1/redteam/REPORT.md` |
+| Fix round 2（`31a220e`） | 紅隊第 2 輪 FAIL：R2-F1 否定邏輯缺口、R2-F2 子字串誤命中未除根（blocking）、R2-F3 搜尋後候選保留失效 | 同類問題第三次出現；使用者裁定 (a) 結構性重做意圖解析 |
+| Fix round 3（`501fd7d`） | 紅隊第 3 輪 FAIL：R3-F1～F3 否定形缺口（blocking）、R3-F4 詞邊界新殺合法複合詞 | 架構錯誤信號：日文自由文字解析無真正分詞不可能收斂；不得開 fix round 4 |
+| 使用者裁定（2026-11-10 16:46 JST） | 改結構化輸入；解析器整塊刪除（23 個識別字在 `src/`／`tests/`／`api/` 全數零命中） | 見 `pr1/DESIGN-structured-input.md` |
+| 結構化重做（`5b31687`）＋略過修復（`e547894`） | 紅隊第 4 輪 FAIL：RT4-F1（略過後再選站，摘要宣稱附著、路線無該站）blocking＋O1 觀察（先選站、後填目的地被彈回） | 使用者 2026-11-10 17:50 JST 裁定兩項都照協調員建議做：(a) 選站移除其 `avoid`；(b) 放寬不變量，站可先選、目的地後填 |
+| RT4 fix（`da67c16`） | 紅隊第 5 輪 PASS：0 findings | 見 `pr1/redteam/REPORT-5.md`；PR #50 合併 |
+
+來源：`~/workspace/general-decision-core-loop-2.0/pr1/REPORT.md`、`pr1/pr-body.md`、`pr1/redteam/REPORT.md`、`REPORT-2.md`、`REPORT-3.md`、`REPORT-4.md`、`REPORT-5.md`。
+
+已知殘留（PR-1）：R-1 目的地查無此店＝既有 specified 行為（`noCandidate`）；R-3 活動勾選無目的地時對路由無可見影響；R-5 舊自由文字意圖升級時一次性遺失（需重新勾選）；R-7 specified 站是否為地理錨點（U5）仍未裁定。**O2 見 §7.6，不在本批次。**
+
+### 7.4 PR-2 與 PR-4（✅ 已合併：PR #51、#52）
+
+#### PR-2：部分行程標示（2.1 O1）＋ seen 跨請求留存（2.2 O2）
+
+| 項目 | 內容 |
+|---|---|
+| 分支／head | `server/pr2-partial-seen`，head `dd9ed651cc778a501d30ecc650bab1ef5ede608a`（parent `40a523e` ← base `5bf71a87`）；已合併 PR #51（merge `ce7827e5`），production 已驗（bundle index-BtC-1r0b.js） |
+| 改動 | `git diff 5bf71a87..HEAD --stat`：5 檔，543 insertions、7 deletions（`api/daily-route.ts`、`src/dailyDecision.tsx`、`tests/unit/daily-route.test.ts`、`tests/unit/dailyDecision-pr2.test.ts`（新）、`tests/unit/dailyDecision-ui.test.tsx`） |
+| 內容 | (a) creative 表項驗證為活碼、不退役（三張表一字未動）；(b) intent 請求欄位不需要、不加（目的地已編碼為指定站，活動勾選不改變伺服器行為）；(c) 2.1 O1：頂層 `partial`＋`missingStops: {id, reason}[]`（兩個成功回應都帶；`reason` 為 `area`／`filtered`／`empty`；純文字 rest 不列入，被指定了地點的 rest 查無店家時列入）；前端 `partial` 為真時明寫「部分行程：」；(d) 2.2 O2：完整重生路徑新增 `withCurrentAsSeen` 寫回 `state.seen`（只記自動站），＋設定面板「清除今天換掉的店紀錄」按鈕（只清 seen，disliked 不動）；換天過期（既有） |
+| 測試 | 全套 1152/1152（53 檔）；lint 0；tsc exit 0；e2e `daily-location` 2 passed |
+| 紅隊 | 第 1 輪 PASS（0 blocking、3 non-blocking 已於修正輪 `dd9ed65` 修掉：F1 說法更正、F2 空行程文案、F3 空 `missingStops` 退回掃描）；第 2 輪 PASS（0 blocking、2 non-blocking 殘留：RT2-F1 rest-only 行程狀態列說錯話、RT2-F2 `missingStops` 不完整時漏缺站） |
+
+來源：`~/workspace/general-decision-core-loop-2.0/pr2/REPORT.md`、`pr2/pr-body.md`、`pr2/redteam2/REPORT.md`。
+
+#### PR-4：開始時間輸入
+
+| 項目 | 內容 |
+|---|---|
+| 分支／head | `feature/start-time-input`，head `09e8cd7eaf9c2cf5132a83e9a7f3178dc62b399b`（parent `1c9f79a` ← base `ce7827e5`；原 `b4a09a8` rebase 到 PR-2 合併後的 main）；已合併 PR #52（merge `43a82820`），production 已驗（bundle index-ScDXdLMo.js） |
+| 改動 | `git diff ce7827e5..HEAD --stat`：5 檔，503 insertions、24 deletions（`api/daily-route.ts`、`src/dailyDecision.tsx`、`src/dailyRouting.ts`、`tests/unit/dailyDecision-start-time.test.ts`（新）、`tests/unit/dailyDecision-ui.test.tsx`）；rebase 解開三處 PR-2／PR-4 衝突（成功回應同時帶 `partial`／`missingStops` 與 `anchorTime`；`DailyRouteResponse` 同時含兩者；狀態列取 PR-2 的 `mappedMissing`／`hasCandidate`／F2 邏輯＋PR-4 的 `anchorNote`） |
+| 內容 | 開始時間輸入（`type="time"`，testid `daily-start-time`，在出發地之下、意圖欄位之上）；`effectiveStartTime`：合法未來時間當錨點，否則伺服器當下東京時間（過去時間 clamp）；午夜跨日 day-aware 運算：ETA 標「翌日」（`etaDayOffset`／`departureDayOffset`），固定安排 deadline 取當天／隔天離錨點最近的一次；回應加 `anchorTime`；改時間不搜尋、不重建任務，`clearRoute` 同時清逐站舊 ETA／衝突；開始時間只留今天、換天歸零 |
+| 測試 | 全套 1184/1184（54 檔，rebase 後 head 主代理重跑）；lint 0；tsc exit 0；e2e 由 CI 全跑 |
+| 紅隊 | 第 1 輪 FAIL（F1 午夜跨日 blocking；F2 逐站衝突殘留；O1 時區未標明、O2 有效錨點不可見）→ 修正輪（結構性修法，非 23:59 特例）→ 第 2 輪 PASS（0 blocking、0 non-blocking） |
+
+來源：`~/workspace/general-decision-core-loop-2.0/pr4/REPORT.md`、`pr4/DESIGN-start-time.md`、`pr4/pr-body.md`、`pr4/redteam2/REPORT.md`。
+
+### 7.5 2.1～2.4 狀態
+
+| 項 | 狀態 | 說明 |
+|---|---|---|
+| 2.1 O1：池子太薄時回傳部分行程並標示缺站 | ✅ PR-2 已合併（PR #51） | 已裁定（2026-11-10，使用者授權按目的決定）；見 §7.4 PR-2 (c) |
+| 2.2 O2：`seen` 跨請求保存（當天、弱於 `disliked`、可清除） | ✅ PR-2 已合併（PR #51） | 已裁定（同上）；見 §7.4 PR-2 (d)。注意：此處的 O2 是「seen 跨請求保存」；PR-1 紅隊第 5 輪的 O2 觀察是另一件事，見 §7.6 |
+| 2.3 AKOMEYA 食堂排除按鈕標籤 | ✅ 觀察 done（文案待裁） | Production 觀察 2026-11-10 19:03–19:07 JST：production bundle 與 main @ `5bf71a87` SHA-256 一致（`a2667822762537875babe8381fc2658a1a84134337e24109abbe7e2cc979e366`，`assets/index-VHua357e.js`）；按鈕模板唯一：`不要「{kindLabel}」這類`；kind 唯一來源是當下候選的 Google Places types／primaryType（type＋brand 判定，店名零貢獻）；stale 標籤假設在 UI 渲染層不成立。**AKOMEYA 今日的 types 未確認**（需瀏覽器實測 production 渲染）；文案決定待使用者看證據後做 |
+| 2.4 行為回饋迴圈＋權重圖 | ✅ 設計 done（待核准，未實作） | 設計稿 `~/workspace/general-decision-core-loop-2.0/design-2.4/DESIGN-feedback-loop.md`；訊號三層（手動輸入最強／明確表態／隱性訊號）、圖譜軟分數、半衰期 30 天、`prefer` 加權皆為提案；待核准問題 Q1–Q11（權重數字、衰減、儲存位置、清除粒度、跨日目的地、標記完成是否寫入核心記憶、`prefer` 加權與放寬、種類親和閾值、說明文字、活動跨日效果、是否讀取愛店）。核准後才實作 |
+
+### 7.6 不在本批次：O2（PR-1 紅隊第 5 輪觀察）
+
+重開頁面後，未搜尋過的意圖附著站會從路線掉落（`loadDaily` 過濾器濾掉無候選的指定站，掛載不重跑 `replanDaily`），而摘要仍宣稱附著，直到下一次改動意圖觸發 `replanDaily` 才自癒。`e547894` 上一模一樣，既有行為、非 PR-1 迴歸。**明確不在 Wave-2 批次內**，需使用者另行裁定（掛載重跑 `replanDaily`，或過濾器保留意圖站）。PR-2／PR-4 皆未碰。
+
+來源：`~/workspace/general-decision-core-loop-2.0/pr1/redteam/REPORT-5.md` 觀察 O2；`pr1/pr-body.md` Known residuals O2。
+
+### 7.7 本節未改的守則
+
+- 錯判（種類判錯、雙向誤導排除）與資料遺失（清掉使用者明確封鎖）永遠不接受，每輪仍是 blocking 條件。
+- `notes` 絕不當意圖來源；自由文字解析器已刪除，不得寫回文件當作現行方案。
+- 地區偏好（結構化、可選、預設澀谷／開、伺服器端執行）、隨機化（完整重新生成必須不同路線）、種類判斷（type＋brand only，歧義回 `undefined`）維持不變。
