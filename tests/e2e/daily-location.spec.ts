@@ -75,7 +75,7 @@ test('定位被拒 → 顯示原因、原行程不動、不送請求（不改用
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
     const c = { id: 'old1', name: '原本的咖啡店', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=old1', lat: 35.66, lng: 139.70 }
     localStorage.setItem('decide.daily.v1', JSON.stringify({
-      day, area: '澀谷', currentPlace: '渋谷駅', mode: 'creative', notes: [], avoid: [], routedFrom: 'text:渋谷駅',
+      day, area: '澀谷', currentPlace: '渋谷駅', notes: [], avoid: [], routedFrom: 'text:渋谷駅',
       tasks: [{ id: 'coffee', kind: 'creative', title: '原本的咖啡店', minutes: 60, done: false, candidate: c }],
     }))
   })

@@ -21,7 +21,7 @@ const cand = (id: string, name: string, primaryType = 'restaurant', types: strin
 })
 const seed = (candidate: ReturnType<typeof cand>) => {
   localStorage.setItem(KEY, JSON.stringify({
-    day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+    day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
     tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate }],
     notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
   }))
@@ -133,7 +133,7 @@ describe('無候選站顯示（紅隊 round 6 L1／L2，round 7）', () => {
   const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
   const seedNoCandidate = (reason: 'area' | 'filtered' | 'empty') => {
     localStorage.setItem(KEY, JSON.stringify({
-      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', 
       tasks: [{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: reason }],
       notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
     }))
@@ -170,7 +170,7 @@ describe('無候選站顯示（紅隊 round 6 L1／L2，round 7）', () => {
   })
   it('round 8 F7：原因 filtered 的卡片有「清除『不喜歡』的紀錄」按鈕，按了真的清掉 localStorage 的 disliked／dislikedKinds 並顯示確認', async () => {
     localStorage.setItem(KEY, JSON.stringify({
-      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', 
       tasks: [{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'filtered' }],
       notes: [], avoid: [], seen: {}, disliked: ['d1', 'd2'], dislikedKinds: ['udon'],
     }))
@@ -212,7 +212,7 @@ describe('排除清單截斷通知（round 7）', () => {
   it('placeMem 封鎖 150＋不喜歡 100 → 生成後顯示截斷通知（50 個未送出）', async () => {
     const disliked = Array.from({ length: 100 }, (_, i) => 'd' + i)
     localStorage.setItem(KEY, JSON.stringify({
-      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', 
       tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('s1', '某咖啡店') }],
       notes: [], avoid: [], seen: {}, disliked, dislikedKinds: [],
     }))
@@ -233,7 +233,7 @@ describe('round 10：F1a-load（載入清掉的車站候選要說原因）＋ cl
   it('F1a-load：舊存檔的 meal 帶車站候選，載入後卡片顯示 denied 原因（車站或地標），不是只留舊店名', async () => {
     const stationCand = { id: 'shibuya-station', name: '渋谷駅', address: '渋谷駅地下 1F', mapUrl: 'https://maps.google.com/?cid=shibuya-station', lat: 35.6595, lng: 139.7005, rating: 4.2, userRatingCount: 9000, types: ['transit_station', 'train_station'], primaryType: 'transit_station' }
     localStorage.setItem(KEY, JSON.stringify({
-      day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', mode: 'creative',
+      day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', 
       tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, place: '渋谷駅地下 1F', candidate: stationCand }],
       notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
     }))
@@ -248,7 +248,7 @@ describe('round 10：F1a-load（載入清掉的車站候選要說原因）＋ cl
     const { clearDislike } = await import('../../src/placeMem.ts')
     vi.mocked(clearDislike).mockRejectedValueOnce(new Error('IndexedDB 寫入失敗'))
     localStorage.setItem(KEY, JSON.stringify({
-      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', 
       tasks: [{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'filtered' }],
       notes: [], avoid: [], seen: {}, disliked: ['d1', 'd2'], dislikedKinds: ['udon'],
     }))
@@ -311,7 +311,7 @@ describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新�
   it('完整重新生成送 seen：存檔 seen 裡的店＋目前候選都在請求的 seen 裡，且沒有 shuffle 欄位', async () => {
     const fetchMock = routeFetch()
     localStorage.setItem(KEY, JSON.stringify({
-      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', 
       tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('cur-1', '目前的店') }],
       notes: [], avoid: [], seen: { meal: ['old-1', 'old-2'] }, disliked: [], dislikedKinds: [],
     }))
@@ -328,7 +328,7 @@ describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新�
     const { clearDislike } = await import('../../src/placeMem.ts')
     vi.mocked(clearDislike).mockResolvedValue({ sharedRemains: true })
     localStorage.setItem(KEY, JSON.stringify({
-      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', 
       tasks: [{ id: 'shopping', title: '藥局', minutes: 30, kind: 'shopping', done: false, noCandidate: true, noCandidateReason: 'filtered' }],
       notes: [], avoid: [], seen: {}, disliked: ['d1', 'd2'], dislikedKinds: [],
     }))
@@ -340,5 +340,52 @@ describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新�
     expect(screen.getByText(/其中 2 家仍有其他封鎖紀錄，仍不會出現/)).toBeTruthy()
     const saved = JSON.parse(localStorage.getItem(KEY)!) as { disliked: string[] }
     expect(saved.disliked).toEqual([])
+  })
+})
+
+describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () => {
+  const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
+  it('模式按鈕整組消失，改為意圖輸入框（label／placeholder／上限 120 字）', async () => {
+    seed(cand('s1', '某咖啡店'))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.queryByText('偵察探索')).toBeNull()
+    expect(screen.queryByText('效率採買')).toBeNull()
+    expect(screen.queryByText('今天想怎麼過？')).toBeNull()
+    const input = screen.getByTestId<HTMLInputElement>('daily-intent')
+    expect(input.getAttribute('aria-label')).toBe('今天想去哪裡／想做什麼')
+    expect(input.placeholder).toContain('留空就隨興探索')
+    expect(input.maxLength).toBe(120)
+    expect(input.value).toBe('')
+  })
+  it('輸入意圖 → 午餐站被指定為意圖原文、顯示解析提示、寫進 localStorage、不觸發伺服器請求', async () => {
+    seed(cand('s1', '某咖啡店'))
+    const fetchMock = vi.fn((_url: string | URL | Request) => Promise.resolve({ ok: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃拉麵' } })
+    // 提示逐字反映 parseIntent 的輸出
+    expect(screen.getByTestId('daily-intent-hint').textContent).toBe('已辨識：拉麵 → 午餐站')
+    // 午餐站的指定地點輸入框值＝意圖原文（specified 站不顯示「換這一站」）
+    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('想吃拉麵')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { intent: string }
+    expect(saved.intent).toBe('想吃拉麵')
+    // 改意圖不觸發伺服器請求（跟舊模式按鈕一樣；照片 API 的呼叫不算）
+    expect(fetchMock.mock.calls.some(c => urlText(c[0]).includes('/api/daily-route'))).toBe(false)
+  })
+  it('空狀態文案是意圖導向、對齊實際按鈕文案（不再提模式／生成今日行程）', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.getByText('今天還沒有行程')).toBeTruthy()
+    expect(screen.getByText(/先在「今天想去哪裡／想做什麼」寫下今天的想法/)).toBeTruthy()
+    expect(screen.getByText(/再點「搜尋店家並生成路線」/)).toBeTruthy()
+    expect(screen.queryByText(/選擇模式/)).toBeNull()
+    expect(screen.queryByText(/生成今日行程/)).toBeNull()
   })
 })

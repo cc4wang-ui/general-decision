@@ -9,7 +9,10 @@ import { AREA_NAMES, withinArea } from './areas.ts'
 
 export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied' }
 export type DailyState = {
-  day: string; area: string; currentPlace: string; mode: 'creative'|'practical'
+  day: string; area: string; currentPlace: string
+  /** 當日意圖原文（2.0）：「今天想去哪裡／想做什麼」。每天重新問，換天歸零；
+   * 同一天內存在於當日 state。舊存檔沒有此欄位時預設 ''。 */
+  intent?: string
   tasks: DailyTask[]; notes: string[]; avoid: string[]
   /** 地區偏好（F7）：只在所選地區中心 1 公里內找店。預設開啟；關掉＝不限區域。 */
   areaOnly?: boolean
@@ -31,7 +34,7 @@ const KEY = 'decide.daily.v1'
 const CROSS_AREA_NOTE = '以澀谷為生活基地，避免不必要跨區'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
-  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', mode: 'creative',
+  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: '',
   tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: [],
   seen: {}, disliked: [], dislikedKinds: [],
 })
@@ -120,7 +123,13 @@ export function loadDaily(): DailyState {
     const area = typeof raw.area === 'string' && AREA_NAMES.includes(raw.area) ? raw.area : '澀谷'
     const areaOnly = raw.areaOnly === undefined ? true : raw.areaOnly === true
     const ctx: StaleContext = { disliked, dislikedKinds, area, areaOnly }
-    return { ...fresh, ...raw, day: fresh.day,
+    // 舊存檔移轉（2.0）：mode 欄位明確剝掉——{...raw} 展開會把它帶回 state，
+    // 下次 saveDaily 又存回去。intent 只在同一天保留：換天歸零（{...fresh, ...raw}
+    // 展開會把舊 intent 帶過來，所以在後面的覆寫欄位裡按 raw.day 決定留或清），
+    // 且只接受字串、截到 120 字（跟輸入框上限一致）。
+    const { mode: _legacyMode, ...rest } = raw as Partial<DailyState> & { mode?: unknown }
+    const intent = raw.day === fresh.day && typeof raw.intent === 'string' ? raw.intent.slice(0, 120) : ''
+    return { ...fresh, ...rest, day: fresh.day, intent,
       // 地區偏好移轉（F7）：舊資料的跨區自由文字偏好對應成 area='澀谷'＋areaOnly 開啟；
       // 舊資料沒有 areaOnly 欄位時預設開啟（當時沒有關掉的辦法，開啟才是忠實轉換）。
       area, areaOnly,
@@ -146,12 +155,61 @@ const catalog: Omit<DailyTask,'done'>[] = [
 export function catalogTitle(id: string): string | undefined {
   return catalog.find(t => t.id === id)?.title
 }
+/** 意圖解析（2.0）：把一日級自由文字意圖對應到站種類。封閉關鍵字表——
+ * 命中才有站，沒命中回 []（走創意預設），絕不猜測。裸字「展」不在表內
+ * （會誤命中「發展」）。咖啡關鍵字併入 creative 列：DailyTask 的 kind
+ * 沒有 'coffee'，咖啡站的 kind 本來就是 'creative'（見 catalog），所以
+ * 咖啡意圖與展覽意圖都會命中 creative 種類、同時指定探索站與咖啡站——
+ * 這是既有 kind 模型的直接結果，不是新增的猜測（見 PR-1 REPORT.md 未決事項）。
+ * CJK 關鍵字用子字串比對；羅馬字關鍵字一律 word-boundary regex
+ * （case-insensitive），`art` 不命中 party／heart，`ramen` 不命中其他
+ * 單字的一部分。回傳順序是 catalog 順序。 */
+type IntentEntry = { kind: DailyTask['kind']; cjk: string[]; roman: string[] }
+const INTENT_KEYWORDS: IntentEntry[] = [
+  { kind: 'gym', cjk: ['健身', '健身房', '運動', 'ジム', '筋トレ', 'トレーニング'], roman: ['gym'] },
+  { kind: 'meal', cjk: ['拉麵', 'らーめん', 'ラーメン', '壽司', '寿司', 'すし', '吃', '飯', 'ご飯', 'ごはん', '定食', '午餐', '午饭', '晚餐', '晚饭', 'ランチ', 'ディナー', '食べ', '餐廳', 'レストラン'], roman: ['ramen', 'sushi', 'restaurant'] },
+  { kind: 'creative', cjk: ['展覽', '展覧会', '展示', '美術館', '美術', '畫廊', 'ギャラリー', '博物館', 'アート', '咖啡', 'コーヒー', '珈琲', 'カフェ'], roman: ['art', 'cafe', 'coffee'] },
+  { kind: 'shopping', cjk: ['購物', '買い物', 'ショッピング', '買'], roman: ['shopping'] },
+  { kind: 'rest', cjk: ['休息', '休憩'], roman: [] },
+]
+/** 第一個命中的關鍵字（parseIntent 與提示共用）：CJK 關鍵字按表內順序找，羅馬字同理。 */
+const firstHitKeyword = (text: string, e: IntentEntry): string | undefined =>
+  e.cjk.find(k => text.includes(k)) ?? e.roman.find(k => new RegExp(`\\b${k}\\b`, 'i').test(text))
+export function parseIntent(text: string): DailyTask['kind'][] {
+  if (!text.trim()) return []
+  return INTENT_KEYWORDS.filter(e => firstHitKeyword(text, e) !== undefined).map(e => e.kind)
+}
+/** 意圖解析提示（UI 用）：逐字反映 parseIntent 的輸出——每種命中種類取第一個
+ * 命中的關鍵字，列出該種類對應的站。creative 種類對應探索站與咖啡站
+ * （咖啡站的 kind 也是 'creative'）。無命中回 null。 */
+const INTENT_STATION_LABEL: Record<string, string> = { gym: '健身站', meal: '午餐站', creative: '探索站', coffee: '咖啡站', shopping: '購物站', rest: '休息站' }
+export function intentHintText(intent: string): string | null {
+  const hits = parseIntent(intent)
+  if (!hits.length) return null
+  const parts = INTENT_KEYWORDS.filter(e => hits.includes(e.kind)).map(e => {
+    const stations = catalog.filter(t => t.kind === e.kind).map(t => INTENT_STATION_LABEL[t.id] ?? t.id).join('、')
+    return `${firstHitKeyword(intent, e) ?? ''} → ${stations}`
+  })
+  return `已辨識：${parts.join('、')}`
+}
 export function buildDaily(s: DailyState): DailyTask[] {
   const previous = new Map(s.tasks.map(t=>[t.id,t]))
-  const order = s.mode === 'creative' ? ['gym','meal','creative','coffee','shopping','rest'] : ['gym','meal','shopping','coffee','rest']
+  // 2.0：order 固定為創意預設（不再有 mode 分支），再按 avoid 過濾。
+  const order = ['gym','meal','creative','coffee','shopping','rest']
+  const intent = (s.intent ?? '').trim()
+  const hits = parseIntent(intent)
   return order.filter(id=>!s.avoid.includes(id)).map(id=>{
     const c = catalog.find(t=>t.id===id)!
-    return { ...c, ...previous.get(id), done: previous.get(id)?.done ?? false }
+    const prev = previous.get(id)
+    const base = { ...c, ...prev, done: prev?.done ?? false }
+    if (!hits.includes(c.kind)) return base
+    // 意圖命中的站：place＝意圖原文、specified（走既有 specified 語意：
+    // 查詢字串＝原話、不套類型／地區／評論門檻、完整重生時保留）。
+    // 舊候選只在「同一意圖、已是指定站」時保留；意圖換了，舊候選就是過期的，
+    // 連同 eta／departure／travelMin／conflict／noCandidate 一起清掉
+    // （noCandidate 是舊查詢的結果，留著會在新查詢下顯示過期的「沒有店」原因）。
+    if (prev?.specified && prev.place === intent && prev.candidate) return { ...base, place: intent, specified: true }
+    return { ...base, place: intent, specified: true, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, noCandidate: undefined, noCandidateReason: undefined }
   })
 }
 export function replanDaily(s: DailyState): DailyState {
@@ -389,6 +447,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     })()
   }
   const completed=state.tasks.filter(t=>t.done).length
+  const intentHint=intentHintText(state.intent ?? '')
   return <section className="screen dd" data-screen="daily-decision">
     <header className="dd-header">
       <button className="dd-back" onClick={onBack} aria-label="返回">← 返回</button>
@@ -412,11 +471,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
             ?<button className="dd-secondary" data-testid="daily-origin-typed" disabled={busy!==null} onClick={pickTyped}>改用輸入地點</button>
             :<button className="dd-secondary" data-testid="daily-origin-here" disabled={busy!==null} onClick={pickHere}>📍 用目前位置</button>}
           <small>{state.useHere?'每次搜尋都重新定位；座標只送去查店、排路線，不存在手機。':'預設以澀谷站為出發點；可輸入確切地點，或按「用目前位置」。'}</small>
-          <label>今天想怎麼過？</label>
-          <div className="dd-mode" role="group" aria-label="今日模式">
-            <button aria-pressed={state.mode==='creative'} onClick={()=>change(s=>replanDaily({...s,mode:'creative'}))}>偵察探索</button>
-            <button aria-pressed={state.mode==='practical'} onClick={()=>change(s=>replanDaily({...s,mode:'practical'}))}>效率採買</button>
-          </div>
+          <label htmlFor="daily-intent">今天想去哪裡／想做什麼</label>
+          <input id="daily-intent" data-testid="daily-intent" aria-label="今天想去哪裡／想做什麼" value={state.intent ?? ''} maxLength={120} placeholder="例如：想吃拉麵、去看展覽（留空就隨興探索）" onChange={e=>change(s=>replanDaily({...s,intent:e.target.value.slice(0,120)}))} />
+          {intentHint && <small data-testid="daily-intent-hint">{intentHint}</small>}
           <label htmlFor="daily-area">地區偏好</label>
           <div className="dd-area">
             <select id="daily-area" aria-label="地區偏好" value={state.area} disabled={busy!==null} onChange={e=>{change(s=>({...s,area:e.target.value}));clearRoute();setStatus('地區變更，請重新搜尋路線')}}>
@@ -452,7 +509,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
         </aside>
         <div className="dd-itinerary">
           <div className="dd-section-title"><div><span>▸ 任務路線</span><h2>今日路線</h2></div><span className="dd-count">{state.tasks.length} STOPS{routeKm!==null?" · "+routeKm+" KM":""}{travelMin!==null?" · 步行 "+travelMin+" MIN":""}</span></div>
-          {state.tasks.length===0?<div className="dd-empty"><span>✳</span><h3>今天還沒有行程</h3><p>選擇模式後點「生成今日行程」，讓今天開始。</p></div>:<div className="dd-timeline" aria-label="今日任務">
+          {state.tasks.length===0?<div className="dd-empty"><span>✳</span><h3>今天還沒有行程</h3><p>先在「今天想去哪裡／想做什麼」寫下今天的想法，留空就隨興探索；再點「搜尋店家並生成路線」，讓今天開始。</p></div>:<div className="dd-timeline" aria-label="今日任務">
             {state.tasks.map((t,i)=><article className={'dd-stop'+(t.done?' is-done':'')} key={t.id}>
               <div className="dd-marker"><span>{String(i+1).padStart(2,'0')}</span></div>
               <div className="dd-card">

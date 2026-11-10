@@ -4,20 +4,26 @@ import { buildDaily, replanDaily, withSeen, seenFor, excludeFor, excludeForInfo,
 const KEY = 'decide.daily.v1'
 const todayTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 
-const state = (): DailyState => ({ day:'2026-11-03', area:'澀谷', currentPlace:'宮下公園', mode:'creative', tasks:[], notes:[], avoid:[] })
+const state = (): DailyState => ({ day:'2026-11-03', area:'澀谷', currentPlace:'宮下公園', intent:'', tasks:[], notes:[], avoid:[] })
 
 describe('Daily Decision replan',()=>{
   it('always uses FIT-EASY rather than another gym',()=>{
     const tasks=buildDaily(state())
     expect(tasks.find(t=>t.kind==='gym')?.title).toContain('FIT-EASY')
   })
-  it('preserves completed tasks and only replans pending',()=>{
+  it('preserves completed tasks and only replans pending（2.0：split 已刪，改寫）',()=>{
     const s=state()
     s.tasks=buildDaily(s).map(t=>t.id==='gym'?{...t,done:true}:t)
-    const result=replanDaily({...s,currentPlace:'宮下公園',mode:'practical'})
-    expect(result.tasks.filter(t=>t.id==='gym')).toHaveLength(1)
-    expect(result.tasks.find(t=>t.id==='gym')?.done).toBe(true)
-    expect(result.tasks.some(t=>t.id==='creative')).toBe(false)
+    // 無意圖時 creative 站在（舊 practical 斷言「沒有 creative 站」是 split 的定義本身，已刪）
+    const noIntent=replanDaily({...s,currentPlace:'宮下公園',intent:''})
+    expect(noIntent.tasks.filter(t=>t.id==='gym')).toHaveLength(1)
+    expect(noIntent.tasks.find(t=>t.id==='gym')?.done).toBe(true)
+    expect(noIntent.tasks.some(t=>t.id==='creative')).toBe(true)
+    // 意圖命中時該站 specified、place＝原文，已完成站照留
+    const withIntent=replanDaily({...s,currentPlace:'宮下公園',intent:'想吃拉麵'})
+    expect(withIntent.tasks.find(t=>t.id==='gym')?.done).toBe(true)
+    expect(withIntent.tasks.find(t=>t.id==='meal')?.specified).toBe(true)
+    expect(withIntent.tasks.find(t=>t.id==='meal')?.place).toBe('想吃拉麵')
   })
   it('honors explicit skip',()=>{
     const result=replanDaily({...state(),avoid:['shopping']})
@@ -112,7 +118,7 @@ describe('loadDaily：上限留最新、rest 殘留清除（紅隊 §3.3／§3.4
  afterEach(()=>{localStorage.clear()})
  const stationCand={id:'shibuya-station',name:'渋谷駅',address:'渋谷駅地下 1F',mapUrl:'https://maps.google.com/?cid=shibuya-station',lat:35.6595,lng:139.7005,rating:4.1,userRatingCount:9000,types:['transit_station'],primaryType:'transit_station'}
  const seed=(tasks:unknown[],disliked:string[],dislikedKinds:string[])=>{
-  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',mode:'creative',tasks,notes:[],avoid:[],seen:{},disliked,dislikedKinds}))
+  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',tasks,notes:[],avoid:[],seen:{},disliked,dislikedKinds}))
  }
  it('不喜歡 101 家：留最新的 100 家（第 101 家＝最新的一家還在，最舊的一家被清掉）',()=>{
   const disliked=Array.from({length:101},(_,i)=>'d'+i)
@@ -212,7 +218,7 @@ describe('round 9 F1b：缺評論數＝未知，不清掉（e2e daily-location.s
  beforeEach(()=>{localStorage.clear()})
  afterEach(()=>{localStorage.clear()})
  const seed=(tasks:unknown[],disliked:string[],dislikedKinds:string[])=>{
-  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',mode:'creative',tasks,notes:[],avoid:[],seen:{},disliked,dislikedKinds}))
+  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',tasks,notes:[],avoid:[],seen:{},disliked,dislikedKinds}))
  }
  it('e2e seed 形狀：候選沒有 userRatingCount、沒有 types——loadDaily 後候選與標題都還在（不是被清掉＋換成目錄標題）',()=>{
   const coffee={id:'coffee',kind:'creative',title:'原本的咖啡店',minutes:60,done:false,candidate:{id:'old1',name:'原本的咖啡店',address:'渋谷',mapUrl:'https://maps.google.com/?cid=old1',lat:35.66,lng:139.70}}
@@ -320,7 +326,7 @@ describe('loadDaily：既有候選保留規則統一（紅隊 round 5 item 7，r
  afterEach(()=>{localStorage.clear()})
  const stationCand={id:'shibuya-station',name:'渋谷駅',address:'渋谷駅地下 1F',mapUrl:'https://maps.google.com/?cid=shibuya-station',lat:35.6595,lng:139.7005,rating:4.1,userRatingCount:9000,types:['transit_station'],primaryType:'transit_station'}
  const seedRaw=(raw:Record<string,unknown>)=>{
-  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',mode:'creative',notes:[],avoid:[],seen:{},disliked:[],dislikedKinds:[],...raw}))
+  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',notes:[],avoid:[],seen:{},disliked:[],dislikedKinds:[],...raw}))
  }
  it('已完成 meal 的車站候選保留（使用者的選擇；伺服器端同一規則）',()=>{
   const meal={id:'meal',title:'定食',minutes:45,kind:'meal',done:true,candidate:stationCand}
@@ -346,7 +352,7 @@ describe('loadDaily：地區偏好移轉（紅隊 round 5 F7，round 6）',()=>{
  beforeEach(()=>{localStorage.clear()})
  afterEach(()=>{localStorage.clear()})
  const seedRaw=(raw:Record<string,unknown>)=>{
-  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',mode:'creative',tasks:[],notes:[],avoid:[],seen:{},disliked:[],dislikedKinds:[],...raw}))
+  localStorage.setItem(KEY,JSON.stringify({day:todayTokyo(),area:'澀谷',currentPlace:'渋谷駅',tasks:[],notes:[],avoid:[],seen:{},disliked:[],dislikedKinds:[],...raw}))
  }
  it('舊資料的跨區自由文字偏好轉成結構化偏好：notes 移除那一行，area 澀谷、areaOnly 開啟',()=>{
   seedRaw({notes:['固定健身房：FIT-EASY；不推薦其他付費健身房','以澀谷為生活基地，避免不必要跨區','偏好安靜咖啡廳、日式定食、藝術與日本 IP']})
@@ -379,7 +385,7 @@ describe('loadDaily：既有候選重驗（round 7 L1／L2）', () => {
   beforeEach(() => { localStorage.clear() })
   afterEach(() => { localStorage.clear() })
   const seed = (tasks: unknown[], disliked: string[] = [], dislikedKinds: string[] = [], extra: Record<string, unknown> = {}) => {
-    localStorage.setItem(KEY, JSON.stringify({ day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', mode: 'creative', tasks, notes: [], avoid: [], seen: {}, disliked, dislikedKinds, ...extra }))
+    localStorage.setItem(KEY, JSON.stringify({ day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', tasks, notes: [], avoid: [], seen: {}, disliked, dislikedKinds, ...extra }))
   }
   /** 澀谷店候選（距中心約 72 公尺）、原宿店候選（約 1233 公尺）。 */
   const shibuyaCand = { id: 'sundrug-shibuya', name: 'サンドラッグ 渋谷店', address: '渋谷', mapUrl: 'https://maps.google.com/?cid=sundrug-shibuya', lat: 35.6590, lng: 139.7010, rating: 4.1, userRatingCount: 200, types: ['drugstore'], primaryType: 'drugstore' }
@@ -459,7 +465,7 @@ describe('round 10：R9-F1a-load——載入時清掉候選要說原因（不是
   const stationCand = { id: 'shibuya-station', name: '渋谷駅', address: '渋谷駅地下 1F', mapUrl: 'https://maps.google.com/?cid=shibuya-station', lat: 35.6595, lng: 139.7005, rating: 4.2, userRatingCount: 9000, types: ['transit_station', 'train_station'], primaryType: 'transit_station' }
   const harajukuCand = { id: 'sugi-harajuku', name: 'スギ薬局 原宿店', address: '原宿', mapUrl: 'https://maps.google.com/?cid=sugi-harajuku', lat: 35.6704, lng: 139.7030, rating: 4.0, userRatingCount: 150, types: ['drugstore'], primaryType: 'drugstore' }
   const seed = (tasks: unknown[], disliked: string[] = [], dislikedKinds: string[] = [], extra: Record<string, unknown> = {}) => {
-    localStorage.setItem(KEY, JSON.stringify({ day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', mode: 'creative', tasks, notes: [], avoid: [], seen: {}, disliked, dislikedKinds, ...extra }))
+    localStorage.setItem(KEY, JSON.stringify({ day: todayTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', tasks, notes: [], avoid: [], seen: {}, disliked, dislikedKinds, ...extra }))
   }
   it('DENY 清掉：候選沒了、title 照留（round 9 F1a 不動），但該站標成 noCandidate 原因 denied（不再只剩舊店名加一句「地點尚未確認」）', () => {
     const meal = { id: 'meal', title: '麺喜やしま', minutes: 45, kind: 'meal', done: false, place: '渋谷駅地下 1F', candidate: stationCand }
@@ -548,7 +554,7 @@ describe('round 11：seenFor（完整重新生成送 seen）＋ 壁畫候選載�
     expect(cleared.title).toBe('探索')
     // 經 loadDaily 走一遍：壁畫候選清掉、原因 denied
     localStorage.setItem(KEY, JSON.stringify({
-      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', mode: 'creative',
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', 
       tasks: [creative], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
     }))
     const out = loadDaily().tasks.find(t => t.id === 'creative')!
