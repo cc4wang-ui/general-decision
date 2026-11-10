@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildDaily, copyIntent, EMPTY_INTENT, intentSummaryText, loadDaily, normalizeIntent, replanDaily, routeProposal, sameIntent, type DailyIntent, type DailyState } from '../../src/dailyDecision.tsx'
+import { applyConvenienceDefault, buildDaily, copyIntent, EMPTY_INTENT, intentSummaryText, loadDaily, normalizeIntent, replanDaily, routeProposal, sameIntent, type DailyIntent, type DailyState } from '../../src/dailyDecision.tsx'
 
 const KEY = 'decide.daily.v1'
 const todayTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -40,14 +40,22 @@ describe('G1 — 形狀與正規化（normalizeIntent／sameIntent／copyIntent�
     expect(normalizeIntent(mkIntent('  ', 'meal', [])).destinationStation).toBe('')
     expect(normalizeIntent(mkIntent('', 'meal', ['meal'])).destinationStation).toBe('')
   })
-  it('便利預設：目的地非空、站未選、恰好一個活動 → 站預設為該活動', () => {
-    expect(normalizeIntent(mkIntent('一蘭', '', ['meal'])).destinationStation).toBe('meal')
+  it('normalizeIntent 不產生便利預設：惰性意圖（目的地＋站空＋單一活動）原樣保留', () => {
+    // 結構性修復（略過後靜默重附）：預設已移出 normalizeIntent——存入的惰性意圖是合法狀態，
+    // 任何重新推導（buildDaily／loadDaily／略過）都不該把它改掉。預設只在輸入時由
+    // applyConvenienceDefault 觸發（見下兩案）。
+    const out = normalizeIntent(mkIntent('一蘭', '', ['meal']))
+    expect(out.destinationStation).toBe('')
+    expect(out).toEqual(mkIntent('一蘭', '', ['meal']))
+  })
+  it('便利預設（applyConvenienceDefault）：目的地非空、站未選、恰好一個活動 → 站預設為該活動', () => {
+    expect(applyConvenienceDefault(mkIntent('一蘭', '', ['meal'])).destinationStation).toBe('meal')
   })
   it('便利預設不觸發：多活動／零活動／站已有值／目的地為空', () => {
-    expect(normalizeIntent(mkIntent('一蘭', '', ['meal', 'coffee'])).destinationStation).toBe('')
-    expect(normalizeIntent(mkIntent('一蘭', '', [])).destinationStation).toBe('')
-    expect(normalizeIntent(mkIntent('一蘭', 'coffee', ['meal'])).destinationStation).toBe('coffee')
-    expect(normalizeIntent(mkIntent('', '', ['meal'])).destinationStation).toBe('')
+    expect(applyConvenienceDefault(mkIntent('一蘭', '', ['meal', 'coffee'])).destinationStation).toBe('')
+    expect(applyConvenienceDefault(mkIntent('一蘭', '', [])).destinationStation).toBe('')
+    expect(applyConvenienceDefault(mkIntent('一蘭', 'coffee', ['meal'])).destinationStation).toBe('coffee')
+    expect(applyConvenienceDefault(mkIntent('', '', ['meal'])).destinationStation).toBe('')
   })
   it('sameIntent：三個欄位都相等才相等；活動只比集合、不看順序', () => {
     const base = mkIntent('一蘭', 'meal', ['meal'])
@@ -83,7 +91,7 @@ describe('G1 — intentSummaryText：確認摘要逐字回饋', () => {
   it('目的地已附站＋其他活動：「還想」列出排除目的地站的其餘活動', () => {
     expect(intentSummaryText(mkIntent('一蘭', 'meal', ['meal', 'coffee']))).toBe('目的地：一蘭 → 午餐站；還想：喝咖啡')
   })
-  it('目的地未附站（惰性）：警告＋活動（多活動／零活動才到得了惰性狀態）', () => {
+  it('目的地未附站（惰性）：警告＋活動（單一活動的惰性狀態也合法：略過後剩一個活動）', () => {
     expect(intentSummaryText(mkIntent('一蘭', '', ['meal', 'coffee']))).toBe('目的地：一蘭（請選是哪一站，否則不會進路線）；想做：吃飯、喝咖啡')
     expect(intentSummaryText(mkIntent('一蘭', '', []))).toBe('目的地：一蘭（請選是哪一站，否則不會進路線）')
   })
@@ -114,6 +122,16 @@ describe('G2 — buildDaily：目的地附著', () => {
     const tasks = buildDaily(state(mkIntent('一蘭', '', ['meal', 'coffee'])))
     expect(tasks.every(t => !t.specified)).toBe(true)
     expect(tasks.every(t => t.place === undefined)).toBe(true)
+  })
+  it('略過後惰性意圖（目的地＋站空＋恰好一個活動）：buildDaily 不重新附著——該活動站 specified falsy、place undefined', () => {
+    // 協調員探針證實的缺陷：略過 meal 後剩唯一活動 coffee，buildDaily 經 normalizeIntent
+    // 重新觸發便利預設，把 coffee 站指定為一蘭。惰性意圖是合法狀態（設計 §2.3），
+    // 重新推導不得把它改掉。
+    const tasks = buildDaily({ ...state(mkIntent('一蘭', '', ['coffee'])), avoid: ['meal'] })
+    const coffee = tasks.find(t => t.id === 'coffee')!
+    expect(coffee.specified).toBeFalsy()
+    expect(coffee.place).toBeUndefined()
+    expect(tasks.every(t => !t.specified)).toBe(true)
   })
   it('多活動＋目的地：只有目的地站被指定，其他被選活動站是自動站', () => {
     const tasks = buildDaily(state(mkIntent('一蘭', 'meal', ['meal', 'coffee', 'shopping'])))
@@ -300,6 +318,15 @@ describe('G5 — loadDaily：舊存檔移轉', () => {
     expect(out.intent).toEqual(mkIntent('一蘭', 'meal', ['meal']))
     expect(out.appliedIntent).toEqual(mkIntent('一蘭', 'meal', ['meal']))
   })
+  it('惰性意圖重開頁面不重新附著：目的地＋站空＋恰好一個活動的同日存檔，載入後站仍為空字串', () => {
+    // 協調員探針證實的缺陷：loadDaily → validateStructuredIntent 經 normalizeIntent
+    // 重新觸發便利預設，存入的惰性狀態重開頁面就活不下來（剩恰好一個活動時）。
+    const lazy = mkIntent('一蘭', '', ['coffee'])
+    seed({ intent: lazy, appliedIntent: lazy, tasks: [] })
+    const out = loadDaily()
+    expect(out.intent).toEqual(lazy)
+    expect(out.intent.destinationStation).toBe('')
+  })
   it('舊存檔沒有 appliedIntent：沿用當日 intent（移轉——任務本來就是那份意圖長出來的）', () => {
     seed({ intent: mkIntent('一蘭', 'meal', ['meal']), tasks: [] })
     expect(loadDaily().appliedIntent).toEqual(mkIntent('一蘭', 'meal', ['meal']))
@@ -352,9 +379,9 @@ describe('G5 — loadDaily：舊存檔移轉', () => {
     seed({ intent: ['meal'], tasks: [] })
     expect(loadDaily().intent).toEqual(emptyIntent())
   })
-  it('髒意圖驗證：activities 含 rest／非法字串 → 過濾；destinationStation 為 rest／非法值 → 空字串（再由便利預設補上）', () => {
+  it('髒意圖驗證：activities 含 rest／非法字串 → 過濾；destinationStation 為 rest／非法值 → 空字串（載入不套便利預設，站維持空字串）', () => {
     seed({ intent: { destination: '一蘭', destinationStation: 'rest', activities: ['rest', 'meal', 'nope'] }, tasks: [] })
-    expect(loadDaily().intent).toEqual(mkIntent('一蘭', 'meal', ['meal']))
+    expect(loadDaily().intent).toEqual(mkIntent('一蘭', '', ['meal']))
     seed({ intent: { destination: '一蘭', destinationStation: 'nope', activities: [] }, tasks: [] })
     expect(loadDaily().intent).toEqual(mkIntent('一蘭', '', []))
   })

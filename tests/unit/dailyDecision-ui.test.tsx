@@ -395,6 +395,18 @@ describe('G6 — 意圖輸入（2.0 重做：結構化輸入——目的地＋�
     expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('')
     expect(destInput().value).toBe('一蘭')
   })
+  it('便利預設可見（目的地輸入路徑）：先勾唯一活動再填目的地，選單值自動變為該活動的站', async () => {
+    seed(cand('s1', '某咖啡店'))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-intent-activity-coffee'))
+    expect(stationSelect().value).toBe('')
+    fireEvent.change(destInput(), { target: { value: '一蘭' } })
+    // 目的地輸入處理器套用便利預設（applyConvenienceDefault）：唯一活動 coffee → 站預設為 coffee
+    expect(stationSelect().value).toBe('coffee')
+    expect(summary()).toBe('目的地：一蘭 → 咖啡站')
+  })
   it('勾選活動 → 摘要顯示「想做：…」（catalog 順序）；便利預設可見：填目的地後勾唯一活動，選單值自動變為該活動的站', async () => {
     seed(cand('s1', '某咖啡店'))
     render(<DailyDecision onBack={() => {}} />)
@@ -428,6 +440,10 @@ describe('G6 — 意圖輸入（2.0 重做：結構化輸入——目的地＋�
     const saved = JSON.parse(localStorage.getItem(KEY)!) as { intent: DailyIntent; avoid: string[] }
     expect(saved.intent).toEqual({ destination: '一蘭', destinationStation: '', activities: ['coffee'] })
     expect(saved.avoid).toContain('meal')
+    // 受影響站 coffee：不是指定站、place 不是一蘭。舊缺陷：略過後 buildDaily 在同一次
+    // 點擊裡把目的地靜默附到剩下的唯一活動站（coffee 指定為一蘭），摘要卻同時顯示惰性警告。
+    expect(screen.getByText('安靜咖啡廳｜閱讀、寫下 3 個新觀察')).toBeTruthy()
+    expect(screen.getByLabelText<HTMLInputElement>('安靜咖啡廳｜閱讀、寫下 3 個新觀察 指定地點').value).toBe('')
   })
   it('G3「今天略過」擴充：略過非目的地活動站 → 目的地站不受影響', async () => {
     skipSeed({ destination: '一蘭', destinationStation: 'meal', activities: ['meal', 'coffee'] })

@@ -16,31 +16,40 @@ const isIntentStationId = (v: unknown): v is IntentStationId => typeof v === 'st
 /** 一日級結構化意圖（2.0 重做）：「今天想去哪裡／想做什麼」的兩個部分裝在同一個物件裡。
  * destination 是「想去哪裡」（自由輸入的地名／店名原文）；activities 是「想做什麼」（明確勾選）；
  * destinationStation 說明目的地落在哪一站（使用者明確選擇）。三個欄位都由使用者
- * 明確給出或由 normalizeIntent 的確定性規則產生，系統絕不從文字推導任何一個欄位。 */
+ * 明確給出或由輸入時的便利預設（applyConvenienceDefault）產生，系統絕不從文字推導任何一個欄位。 */
 export interface DailyIntent {
   destination: string
   destinationStation: IntentStationId | ''
   activities: IntentStationId[]
 }
 export const EMPTY_INTENT: DailyIntent = { destination: '', destinationStation: '', activities: [] }
-/** 結構化意圖正規化（唯一規則，所有寫入點共用）：
+/** 結構化意圖正規化（唯一規則，所有寫入點共用）——純驗證函式，不產生預設：
  * - destination：trim，截到 120 字（與舊意圖框上限、addFixedTask 的 place 上限一致）。
  * - activities：只留 5 個合法站 id，去重，按 catalog 順序（gym／meal／creative／coffee／shopping）存放。
  * - 不變量：destination 為空時 destinationStation 必為 ''（空目的地沒有附著對象）。
- * - 便利預設：destination 非空、destinationStation 為 ''、且恰好選了一個活動時，
- *   destinationStation 預設為該活動的站。預設來自使用者明確勾選的活動，不是文字推導，
- *   且永遠顯示在選單與確認摘要裡，使用者隨時可改。
+ * 便利預設不在這裡：存入的惰性意圖 { destination, station: '', activities: [單一] } 是合法狀態
+ * （設計 §2.3），buildDaily／loadDaily／略過等重新推導都不該把它改掉；預設只在使用者主動
+ * 輸入時由 applyConvenienceDefault 觸發（目的地 input、活動 checkbox 兩處）。
  * 純函式，不改傳入物件，回傳新物件（activities 換新陣列）。 */
 export function normalizeIntent(intent: DailyIntent): DailyIntent {
   const destination = typeof intent.destination === 'string' ? intent.destination.trim().slice(0, 120) : ''
   const activities = [...new Set((Array.isArray(intent.activities) ? intent.activities : []).filter(isIntentStationId))]
     .sort((a, b) => INTENT_CATALOG_ORDER.indexOf(a) - INTENT_CATALOG_ORDER.indexOf(b))
-  let destinationStation: IntentStationId | '' = destination === '' ? '' : (isIntentStationId(intent.destinationStation) ? intent.destinationStation : '')
-  if (destinationStation === '' && destination !== '' && activities.length === 1) {
-    const only = activities[0]
-    if (only) destinationStation = only
-  }
+  const destinationStation: IntentStationId | '' = destination === '' ? '' : (isIntentStationId(intent.destinationStation) ? intent.destinationStation : '')
   return { destination, destinationStation, activities }
+}
+/** 便利預設（設計 §2.5）：destination 非空、destinationStation 為 ''、且恰好選了一個活動時，
+ * destinationStation 預設為該活動的站。預設來自使用者明確勾選的活動，不是文字推導，
+ * 且永遠顯示在選單與確認摘要裡，使用者隨時可改。
+ * 只在使用者主動輸入時呼叫（目的地 input、活動 checkbox 兩處 UI 處理器），絕不在
+ * normalizeIntent／buildDaily／loadDaily／略過處理器裡觸發——預設是「輸入當下的便利」，
+ * 不是資料不變量（見 normalizeIntent 註解）。純函式，不改傳入物件。 */
+export function applyConvenienceDefault(intent: DailyIntent): DailyIntent {
+  if (intent.destination.trim() !== '' && intent.destinationStation === '' && intent.activities.length === 1) {
+    const only = intent.activities[0]
+    if (only) return { ...intent, activities: [...intent.activities], destinationStation: only }
+  }
+  return intent
 }
 /** 結構化意圖相等：逐欄位比對。destination 與 destinationStation 用 ===；
  * activities 以集合比（長度相同且每個元素都在對方裡），不看順序——順序是顯示用的
@@ -574,7 +583,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
           <fieldset className="dd-intent">
             <legend>今天想去哪裡／想做什麼</legend>
             <label htmlFor="daily-intent-destination">想去哪裡</label>
-            <input id="daily-intent-destination" data-testid="daily-intent-destination" aria-label="想去哪裡" value={state.intent.destination} maxLength={120} placeholder="例如：一蘭、Fuglen Tokyo、下北澤（可留空）" onChange={e=>change(s=>replanDaily({...s,intent:normalizeIntent({...s.intent,destination:e.target.value.slice(0,120)})}))} />
+            <input id="daily-intent-destination" data-testid="daily-intent-destination" aria-label="想去哪裡" value={state.intent.destination} maxLength={120} placeholder="例如：一蘭、Fuglen Tokyo、下北澤（可留空）" onChange={e=>change(s=>replanDaily({...s,intent:applyConvenienceDefault(normalizeIntent({...s.intent,destination:e.target.value.slice(0,120)}))}))} />
             <label htmlFor="daily-intent-destination-station">目的地是哪一站</label>
             <div className="dd-area">
               <select id="daily-intent-destination-station" data-testid="daily-intent-destination-station" aria-label="目的地是哪一站" value={state.intent.destinationStation} onChange={e=>change(s=>replanDaily({...s,intent:normalizeIntent({...s.intent,destinationStation:e.target.value as IntentStationId | ''})}))}>
@@ -589,7 +598,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                   <input type="checkbox" data-testid={`daily-intent-activity-${id}`} checked={state.intent.activities.includes(id)} onChange={e=>change(s=>{
                     const activities = e.target.checked ? [...s.intent.activities, id] : s.intent.activities.filter(x=>x!==id)
                     const avoid = e.target.checked ? s.avoid.filter(x=>x!==id) : s.avoid
-                    return replanDaily({...s,avoid,intent:normalizeIntent({...s.intent,activities})})
+                    return replanDaily({...s,avoid,intent:applyConvenienceDefault(normalizeIntent({...s.intent,activities}))})
                   })} />
                   {ACTIVITY_LABEL[id]}
                 </label>
@@ -659,10 +668,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 <div className="dd-actions dd-actions-secondary">
                   <label className="dd-done"><input type="checkbox" checked={t.done} onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done:e.target.checked}:x)}))}/><span>{t.done?'已完成':'標記完成'}</span></label>
                   {/* 「今天略過」同時移除該站的活動勾選、並在它是目的地站時把站清為 ''（目的地文字保留）。
-                    這裡不經 normalizeIntent：寫入的意圖已是正規形（已正規意圖的子集），而重跑
-                    normalizeIntent 會觸發便利預設、把目的地重新附到剩下的唯一活動上，違背
-                    「把站清為 ''」的本意。見 REPORT「設計缺口註記」。 */}
-                  {t.custom?<button onClick={()=>change(s=>({...s,tasks:s.tasks.filter(x=>x.id!==t.id)}))}>移除安排</button>:!t.done&&!t.locked?<button className="dd-muted" onClick={()=>change(s=>replanDaily({...s,avoid:[...new Set([...s.avoid,t.id])],intent:{...s.intent,activities:s.intent.activities.filter(x=>x!==t.id),destinationStation:s.intent.destinationStation===t.id?'':s.intent.destinationStation}}))}>今天略過</button>:null}
+                    經 normalizeIntent 重跑（設計 §1.4 單一寫入規則）：便利預設已不在 normalizeIntent 裡，
+                    略過後剩單一活動也不會重新附著。 */}
+                  {t.custom?<button onClick={()=>change(s=>({...s,tasks:s.tasks.filter(x=>x.id!==t.id)}))}>移除安排</button>:!t.done&&!t.locked?<button className="dd-muted" onClick={()=>change(s=>replanDaily({...s,avoid:[...new Set([...s.avoid,t.id])],intent:normalizeIntent({...s.intent,activities:s.intent.activities.filter(x=>x!==t.id),destinationStation:s.intent.destinationStation===t.id?'':s.intent.destinationStation})}))}>今天略過</button>:null}
                 </div>
                 {!t.done&&<details className="dd-change-place"><summary>⌖ 指定／修改這一站的地點</summary>
                   <label>輸入店家名稱或地址
