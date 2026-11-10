@@ -269,6 +269,8 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [fixedMinutes,setFixedMinutes] = useState('60')
   const change = (fn:(s:DailyState)=>DailyState) => setState(s=>{ const next=fn(s); saveDaily(next); return next })
   const clearRoute = () => {setRouteKm(null);setTravelMin(null);setConflicts([])}
+  /** /api/daily-route 的回應形狀（前端只讀這些欄位；未知欄位不讀）。 */
+  type DailyRouteResponse={message?:string;stops?:DailyTask[];routeVerified?:boolean;distanceKm?:number;travelMinutes?:number;conflicts?:string[]}
   const searchRoute = async (shuffle?:string, s:DailyState=state) => {
     if(busy)return
     setBusy(shuffle??'all')
@@ -300,11 +302,11 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       // 改送 seen（round 11：各站換掉過的店全部合併，剛被換掉的店在完整重新生成時也不回來；
       // seen 同樣只擋自動站的新搜尋、不進 retention，見 seenFor）。
       const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
-      const data=await response.json()
+      const data=(await response.json()) as DailyRouteResponse
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
-      change(old=>({...old,tasks:data.stops,seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
-      setRouteKm(data.routeVerified?data.distanceKm:null)
-      setTravelMin(data.routeVerified?data.travelMinutes:null)
+      change(old=>({...old,tasks:data.stops??old.tasks,seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
+      setRouteKm(data.routeVerified?data.distanceKm??null:null)
+      setTravelMin(data.routeVerified?data.travelMinutes??null:null)
       setConflicts(data.conflicts??[])
       // 有站顯示「無候選」時狀態列要說清楚是哪一站——不要只說「店家已確認」。
       // 原因寫在每一站的卡片上（noCandidateText），狀態列只點名。
@@ -471,7 +473,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 <div className="dd-actions">
                   {t.candidate && <a className="dd-navigate" href={mapsNavigationUrl(t.candidate)} target="_blank" rel="noopener noreferrer" aria-label={'使用 Google Maps 導航至 '+t.candidate.name}>↗ Google Maps 導航</a>}
                   {!t.done&&!t.locked&&!t.specified&&t.kind!=='rest'&&<button disabled={busy!==null} onClick={()=>{void searchRoute(t.id)}}>{busy===t.id?'找替代地點中…':'↻ 換這一站'}</button>}
-                  {t.candidate&&!t.done&&!t.locked&&<button className="dd-muted" disabled={busy!==null} title={kindOfCandidate(t.candidate)?undefined:'只排除這一間店（無法判斷種類）'} onClick={()=>dislikeStop(t)}>不喜歡這間店</button>}
+                  {t.candidate&&!t.done&&!t.locked&&<button className="dd-muted" disabled={busy!==null} title={kindOfCandidate(t.candidate)?undefined:'只排除這一間店（無法判斷種類）'} onClick={()=>{void dislikeStop(t)}}>不喜歡這間店</button>}
                   {t.candidate&&!t.done&&!t.locked&&kindOfCandidate(t.candidate)&&<button className="dd-muted" disabled={busy!==null} onClick={()=>dislikeKind(t)}>不要「{kindLabel(kindOfCandidate(t.candidate)!)}」這類</button>}
                 </div>
                 <div className="dd-actions dd-actions-secondary">

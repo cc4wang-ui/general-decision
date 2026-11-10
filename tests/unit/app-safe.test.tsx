@@ -22,11 +22,11 @@ describe('safe()：逾時與吞錯', () => {
   })
 
   it('正常完成：回原值，不等逾時', async () => {
-    await expect(safe(async () => 'ok', 'fallback')).resolves.toBe('ok')
+    await expect(safe(() => Promise.resolve('ok'), 'fallback')).resolves.toBe('ok')
   })
 
   it('丟錯（同步或非同步）：回 fallback', async () => {
-    await expect(safe(async () => { throw new Error('x') }, 'fb')).resolves.toBe('fb')
+    await expect(safe(() => Promise.reject(new Error('x')), 'fb')).resolves.toBe('fb')
     await expect(safe(() => { throw new Error('y') }, 'fb')).resolves.toBe('fb')
   })
 })

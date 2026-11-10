@@ -1,13 +1,14 @@
 // UI 誠實度（紅隊 §3.1）：認不出種類的店，不顯示「不要這類」按鈕；認得出的才顯示。
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { bodyText, urlText } from './mockFetch.ts'
 /** placeMem 封鎖清單 mock：截斷通知測試需要 150 個封鎖 id；其他測試不按「不喜歡」，不受影響。 */
 vi.mock('../../src/placeMem.ts', () => ({
-  blockedPlaceIds: async () => Array.from({ length: 150 }, (_, i) => 'p' + i),
+  blockedPlaceIds: () => Promise.resolve(Array.from({ length: 150 }, (_, i) => 'p' + i)),
   markNeverAgain: async () => {},
   markDailyDislike: vi.fn(async () => {}),
   migrateDailyDislike: vi.fn(async () => {}),
-  clearDislike: vi.fn(async () => ({ sharedRemains: false })),
+  clearDislike: vi.fn(() => Promise.resolve({ sharedRemains: false })),
 }))
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { DailyDecision } from '../../src/dailyDecision.tsx'
@@ -68,27 +69,27 @@ describe('「不要這類」按鈕只在認得出種類時出現', () => {
 
 describe('地區偏好控制項（紅隊 round 5 F7，round 6）', () => {
   const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
-  const okResponse = (stops: unknown[] = []) => ({ ok: true, json: async () => ({ stops, routeVerified: false, conflicts: [] }) })
+  const okResponse = (stops: unknown[] = []) => ({ ok: true, json: () => ({ stops, routeVerified: false, conflicts: [] }) })
   const lastBody = (mock: ReturnType<typeof vi.fn>) => {
-    const call = mock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route'))
-    return JSON.parse(String(call![1].body)) as Record<string, unknown>
+    const call = mock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route')) as [unknown, RequestInit | undefined] | undefined
+    return JSON.parse(bodyText(call?.[1]?.body, '{}')) as Record<string, unknown>
   }
   it('地區控制項存在：預設澀谷、「只在這一帶找店」開啟（舊資料無 areaOnly 時移轉為開啟）', async () => {
     seed(cand('s1', '某咖啡店'))
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
-    expect((screen.getByLabelText('地區偏好') as HTMLSelectElement).value).toBe('澀谷')
-    expect((screen.getByLabelText('只在這一帶找店') as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByLabelText<HTMLSelectElement>('地區偏好').value).toBe('澀谷')
+    expect(screen.getByLabelText<HTMLInputElement>('只在這一帶找店').checked).toBe(true)
   })
   it('切換地區到新宿再生成：請求體帶 area 新宿、areaOnly true', async () => {
     seed(cand('s1', '某咖啡店'))
-    const fetchMock = vi.fn(async (url: string | URL | Request) => String(url).includes('/api/daily-route') ? okResponse() : { ok: false })
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route') ? okResponse() : { ok: false }))
     vi.stubGlobal('fetch', fetchMock)
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.change(screen.getByLabelText('地區偏好'), { target: { value: '新宿' } })
-    expect((screen.getByLabelText('地區偏好') as HTMLSelectElement).value).toBe('新宿')
+    expect(screen.getByLabelText<HTMLSelectElement>('地區偏好').value).toBe('新宿')
     fireEvent.click(screen.getByTestId('daily-generate'))
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
     expect(lastBody(fetchMock).area).toBe('新宿')
@@ -96,13 +97,13 @@ describe('地區偏好控制項（紅隊 round 5 F7，round 6）', () => {
   })
   it('關掉「只在這一帶找店」再生成：請求體 areaOnly false', async () => {
     seed(cand('s1', '某咖啡店'))
-    const fetchMock = vi.fn(async (url: string | URL | Request) => String(url).includes('/api/daily-route') ? okResponse() : { ok: false })
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route') ? okResponse() : { ok: false }))
     vi.stubGlobal('fetch', fetchMock)
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.click(screen.getByLabelText('只在這一帶找店'))
-    expect((screen.getByLabelText('只在這一帶找店') as HTMLInputElement).checked).toBe(false)
+    expect(screen.getByLabelText<HTMLInputElement>('只在這一帶找店').checked).toBe(false)
     fireEvent.click(screen.getByTestId('daily-generate'))
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
     expect(lastBody(fetchMock).areaOnly).toBe(false)
@@ -115,7 +116,7 @@ describe('單站換站文案（紅隊 round 5 F8，round 6）', () => {
     seed(cand('s1', '某咖啡店'))
     let resolveFetch!: (v: unknown) => void
     const pending = new Promise((r) => { resolveFetch = r })
-    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request) => String(url).includes('/api/daily-route') ? pending : Promise.resolve({ ok: false })))
+    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request) => urlText(url).includes('/api/daily-route') ? pending : Promise.resolve({ ok: false })))
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     const { fireEvent } = await import('@testing-library/react')
@@ -123,7 +124,7 @@ describe('單站換站文案（紅隊 round 5 F8，round 6）', () => {
     await waitFor(() => expect(screen.getByText('正在找這一站的替代地點…')).toBeTruthy())
     expect(screen.getByTestId('daily-generate').textContent).toBe('正在換這一站…')
     expect(screen.getByTestId('daily-generate').textContent).not.toBe('搜尋中…')
-    resolveFetch({ ok: true, json: async () => ({ stops: [], routeVerified: false, conflicts: [] }) })
+    resolveFetch({ ok: true, json: () => ({ stops: [], routeVerified: false, conflicts: [] }) })
     await waitFor(() => expect(screen.queryByText('正在找這一站的替代地點…')).toBeNull())
   })
 })
@@ -165,7 +166,7 @@ describe('無候選站顯示（紅隊 round 6 L1／L2，round 7）', () => {
     const link = screen.getByText('前往地區偏好設定')
     expect(link.getAttribute('href')).toBe('#daily-area')
     // 地區偏好 select 真的有這個 id，連結點下去才到得了
-    expect((screen.getByLabelText('地區偏好') as HTMLSelectElement).id).toBe('daily-area')
+    expect(screen.getByLabelText<HTMLSelectElement>('地區偏好').id).toBe('daily-area')
   })
   it('round 8 F7：原因 filtered 的卡片有「清除『不喜歡』的紀錄」按鈕，按了真的清掉 localStorage 的 disliked／dislikedKinds 並顯示確認', async () => {
     localStorage.setItem(KEY, JSON.stringify({
@@ -215,9 +216,9 @@ describe('排除清單截斷通知（round 7）', () => {
       tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, candidate: cand('s1', '某咖啡店') }],
       notes: [], avoid: [], seen: {}, disliked, dislikedKinds: [],
     }))
-    const fetchMock = vi.fn(async (url: string | URL | Request) => String(url).includes('/api/daily-route')
-      ? { ok: true, json: async () => ({ stops: [], routeVerified: false, conflicts: [] }) }
-      : { ok: false })
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: [], routeVerified: false, conflicts: [] }) }
+      : { ok: false }))
     vi.stubGlobal('fetch', fetchMock)
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
@@ -266,16 +267,16 @@ describe('round 10：F1a-load（載入清掉的車站候選要說原因）＋ cl
 describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新生成送 seen ＋ 清除時 sharedRemains 誠實提示', () => {
   const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
   const routeFetch = () => {
-    const fetchMock = vi.fn(async (url: string | URL | Request) => String(url).includes('/api/daily-route')
-      ? { ok: true, json: async () => ({ stops: [], routeVerified: false, conflicts: [] }) }
-      : { ok: false })
+    const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
+      ? { ok: true, json: () => ({ stops: [], routeVerified: false, conflicts: [] }) }
+      : { ok: false }))
     vi.stubGlobal('fetch', fetchMock)
     return fetchMock
   }
   /** 最後一次 /api/daily-route 請求的 body（round 6 地區偏好區塊的既有 helper，型別正確）。 */
   const lastBody = (mock: ReturnType<typeof vi.fn>) => {
-    const call = mock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route'))
-    return JSON.parse(String(call![1].body)) as Record<string, unknown>
+    const call = mock.mock.calls.find((c) => String(c[0]).includes('/api/daily-route')) as [unknown, RequestInit | undefined] | undefined
+    return JSON.parse(bodyText(call?.[1]?.body, '{}')) as Record<string, unknown>
   }
   it('F2b：markDailyDislike 寫入失敗 → 顯示失敗、不進 localStorage 的 disliked、店還在（再按一次可以重試）', async () => {
     const { markDailyDislike } = await import('../../src/placeMem.ts')

@@ -1,6 +1,9 @@
 // Order JSON 解析 — 第 11 節：4 層解析；第 5 節 Order 形狀驗證。
 import type { Order, WeeklyReport } from './types.ts'
 
+/** JSON.parse 回 any；先收進 unknown，形狀由 isOrder／欄位檢查驗證。 */
+const parseJson = (text: string): unknown => JSON.parse(text) as unknown
+
 export class ParseError extends Error {
   constructor(message: string) {
     super(message)
@@ -12,11 +15,11 @@ export class ParseError extends Error {
 export function parseOrder(raw: string): Order {
   const attempts: (() => unknown)[] = [
     // 1. 直接 parse
-    () => JSON.parse(raw),
+    () => parseJson(raw),
     // 2. 去掉 ```json fence
-    () => JSON.parse(stripFence(raw)),
+    () => parseJson(stripFence(raw)),
     // 3. regex 取第一個完整 {…}
-    () => JSON.parse(firstObject(raw)),
+    () => parseJson(firstObject(raw)),
   ]
   for (const attempt of attempts) {
     try {
@@ -95,9 +98,9 @@ function normalize(o: Order): Order {
 /** 與 parseOrder 同樣四層，形狀換成 WeeklyReport。 */
 export function parseWeekly(raw: string): Pick<WeeklyReport, 'body' | 'verdict'> {
   const attempts = [
-    () => JSON.parse(raw),
-    () => JSON.parse(stripFence(raw)),
-    () => JSON.parse(firstObject(raw)),
+    () => parseJson(raw),
+    () => parseJson(stripFence(raw)),
+    () => parseJson(firstObject(raw)),
   ]
   for (const attempt of attempts) {
     try {

@@ -12,7 +12,7 @@ describe('daily route fixed appointments',()=>{
  it('keeps fixed appointment and assigns walking ETAs',()=>{
   const out=scheduleRoute(stops,matrix,distances,'13:00')
   expect(out.stops.map(x=>x.id)).toEqual(['coffee','fixed','gym'])
-  expect(out.stops[1].eta).toBe('15:00')
+  expect(out.stops[1]?.eta).toBe('15:00')
   expect(out.travelMinutes).toBe(30)
   expect(out.conflicts).toEqual([])
  })

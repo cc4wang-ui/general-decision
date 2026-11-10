@@ -36,6 +36,7 @@ export async function routesErrorDetail(response:Response):Promise<string>{
  const t=scrub(text).slice(0,160)
  return t?' '+t:''
 }
+type RouteElement={originIndex:number;destinationIndex:number;duration?:string;distanceMeters?:number;condition?:string;status?:{code?:number}}
 export async function travelMatrix(key:string,origin:Point,stops:ScheduledStop[]):Promise<{matrix:number[][];distances:number[][]}>{
  const points=[origin,...stops.map(s=>s.candidate).filter((p):p is Point=>!!p)]
  const waypoints=points.map(p=>({waypoint:{location:{latLng:{latitude:p.lat,longitude:p.lng}}}}))
@@ -44,13 +45,17 @@ export async function travelMatrix(key:string,origin:Point,stops:ScheduledStop[]
   body:JSON.stringify({origins:waypoints,destinations:waypoints,travelMode:'WALK',routingPreference:'ROUTING_PREFERENCE_UNSPECIFIED'}),signal:AbortSignal.timeout(14000)})
  if(!response.ok)throw new Error('Google Routes 步行路線服務未啟用或暫時不可用（'+response.status+'）'+(await routesErrorDetail(response)))
  const body=await response.text()
- let elements:Array<{originIndex:number;destinationIndex:number;duration?:string;distanceMeters?:number;condition?:string;status?:{code?:number}}>=[] 
- try{const data=JSON.parse(body);elements=Array.isArray(data)?data:[data]}catch{elements=body.split('\n').filter(Boolean).map(line=>JSON.parse(line))}
+ let elements:RouteElement[]=[]
+ try{const data=JSON.parse(body) as RouteElement|RouteElement[];elements=Array.isArray(data)?data:[data]}catch{elements=body.split('\n').filter(Boolean).map(line=>JSON.parse(line) as RouteElement)}
  const matrix=points.map((_,i)=>points.map((__,j)=>i===j?0:Infinity))
  const distances=points.map((_,i)=>points.map((__,j)=>i===j?0:Infinity))
  for(const e of elements){if(e.status?.code||e.condition==='ROUTE_NOT_FOUND')continue
   const seconds=Number(e.duration?.replace('s',''))
-  if(Number.isFinite(seconds)&&e.originIndex<points.length&&e.destinationIndex<points.length){matrix[e.originIndex][e.destinationIndex]=Math.ceil(seconds/60);distances[e.originIndex][e.destinationIndex]=(e.distanceMeters??0)/1000}
+  if(Number.isFinite(seconds)&&e.originIndex<points.length&&e.destinationIndex<points.length){
+   const mRow=matrix[e.originIndex],dRow=distances[e.originIndex]
+   // 兩行都存在：matrix/distances 都是 points.length 列，originIndex 已驗證 < points.length。
+   if(mRow&&dRow){mRow[e.destinationIndex]=Math.ceil(seconds/60);dRow[e.destinationIndex]=(e.distanceMeters??0)/1000}
+  }
  }
  if(matrix.some(row=>row.some(v=>!Number.isFinite(v))))throw new Error('部分站點沒有可用步行路線；不會以直線距離冒充實際路線')
  return {matrix,distances}
@@ -63,13 +68,18 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
  let position=originIndex,at=minute(now)??9*60,travelMinutes=0,distanceKm=0
  const conflicts:string[]=[]
  const visit=(s:T)=>{
-  const next=idx.get(s.id)!,duration=matrix[position][next],distance=distances[position][next]
-  if(!Number.isFinite(duration))throw new Error('部分站點無法步行抵達')
+  const next=idx.get(s.id)
+  const mRow=matrix[position],dRow=distances[position]
+  // next 缺失或矩陣列缺失＝呼叫端給的 stops/matrix 對不上：無法算步行時間，fail closed（與下方
+  // Number.isFinite 檢查同一原則：部分站點無法步行抵達，不以直線距離冒充）。
+  if(next===undefined||!mRow||!dRow)throw new Error('部分站點無法步行抵達')
+  const duration=mRow[next],distance=dRow[next]
+  if(duration===undefined||distance===undefined||!Number.isFinite(duration))throw new Error('部分站點無法步行抵達')
   const arrival=at+duration,deadline=s.start?minute(s.start):null
   const eta=deadline!==null&&arrival<deadline?deadline:arrival
   const conflict=deadline!==null&&arrival>deadline?'預計晚到 '+(arrival-deadline)+' 分鐘':undefined
   if(conflict)conflicts.push((s.title??s.id)+'：'+conflict)
-  ordered.push({...s,eta:clock(eta),departure:clock(eta+(s.minutes??45)),travelMin:duration,conflict} as T)
+  ordered.push({...s,eta:clock(eta),departure:clock(eta+(s.minutes??45)),travelMin:duration,conflict})
   travelMinutes+=duration;distanceKm+=distance;at=eta+(s.minutes??45);position=next
  }
  for(const fixed of [...appointments,{id:'__end__'} as T]){
@@ -77,16 +87,26 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
   const deadline=target?.start?minute(target.start):null
   while(flexible.length){
    const possible=flexible.map((s,i)=>{
-    const p=idx.get(s.id)!,leg=matrix[position][p],toFixed=target?matrix[p][idx.get(target.id)!]:0
-    const feasible=deadline===null||at+leg+(s.minutes??45)+toFixed<=deadline
+    const p=idx.get(s.id)
+    const row=matrix[position]
+    const leg=p===undefined?undefined:row?.[p]
+    const targetIdx=target?idx.get(target.id):undefined
+    const toFixed=target?(p===undefined||targetIdx===undefined?undefined:matrix[p]?.[targetIdx]):0
+    // leg/toFixed 任一未知＝到不了或回不來：不可行，不參與排序（下方 filter 用型別守衛收窄 leg 為 number）。
+    const feasible=deadline===null||(leg!==undefined&&toFixed!==undefined&&at+leg+(s.minutes??45)+toFixed<=deadline)
     return {i,leg,feasible}
-   }).filter(x=>x.feasible&&Number.isFinite(x.leg)).sort((a,b)=>a.leg-b.leg)
+   }).filter((x):x is {i:number;leg:number;feasible:boolean}=>x.feasible&&x.leg!==undefined&&Number.isFinite(x.leg)).sort((a,b)=>a.leg-b.leg)
    if(!possible.length)break
-   visit(flexible.splice(possible[0].i,1)[0])
+   const first=possible[0]
+   if(!first)break
+   const removed=flexible.splice(first.i,1)[0]
+   if(!removed)break
+   visit(removed)
   }
   if(target)visit(target)
  }
  // If a fixed appointment cannot be met, surface the conflict, never silently discard stops.
- while(flexible.length){const ranked=flexible.map((s,i)=>({i,leg:matrix[position][idx.get(s.id)!]})).sort((a,b)=>a.leg-b.leg);visit(flexible.splice(ranked[0].i,1)[0])}
+ // leg 未知（矩陣缺列）時以 Infinity 計：排到最後，visit 會因非有限時間而 throw，不靜默丟站。
+ while(flexible.length){const row=matrix[position];const ranked=flexible.map((s,i)=>({i,leg:row?.[idx.get(s.id)??-1]??Infinity})).sort((a,b)=>a.leg-b.leg);const first=ranked[0];if(!first)break;const removed=flexible.splice(first.i,1)[0];if(!removed)break;visit(removed)}
  return {stops:ordered,distanceKm:Math.round(distanceKm*10)/10,travelMinutes,conflicts}
 }

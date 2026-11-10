@@ -79,7 +79,7 @@ describe('summarize／exportTrial', () => {
 
   it('匯出檔：摘要＋全部紀錄，可以 JSON.parse', () => {
     recordTrial({ module: 'eat', level: 1, ok: true, placeId: 'a' }, T0)
-    const out = JSON.parse(exportTrial(readTrial(), T0))
+    const out = JSON.parse(exportTrial(readTrial(), T0)) as Record<string, unknown>
     expect(out).toMatchObject({ app: 'decide', kind: 'trial-log', summary: { orders: 1 } })
     expect(out.entries).toHaveLength(1)
   })
@@ -129,7 +129,7 @@ describe('N4 一鍵匯出', () => {
   it('匯出檔有版本號；給了記憶就附在 memory，沒給就沒有這欄', () => {
     recordTrial({ module: 'eat', level: 1, ok: true, placeId: 'a' }, T0)
     const memory = { app: 'decide' as const, kind: 'place-memory' as const, version: 1, exportedAt: at(T0), places: [], cuisine: {} }
-    const withMem = JSON.parse(exportTrial(readTrial(), T0, memory))
+    const withMem = JSON.parse(exportTrial(readTrial(), T0, memory)) as Record<string, unknown>
     expect(withMem).toMatchObject({ kind: 'trial-log', version: TRIAL_FILE_VERSION, memory })
     expect(withMem.entries).toHaveLength(1)
     expect('memory' in JSON.parse(exportTrial(readTrial(), T0))).toBe(false)

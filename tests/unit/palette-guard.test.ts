@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 // @ts-expect-error design/ 是 .mjs 沒有型別
 import { nesPalette } from '../../design/hwpalette.mjs'
 
-const NES = new Set<string>((nesPalette() as string[]).map((h) => h.toUpperCase()))
+const NES = new Set<string>(((nesPalette as unknown as () => string[])()).map((h) => h.toUpperCase()))
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8')
 const hexes = (s: string) => [...s.matchAll(/#([0-9a-fA-F]{6})\b/g)].map((m) => `#${m[1]!.toUpperCase()}`)
 

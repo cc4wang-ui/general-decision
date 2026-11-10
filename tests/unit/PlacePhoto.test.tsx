@@ -5,7 +5,7 @@ import {PlacePhoto} from '../../src/PlacePhoto.tsx'
 afterEach(()=>{cleanup();vi.unstubAllGlobals()})
 describe('real venue photo',()=>{
  it('renders a Google Places photo with required author attribution',async()=>{
-  vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:()=>({
    photoUrl:'https://lh3.googleusercontent.com/sample',
    attributions:[{name:'Actual photographer',url:'https://maps.google.com/maps/contrib/123'}]
   })}))

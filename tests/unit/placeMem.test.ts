@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const store = new Map<string, unknown>()
 vi.mock('idb-keyval', () => ({
-  get: async (k: string) => structuredClone(store.get(k)),
-  set: async (k: string, v: unknown) => { store.set(k, structuredClone(v)) },
-  del: async (k: string) => { store.delete(k) },
+  get: (k: string) => structuredClone(store.get(k)),
+  set: (k: string, v: unknown) => { store.set(k, structuredClone(v)) },
+  del: (k: string) => { store.delete(k) },
 }))
 
 const {
@@ -19,7 +19,7 @@ const DAY = 24 * 3600 * 1000
 const T0 = new Date('2026-10-21T12:00:00+08:00').getTime()
 const meta = { module: 'eat' as const }
 
-beforeEach(async () => { store.clear() })
+beforeEach(() => { store.clear() })
 
 describe('shown：拿到口令的當下就記', () => {
   it('記時間戳、品牌鍵、細類；新的在前；最多 10 筆', async () => {
@@ -362,7 +362,7 @@ describe('round 10：今日行程「不喜歡」跟核心 app「不要再來」�
     await markNeverAgain('p1', T0)
     await markDailyDislike('p1', T0 + 10 * DAY)
     const [row] = await memSummary('eat', T0 + 11 * DAY)
-    expect(row.x).toBe(T0 + 10 * DAY + NEVER_AGAIN_MS)
+    expect(row?.x).toBe(T0 + 10 * DAY + NEVER_AGAIN_MS)
   })
   it('過渡（round 11，R10-F2a）：沒有 daily 欄位的舊紀錄，clearDislike 不動共用欄位——分來源之後只在核心 app 按過的紀錄也是這個形狀，分不出來就不碰；要清舊紀錄的今日行程封鎖，先走 migrateDailyDislike（見下方 round 11 測試）', async () => {
     await markNeverAgain('p1', T0) // 只有共用欄位，沒有 daily 欄位
@@ -376,7 +376,7 @@ describe('round 10：今日行程「不喜歡」跟核心 app「不要再來」�
     expect(e.dislikes).toBe(1)
     expect((await blockedPlaceIds(T0 + DAY))).toContain('p1')
   })
-  it('mergeEntry 合併 daily 欄位：永久優先，否則取較久者；次數取大的；兩邊都沒有 daily 欄位時不寫', async () => {
+  it('mergeEntry 合併 daily 欄位：永久優先，否則取較久者；次數取大的；兩邊都沒有 daily 欄位時不寫', () => {
     const base = { id: 'p1', module: 'eat' as const, shown: [T0], done: [], dislikes: 0 }
     const a = mergeEntry({ ...base, dailyDislikeUntil: T0 + 10 * DAY, dailyDislikes: 1 }, { ...base, dailyDislikeUntil: T0 + 20 * DAY, dailyDislikes: 2 })
     expect(a.dailyDislikeUntil).toBe(T0 + 20 * DAY)

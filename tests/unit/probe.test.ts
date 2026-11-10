@@ -4,11 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import api from '../../api/probe.ts'
 import { cachingIo, runMatrix, runSceneMatrix, runSim } from '../../src/probe.ts'
 import type { RawPlace } from '../../src/places.ts'
+import { bodyText, urlText } from './mockFetch.ts'
 
 /** 假 Places：每個 lane／查法回 20 家不同 id 的營業中店（id 帶請求內容的雜湊，模擬不同 lane 撈到不同店）。 */
 function fakePlaces(): typeof fetch {
-  return vi.fn(async (_u: string | URL | Request, init?: RequestInit) => {
-    const body = String(init?.body ?? '')
+  return vi.fn((_u: string | URL | Request, init?: RequestInit) => {
+    const body = bodyText(init?.body)
     let h = 0
     for (const ch of body) h = (h * 31 + ch.charCodeAt(0)) >>> 0
     const places: RawPlace[] = Array.from({ length: 20 }, (_, i) => ({
@@ -16,8 +17,8 @@ function fakePlaces(): typeof fetch {
       location: { latitude: 25.0408 + i * 0.0002, longitude: 121.565 },
       currentOpeningHours: { openNow: true }, rating: 4 + (i % 8) / 10, userRatingCount: 50 + i * 10, primaryType: 'restaurant',
     }))
-    return new Response(JSON.stringify({ places }), { status: 200 })
-  }) as unknown as typeof fetch
+    return Promise.resolve(new Response(JSON.stringify({ places }), { status: 200 }))
+  })
 }
 
 beforeEach(() => {
@@ -72,8 +73,8 @@ describe('runSim／runMatrix', () => {
 
   it('matrix：每個情境都有一列，需要店的卡沒店就算失敗', async () => {
     const real = fakePlaces()
-    const claude = vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: '{"verdict":"do","meme":{"top":"a","big":"b","bot":"c"},"steps":["1","2","3"],"log":"x"}' }] }), { status: 200 }))
-    const io = { fetch: (async (u: string | URL | Request, init?: RequestInit) => (String(u).includes('anthropic') ? claude() : real(u, init))) as typeof fetch }
+    const claude = vi.fn(() => new Response(JSON.stringify({ content: [{ type: 'text', text: '{"verdict":"do","meme":{"top":"a","big":"b","bot":"c"},"steps":["1","2","3"],"log":"x"}' }] }), { status: 200 }))
+    const io = { fetch: ((u: string | URL | Request, init?: RequestInit) => (urlText(u).includes('anthropic') ? claude() : real(u, init))) as typeof fetch }
     const m = await runMatrix('xinyi', new Date('2026-10-30T18:30:00+08:00'), io)
     expect(m.rows.length).toBeGreaterThan(10)
     expect(m.rows.find((r) => r.id === 'eat')?.ok).toBe(true)
@@ -82,8 +83,8 @@ describe('runSim／runMatrix', () => {
 
   it('scene（Round 5）：吃、歇每一種情境各一列；「其他」用手動輸入當關鍵字；不符規則的列 pass=false', async () => {
     const real = fakePlaces()
-    const claude = vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: '{"verdict":"do","meme":{"top":"a","big":"b","bot":"c"},"steps":["1","2","3"],"log":"x"}' }] }), { status: 200 }))
-    const io = { fetch: (async (u: string | URL | Request, init?: RequestInit) => (String(u).includes('anthropic') ? claude() : real(u, init))) as typeof fetch }
+    const claude = vi.fn(() => new Response(JSON.stringify({ content: [{ type: 'text', text: '{"verdict":"do","meme":{"top":"a","big":"b","bot":"c"},"steps":["1","2","3"],"log":"x"}' }] }), { status: 200 }))
+    const io = { fetch: ((u: string | URL | Request, init?: RequestInit) => (urlText(u).includes('anthropic') ? claude() : real(u, init))) as typeof fetch }
     const m = await runSceneMatrix('xinyi', new Date('2026-11-01T12:30:00+08:00'), io)
     expect(m.rows.map((r) => r.id)).toEqual([
       'eat:一個人快吃', 'eat:外帶', 'eat:朋友聚餐', 'eat:約會吃好一點', 'eat:宵夜', 'eat:其他',
@@ -102,13 +103,13 @@ describe('runSim／runMatrix', () => {
 // Round 6：mode=geocode——10 個日文站名 → 座標，對參考座標量誤差。
 import { GEOCODE_PASS_M, STATIONS, runGeocodeProbe } from '../../src/probe.ts'
 describe('runGeocodeProbe（Round 6）', () => {
-  const okFetch = (skip?: string) => (async (_url: string | URL | Request, init?: RequestInit) => {
-    const q = JSON.parse(String(init?.body)).textQuery as string
+  const okFetch = (skip?: string) => (_url: string | URL | Request, init?: RequestInit) => {
+    const q = (JSON.parse(bodyText(init?.body)) as { textQuery?: string }).textQuery
     const st = STATIONS.find((s) => s.q === q)
-    if (!st || q === skip) return new Response(JSON.stringify({}), { status: 200 })
+    if (!st || q === skip) return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     // 參考座標往北偏 0.001 度（約 111 公尺）：在 300 公尺內
-    return new Response(JSON.stringify({ places: [{ location: { latitude: st.lat + 0.001, longitude: st.lng }, displayName: { text: q } }] }), { status: 200 })
-  }) as unknown as typeof fetch
+    return Promise.resolve(new Response(JSON.stringify({ places: [{ location: { latitude: st.lat + 0.001, longitude: st.lng }, displayName: { text: q } }] }), { status: 200 }))
+  }
   it('10 站都在門檻內 → 10/10；每站一次 Places 呼叫', async () => {
     const r = await runGeocodeProbe({ fetchFn: okFetch(), key: 'k' })
     expect(STATIONS).toHaveLength(10)

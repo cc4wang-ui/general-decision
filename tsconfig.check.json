@@ -1,0 +1,18 @@
+// Typecheck entry for Node files (used by `npm run typecheck` via tsconfig.json
+// project references). Extends tsconfig.node.json but EXCLUDES tests/e2e/**.
+//
+// Why e2e specs are out of tsc (decision (b), step 3 stage 1 REPORT §4):
+// with noUncheckedIndexedAccess + noImplicitReturns, tsconfig.node.json
+// reports 20 errors, ALL in e2e specs (tests/e2e/r11-share.spec.ts: 18,
+// tests/e2e/r5-scene.spec.ts: 2), all indexed-access `| undefined`.
+// e2e specs are validated by actually running them in CI (the `e2e` job),
+// not by type strictness, so 20 `!` assertions in specs are not worth it.
+// tsconfig.node.json itself still lists tests/e2e in its include (the full
+// Node project for editors); only this check entry excludes it.
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.check.tsbuildinfo"
+  },
+  "include": ["vite.config.ts", "playwright.config.ts", "tests/shots"]
+}

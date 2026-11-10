@@ -263,7 +263,7 @@ export function pickLane(
   const late = hour !== undefined && hour >= 14
   const scenePool = local ? scene?.rule.queries?.[local].filter((l) => !l.block?.includes(diet)) : undefined
   const sceneOnly = !!scenePool?.length
-  let queries = sceneOnly ? scenePool! : local ? QUERY_LANES[local].filter((l) => !l.block?.includes(diet) && !(late && l.lunchOnly)) : []
+  let queries = sceneOnly ? scenePool : local ? QUERY_LANES[local].filter((l) => !l.block?.includes(diet) && !(late && l.lunchOnly)) : []
   // 有預算：只排推估價位對得上（命中或相鄰）的關鍵字；一個都沒有就不限關鍵字，價位交給 priceLevels 與 pickPlace。
   if (budget?.length && queries.length) {
     const fit = queries.filter((l) => priceFit(l.est, budget) > 0)

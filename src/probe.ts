@@ -278,7 +278,7 @@ export function cachingIo(real: typeof fetch = (i, n) => fetch(i, n)): OrderIo &
       if (url.includes('anthropic')) {
         return new Response(JSON.stringify({ content: [{ type: 'text', text: FAKE_ORDER }], usage: { output_tokens: 0 } }), { status: 200 })
       }
-      const key = `${url}|${String(init?.body ?? '')}`
+      const key = `${url}|${typeof init?.body === 'string' ? init.body : ''}`
       let hit = cache.get(key)
       if (!hit) {
         misses++
@@ -451,11 +451,13 @@ export interface LaneProbeResult {
 /** 這個國家要實測的所有 lane 查法。同一個 lane id 只打一次（「素食」同時在吃的關鍵字與吃素的關鍵字裡）。 */
 export function lanePlansFor(country: Country): { plan: LanePlan; verified?: boolean }[] {
   const nearby = [...LANES.filter((l) => !l.only || l.only === country), RESTAURANT_LANE, SWEET_LANE, VEG_LANE]
-    .map((l) => ({ plan: { kind: 'nearby', lane: l.id, includedTypes: l.types, radius: 800, rank: 'POPULARITY' } as LanePlan, verified: l.verified }))
+    // 註：lint:fix 曾把這裡的 `as LanePlan` 當多餘斷言刪掉，結果 kind 從 'nearby'
+    // widen 成 string、tsc 報錯——斷言是在保字面量型別。改用明確回傳型別註解取代斷言。
+    .map((l): { plan: LanePlan; verified: boolean | undefined } => ({ plan: { kind: 'nearby', lane: l.id, includedTypes: l.types, radius: 800, rank: 'POPULARITY' }, verified: l.verified }))
   const local = country === 'TW' || country === 'JP' ? country : null
   const sceneQs = local ? sceneOptions('eat').flatMap((id) => sceneOf('eat', { scene: id })?.rule.queries?.[local] ?? []) : []
   const words = local ? [...QUERY_LANES[local], ...SWEET_QUERIES[local], ...VEG_QUERIES[local], ...sceneQs].map((l) => l.q) : []
-  const eatText = words.map((q) => ({ plan: { kind: 'text', lane: queryLaneId(q), textQuery: q, radius: 800, rank: 'RELEVANCE', restrict: true } as LanePlan }))
+  const eatText = words.map((q): { plan: LanePlan } => ({ plan: { kind: 'text', lane: queryLaneId(q), textQuery: q, radius: 800, rank: 'RELEVANCE', restrict: true } }))
   // 歇：每個「喝什麼」照正式的 pickLane 組（日本會換成日文關鍵字）。
   const restText = Object.keys(CARD_BY_ID.rest.placesQuery?.textQuery?.byOption ?? {})
     .map((drink) => ({ plan: pickLane(CARD_BY_ID.rest, { drink }, undefined, country, () => 0.9) }))
@@ -502,7 +504,7 @@ export async function runLaneProbe(locKey: string, opts: { fetchFn?: typeof fetc
       ...(verified !== undefined ? { verified } : {}), ...(note ? { note } : {}), ms: Date.now() - t0,
     }
   }
-  const rows: LaneProbeRow[] = new Array(plans.length)
+  const rows: LaneProbeRow[] = new Array<LaneProbeRow>(plans.length)
   let next = 0
   const worker = async () => { while (next < plans.length) { const i = next++; rows[i] = await one(plans[i]!) } }
   await Promise.all(Array.from({ length: Math.min(6, plans.length) }, worker))
