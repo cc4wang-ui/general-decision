@@ -141,8 +141,8 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 | ADR-001 | ✅ 2026-11-10 | PR #48（`25e9d9c`）：`docs/adr/adr-001-type-brand-only.md`（種類只留類型＋品牌，刪整條店名判斷） |
 | ADR-002 | ✅ 2026-11-10 | PR #49（`f289074`）：`docs/adr/adr-002-ci-gate.md`（CI 門檻＋分支保護） |
 | 核心迴圈 2.0・PR-1 | ✅ 2026-11-10 | PR #50（`5bf71a87`）：結構化意圖，刪 `mode`；見 §7 |
-| 2.1／2.2・PR-2 | ⏳ 未開 PR | 分支 `server/pr2-partial-seen`（head `dd9ed65`）；實作＋紅隊兩輪 PASS；見 §7 |
-| 開始時間・PR-4 | ⏳ 未開 PR | 分支 `feature/start-time-input`（head `b4a09a8`）；實作＋紅隊複審 PASS；見 §7 |
+| 2.1／2.2・PR-2 | ✅ 2026-11-10 | PR #51（`ce7827e5`）：部分行程標示＋seen 跨請求留存；production 已驗（bundle index-BtC-1r0b.js）；見 §7 |
+| 開始時間・PR-4 | ✅ 2026-11-10 | PR #52（`43a82820`）：開始時間輸入；rebase 後 head `09e8cd7`；production 已驗（bundle index-ScDXdLMo.js）；見 §7 |
 | 2.3 AKOMEYA 觀察 | ✅ 觀察完成 | Production bundle 與 main @ `5bf71a87` SHA-256 一致；按鈕今日文字未確認，文案待裁定；見 §7 |
 | 2.4 回饋迴圈設計 | ✅ 設計完成 | 設計稿待使用者核准（Q1–Q11），未實作；見 §7 |
 | 步驟 4 | ⏳ 進行中 | ADR-001／ADR-002 已合併（PR #48／#49）；錯誤分類統計在 workspace（`~/workspace/improvement-research/ERROR-TAXONOMY-STATS.md`），defect escape rate 追蹤未確認（repo 內無對應檔案） |
@@ -207,13 +207,13 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 
 已知殘留（PR-1）：R-1 目的地查無此店＝既有 specified 行為（`noCandidate`）；R-3 活動勾選無目的地時對路由無可見影響；R-5 舊自由文字意圖升級時一次性遺失（需重新勾選）；R-7 specified 站是否為地理錨點（U5）仍未裁定。**O2 見 §7.6，不在本批次。**
 
-### 7.4 PR-2 與 PR-4（⏳ 實作＋紅隊完成，未開 PR）
+### 7.4 PR-2 與 PR-4（✅ 已合併：PR #51、#52）
 
 #### PR-2：部分行程標示（2.1 O1）＋ seen 跨請求留存（2.2 O2）
 
 | 項目 | 內容 |
 |---|---|
-| 分支／head | `server/pr2-partial-seen`，head `dd9ed651cc778a501d30ecc650bab1ef5ede608a`（parent `40a523e` ← base `5bf71a87`） |
+| 分支／head | `server/pr2-partial-seen`，head `dd9ed651cc778a501d30ecc650bab1ef5ede608a`（parent `40a523e` ← base `5bf71a87`）；已合併 PR #51（merge `ce7827e5`），production 已驗（bundle index-BtC-1r0b.js） |
 | 改動 | `git diff 5bf71a87..HEAD --stat`：5 檔，543 insertions、7 deletions（`api/daily-route.ts`、`src/dailyDecision.tsx`、`tests/unit/daily-route.test.ts`、`tests/unit/dailyDecision-pr2.test.ts`（新）、`tests/unit/dailyDecision-ui.test.tsx`） |
 | 內容 | (a) creative 表項驗證為活碼、不退役（三張表一字未動）；(b) intent 請求欄位不需要、不加（目的地已編碼為指定站，活動勾選不改變伺服器行為）；(c) 2.1 O1：頂層 `partial`＋`missingStops: {id, reason}[]`（兩個成功回應都帶；`reason` 為 `area`／`filtered`／`empty`；純文字 rest 不列入，被指定了地點的 rest 查無店家時列入）；前端 `partial` 為真時明寫「部分行程：」；(d) 2.2 O2：完整重生路徑新增 `withCurrentAsSeen` 寫回 `state.seen`（只記自動站），＋設定面板「清除今天換掉的店紀錄」按鈕（只清 seen，disliked 不動）；換天過期（既有） |
 | 測試 | 全套 1152/1152（53 檔）；lint 0；tsc exit 0；e2e `daily-location` 2 passed |
@@ -225,10 +225,10 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 
 | 項目 | 內容 |
 |---|---|
-| 分支／head | `feature/start-time-input`，head `b4a09a8ac543f0b11bdee7af0db42ab23e9a4c66`（parent `f3bcb92` ← base `5bf71a87`） |
-| 改動 | `git diff 5bf71a87..HEAD --stat`：5 檔，500 insertions、23 deletions（`api/daily-route.ts`、`src/dailyDecision.tsx`、`src/dailyRouting.ts`、`tests/unit/dailyDecision-start-time.test.ts`（新）、`tests/unit/dailyDecision-ui.test.tsx`） |
+| 分支／head | `feature/start-time-input`，head `09e8cd7eaf9c2cf5132a83e9a7f3178dc62b399b`（parent `1c9f79a` ← base `ce7827e5`；原 `b4a09a8` rebase 到 PR-2 合併後的 main）；已合併 PR #52（merge `43a82820`），production 已驗（bundle index-ScDXdLMo.js） |
+| 改動 | `git diff ce7827e5..HEAD --stat`：5 檔，503 insertions、24 deletions（`api/daily-route.ts`、`src/dailyDecision.tsx`、`src/dailyRouting.ts`、`tests/unit/dailyDecision-start-time.test.ts`（新）、`tests/unit/dailyDecision-ui.test.tsx`）；rebase 解開三處 PR-2／PR-4 衝突（成功回應同時帶 `partial`／`missingStops` 與 `anchorTime`；`DailyRouteResponse` 同時含兩者；狀態列取 PR-2 的 `mappedMissing`／`hasCandidate`／F2 邏輯＋PR-4 的 `anchorNote`） |
 | 內容 | 開始時間輸入（`type="time"`，testid `daily-start-time`，在出發地之下、意圖欄位之上）；`effectiveStartTime`：合法未來時間當錨點，否則伺服器當下東京時間（過去時間 clamp）；午夜跨日 day-aware 運算：ETA 標「翌日」（`etaDayOffset`／`departureDayOffset`），固定安排 deadline 取當天／隔天離錨點最近的一次；回應加 `anchorTime`；改時間不搜尋、不重建任務，`clearRoute` 同時清逐站舊 ETA／衝突；開始時間只留今天、換天歸零 |
-| 測試 | 全套 1157/1157（53 檔）；lint 0；tsc exit 0；e2e `daily-location` 2 passed |
+| 測試 | 全套 1184/1184（54 檔，rebase 後 head 主代理重跑）；lint 0；tsc exit 0；e2e 由 CI 全跑 |
 | 紅隊 | 第 1 輪 FAIL（F1 午夜跨日 blocking；F2 逐站衝突殘留；O1 時區未標明、O2 有效錨點不可見）→ 修正輪（結構性修法，非 23:59 特例）→ 第 2 輪 PASS（0 blocking、0 non-blocking） |
 
 來源：`~/workspace/general-decision-core-loop-2.0/pr4/REPORT.md`、`pr4/DESIGN-start-time.md`、`pr4/pr-body.md`、`pr4/redteam2/REPORT.md`。
@@ -237,8 +237,8 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 
 | 項 | 狀態 | 說明 |
 |---|---|---|
-| 2.1 O1：池子太薄時回傳部分行程並標示缺站 | ✅ PR-2 done（未開 PR） | 已裁定（2026-11-10，使用者授權按目的決定）；見 §7.4 PR-2 (c) |
-| 2.2 O2：`seen` 跨請求保存（當天、弱於 `disliked`、可清除） | ✅ PR-2 done（未開 PR） | 已裁定（同上）；見 §7.4 PR-2 (d)。注意：此處的 O2 是「seen 跨請求保存」；PR-1 紅隊第 5 輪的 O2 觀察是另一件事，見 §7.6 |
+| 2.1 O1：池子太薄時回傳部分行程並標示缺站 | ✅ PR-2 已合併（PR #51） | 已裁定（2026-11-10，使用者授權按目的決定）；見 §7.4 PR-2 (c) |
+| 2.2 O2：`seen` 跨請求保存（當天、弱於 `disliked`、可清除） | ✅ PR-2 已合併（PR #51） | 已裁定（同上）；見 §7.4 PR-2 (d)。注意：此處的 O2 是「seen 跨請求保存」；PR-1 紅隊第 5 輪的 O2 觀察是另一件事，見 §7.6 |
 | 2.3 AKOMEYA 食堂排除按鈕標籤 | ✅ 觀察 done（文案待裁） | Production 觀察 2026-11-10 19:03–19:07 JST：production bundle 與 main @ `5bf71a87` SHA-256 一致（`a2667822762537875babe8381fc2658a1a84134337e24109abbe7e2cc979e366`，`assets/index-VHua357e.js`）；按鈕模板唯一：`不要「{kindLabel}」這類`；kind 唯一來源是當下候選的 Google Places types／primaryType（type＋brand 判定，店名零貢獻）；stale 標籤假設在 UI 渲染層不成立。**AKOMEYA 今日的 types 未確認**（需瀏覽器實測 production 渲染）；文案決定待使用者看證據後做 |
 | 2.4 行為回饋迴圈＋權重圖 | ✅ 設計 done（待核准，未實作） | 設計稿 `~/workspace/general-decision-core-loop-2.0/design-2.4/DESIGN-feedback-loop.md`；訊號三層（手動輸入最強／明確表態／隱性訊號）、圖譜軟分數、半衰期 30 天、`prefer` 加權皆為提案；待核准問題 Q1–Q11（權重數字、衰減、儲存位置、清除粒度、跨日目的地、標記完成是否寫入核心記憶、`prefer` 加權與放寬、種類親和閾值、說明文字、活動跨日效果、是否讀取愛店）。核准後才實作 |
 
