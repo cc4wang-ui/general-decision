@@ -11,7 +11,7 @@ vi.mock('../../src/placeMem.ts', () => ({
   clearDislike: vi.fn(() => Promise.resolve({ sharedRemains: false })),
 }))
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
-import { DailyDecision } from '../../src/dailyDecision.tsx'
+import { buildDaily, DailyDecision, type DailyIntent, type DailyState } from '../../src/dailyDecision.tsx'
 
 const KEY = 'decide.daily.v1'
 const todayTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -343,58 +343,126 @@ describe('round 11：F2b（不喜歡寫入失敗不進清單）＋ 完整重新�
   })
 })
 
-describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () => {
+describe('G6 — 意圖輸入（2.0 重做：結構化輸入——目的地＋活動選項）', () => {
   const settlePhoto = async () => { await waitFor(() => expect(screen.queryByText('正在取得現場照片…')).toBeNull()) }
-  it('模式按鈕整組消失，改為意圖輸入框（label／placeholder／上限 120 字）', async () => {
+  const destInput = () => screen.getByTestId<HTMLInputElement>('daily-intent-destination')
+  const stationSelect = () => screen.getByTestId<HTMLSelectElement>('daily-intent-destination-station')
+  const summary = () => screen.getByTestId('daily-intent-summary').textContent
+  const skipSeed = (intent: DailyIntent) => {
+    const base: DailyState = { day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', intent, appliedIntent: { ...intent, activities: [...intent.activities] }, tasks: [], notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [] }
+    // 每站掛一個與目錄標題同名的候選：loadDaily 的載入過濾器只留 custom／locked／done／
+    // rest／有候選／無候選的站，無候選的自動站重開頁面會被濾掉；候選名＝標題，卡片標題不變。
+    localStorage.setItem(KEY, JSON.stringify({ ...base, tasks: buildDaily(base).map(t => ({ ...t, candidate: cand('c-' + t.id, t.title) })) }))
+  }
+  it('舊意圖框整組消失，改為目的地欄位＋站選單＋5 個活動 checkbox＋永遠渲染的摘要', async () => {
     seed(cand('s1', '某咖啡店'))
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
-    expect(screen.queryByText('偵察探索')).toBeNull()
-    expect(screen.queryByText('效率採買')).toBeNull()
-    expect(screen.queryByText('今天想怎麼過？')).toBeNull()
-    const input = screen.getByTestId<HTMLInputElement>('daily-intent')
-    expect(input.getAttribute('aria-label')).toBe('今天想去哪裡／想做什麼')
-    expect(input.placeholder).toContain('留空就隨興探索')
-    expect(input.maxLength).toBe(120)
-    expect(input.value).toBe('')
+    expect(screen.queryByTestId('daily-intent')).toBeNull()
+    expect(screen.queryByTestId('daily-intent-hint')).toBeNull()
+    expect(destInput().getAttribute('aria-label')).toBe('想去哪裡')
+    expect(destInput().placeholder).toContain('可留空')
+    expect(destInput().maxLength).toBe(120)
+    expect(destInput().value).toBe('')
+    expect(stationSelect().value).toBe('')
+    for (const id of ['gym', 'meal', 'creative', 'coffee', 'shopping']) {
+      expect(screen.getByTestId(`daily-intent-activity-${id}`)).toBeTruthy()
+    }
+    expect(summary()).toBe('今天沒有指定目的地或活動，留空就隨興探索。')
   })
-  it('輸入意圖 → 午餐站被指定為意圖原文、顯示解析提示、寫進 localStorage、不觸發伺服器請求', async () => {
+  it('填目的地＋選站 → 摘要顯示目的地 → 午餐站、寫進 localStorage（結構化物件）、不觸發伺服器請求', async () => {
     seed(cand('s1', '某咖啡店'))
     const fetchMock = vi.fn((_url: string | URL | Request) => Promise.resolve({ ok: false }))
     vi.stubGlobal('fetch', fetchMock)
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     const { fireEvent } = await import('@testing-library/react')
-    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃拉麵' } })
-    // 提示逐字反映 parseIntent 的輸出
-    expect(screen.getByTestId('daily-intent-hint').textContent).toBe('已辨識：拉麵 → 午餐站')
-    // 午餐站的指定地點輸入框值＝意圖原文（specified 站不顯示「換這一站」）
-    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('想吃拉麵')
-    const saved = JSON.parse(localStorage.getItem(KEY)!) as { intent: string }
-    expect(saved.intent).toBe('想吃拉麵')
-    // 改意圖不觸發伺服器請求（跟舊模式按鈕一樣；照片 API 的呼叫不算）
+    fireEvent.change(destInput(), { target: { value: '一蘭' } })
+    fireEvent.change(stationSelect(), { target: { value: 'meal' } })
+    expect(summary()).toBe('目的地：一蘭 → 午餐站')
+    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('一蘭')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { intent: DailyIntent }
+    expect(saved.intent).toEqual({ destination: '一蘭', destinationStation: 'meal', activities: [] })
     expect(fetchMock.mock.calls.some(c => urlText(c[0]).includes('/api/daily-route'))).toBe(false)
   })
-  it('咖啡與展覽意圖的提示分開：咖啡 → 咖啡站、展覽 → 探索站（不再共站）', async () => {
+  it('只填目的地不選站 → 摘要顯示惰性警告，目的地站不被指定', async () => {
     seed(cand('s1', '某咖啡店'))
-    const fetchMock = vi.fn((_url: string | URL | Request) => Promise.resolve({ ok: false }))
-    vi.stubGlobal('fetch', fetchMock)
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     const { fireEvent } = await import('@testing-library/react')
-    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想喝咖啡' } })
-    expect(screen.getByTestId('daily-intent-hint').textContent).toBe('已辨識：咖啡 → 咖啡站')
-    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '去看展覽' } })
-    expect(screen.getByTestId('daily-intent-hint').textContent).toBe('已辨識：展覽 → 探索站')
+    fireEvent.change(destInput(), { target: { value: '一蘭' } })
+    expect(summary()).toBe('目的地：一蘭（請選是哪一站，否則不會進路線）')
+    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('')
+    expect(destInput().value).toBe('一蘭')
   })
-  it('伺服器回應洗掉標記後，換意圖仍能更新日意圖站（標記在合併時補回）', async () => {
-    // 真實伺服器成功路徑形狀（api/daily-route.ts:277）：新搜尋成功時 place 一律是
-    // 店家地址、title 是店名，絕不是意圖原文。舊 mock 保留 place＝意圖原文，與真實
-    // 契約矛盾（紅隊 F6），該形狀下 restore 永遠不會被考驗。
+  it('勾選活動 → 摘要顯示「想做：…」（catalog 順序）；便利預設可見：填目的地後勾唯一活動，選單值自動變為該活動的站', async () => {
+    seed(cand('s1', '某咖啡店'))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-intent-activity-coffee'))
+    expect(summary()).toBe('想做：喝咖啡')
+    fireEvent.click(screen.getByTestId('daily-intent-activity-meal'))
+    expect(summary()).toBe('想做：吃飯、喝咖啡')
+    fireEvent.change(destInput(), { target: { value: '一蘭' } })
+    // 目的地已填、站未選、恰好只選一個活動時預設才觸發：目前勾了兩個活動，站仍為空
+    expect(stationSelect().value).toBe('')
+    fireEvent.click(screen.getByTestId('daily-intent-activity-coffee'))
+    // 只剩一個活動 → 便利預設把站設為該活動的站，選單立即顯示
+    expect(stationSelect().value).toBe('meal')
+    expect(summary()).toBe('目的地：一蘭 → 午餐站')
+  })
+  it('G3「今天略過」擴充：略過目的地站 → 活動勾選移除、站清為空、目的地文字保留、該站不在路線裡', async () => {
+    skipSeed({ destination: '一蘭', destinationStation: 'meal', activities: ['meal', 'coffee'] })
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    const mealCard = screen.getByText('澀谷｜一人友善的日式定食').closest('article')!
+    fireEvent.click(within(mealCard).getByText('今天略過'))
+    expect(screen.queryByText('澀谷｜一人友善的日式定食')).toBeNull()
+    expect(destInput().value).toBe('一蘭')
+    expect(stationSelect().value).toBe('')
+    expect(screen.getByTestId<HTMLInputElement>('daily-intent-activity-meal').checked).toBe(false)
+    expect(screen.getByTestId<HTMLInputElement>('daily-intent-activity-coffee').checked).toBe(true)
+    expect(summary()).toBe('目的地：一蘭（請選是哪一站，否則不會進路線）；想做：喝咖啡')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { intent: DailyIntent; avoid: string[] }
+    expect(saved.intent).toEqual({ destination: '一蘭', destinationStation: '', activities: ['coffee'] })
+    expect(saved.avoid).toContain('meal')
+  })
+  it('G3「今天略過」擴充：略過非目的地活動站 → 目的地站不受影響', async () => {
+    skipSeed({ destination: '一蘭', destinationStation: 'meal', activities: ['meal', 'coffee'] })
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    const coffeeCard = screen.getByText('安靜咖啡廳｜閱讀、寫下 3 個新觀察').closest('article')!
+    fireEvent.click(within(coffeeCard).getByText('今天略過'))
+    expect(screen.queryByText('安靜咖啡廳｜閱讀、寫下 3 個新觀察')).toBeNull()
+    expect(screen.getByLabelText<HTMLInputElement>('澀谷｜一人友善的日式定食 指定地點').value).toBe('一蘭')
+    expect(stationSelect().value).toBe('meal')
+    expect(summary()).toBe('目的地：一蘭 → 午餐站')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { intent: DailyIntent }
+    expect(saved.intent).toEqual({ destination: '一蘭', destinationStation: 'meal', activities: ['meal'] })
+  })
+  it('G3 勾選活動解除 avoid：avoid 裡的站回到路線', async () => {
     localStorage.setItem(KEY, JSON.stringify({
       day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
-      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }],
-      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: '想吃拉麵',
+      tasks: [], notes: [], avoid: ['meal'], seen: {}, disliked: [], dislikedKinds: [],
+    }))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    expect(screen.queryByText('澀谷｜一人友善的日式定食')).toBeNull()
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.click(screen.getByTestId('daily-intent-activity-meal'))
+    expect(screen.getByText('澀谷｜一人友善的日式定食')).toBeTruthy()
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { avoid: string[] }
+    expect(saved.avoid).not.toContain('meal')
+  })
+  it('伺服器回應洗掉標記後，換目的地仍能更新日意圖站（標記在合併時補回）', async () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '一蘭', candidate: cand('m1', '拉麵店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+      intent: { destination: '一蘭', destinationStation: 'meal', activities: ['meal'] },
     }))
     const serverStop = { id: 'meal', title: '拉麵店', minutes: 45, kind: 'meal', done: false, specified: true, place: '東京都渋谷区道玄坂1-2-3', candidate: cand('m1', '拉麵店') }
     const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
@@ -406,17 +474,17 @@ describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () =
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.click(screen.getByTestId('daily-generate'))
     await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
-    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃壽司' } })
-    expect(screen.getByLabelText<HTMLInputElement>('拉麵店 指定地點').value).toBe('想吃壽司')
+    fireEvent.change(destInput(), { target: { value: '壽司' } })
+    expect(screen.getByLabelText<HTMLInputElement>('拉麵店 指定地點').value).toBe('壽司')
   })
-  it('保留路徑：伺服器回應 place 不變時，標記同樣補回、換意圖仍能更新', async () => {
-    // 保留路徑（api/daily-route.ts:226）：候選通過重驗時回應原樣推回該站，place 不變。
+  it('保留路徑：伺服器回應 place 不變時，標記同樣補回、換目的地仍能更新', async () => {
     localStorage.setItem(KEY, JSON.stringify({
       day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
-      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }],
-      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: '想吃拉麵',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '一蘭', candidate: cand('m1', '拉麵店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+      intent: { destination: '一蘭', destinationStation: 'meal', activities: ['meal'] },
     }))
-    const serverStop = { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }
+    const serverStop = { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, place: '一蘭', candidate: cand('m1', '拉麵店') }
     const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
       ? { ok: true, json: () => ({ stops: [serverStop], routeVerified: false, conflicts: [] }) }
       : { ok: false }))
@@ -426,19 +494,15 @@ describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () =
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.click(screen.getByTestId('daily-generate'))
     await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
-    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃壽司' } })
-    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('想吃壽司')
+    fireEvent.change(destInput(), { target: { value: '壽司' } })
+    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('壽司')
   })
   it('R2-F3：搜尋後同一意圖重跑，候選與店家地址保留（appliedIntent 在 state 層、伺服器洗不掉）', async () => {
-    // 搜尋後形狀：place 是店家地址、有候選、標記在。意圖不變、按別站的「今天略過」
-    // （只觸發 replanDaily，不改意圖），候選不得被清掉——舊規則 prev.place === intent
-    // 在搜尋後永不成立，意圖框每敲一個字、按「今天略過」都會靜默清掉候選。
-    // 注意：意圖框重打一次「同樣的意圖」測不到——React 會去重值沒變的 onChange，
-    // 根本不觸發 replan；按「今天略過」才是真實觸發點。
     localStorage.setItem(KEY, JSON.stringify({
       day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
-      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '想吃拉麵', candidate: cand('m1', '拉麵店') }],
-      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: '想吃拉麵',
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: '一蘭', candidate: cand('m1', '拉麵店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+      intent: { destination: '一蘭', destinationStation: 'meal', activities: ['meal'] },
     }))
     const serverMeal = { id: 'meal', title: '拉麵店', minutes: 45, kind: 'meal', done: false, specified: true, place: '東京都渋谷区道玄坂1-2-3', candidate: cand('m1', '拉麵店') }
     const plainStop = (id: string, title: string, kind: 'gym' | 'meal' | 'creative' | 'shopping' | 'rest', minutes: number) => ({ id, title, minutes, kind, done: false })
@@ -452,30 +516,25 @@ describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () =
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.click(screen.getByTestId('daily-generate'))
     await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
-    // 搜尋後 place 是地址、候選在卡片上（「不喜歡這間店」只在有候選時出現）
     expect(screen.getByLabelText<HTMLInputElement>('拉麵店 指定地點').value).toBe('東京都渋谷区道玄坂1-2-3')
     expect(screen.getByText('不喜歡這間店')).toBeTruthy()
-    // 意圖不變、按購物站的「今天略過」：只重排，不改意圖——候選與地址都留著
-    const shoppingCard = screen.getByText('購物站').closest('article')!
+    const shoppingCard = within(screen.getByLabelText('今日任務')).getByText('購物站').closest('article')!
     fireEvent.click(within(shoppingCard).getByText('今天略過'))
     expect(screen.getByLabelText<HTMLInputElement>('拉麵店 指定地點').value).toBe('東京都渋谷区道玄坂1-2-3')
     expect(screen.getByText('不喜歡這間店')).toBeTruthy()
-    // localStorage 的 appliedIntent 跟著意圖走
-    const saved = JSON.parse(localStorage.getItem(KEY)!) as { appliedIntent?: string }
-    expect(saved.appliedIntent).toBe('想吃拉麵')
+    const saved = JSON.parse(localStorage.getItem(KEY)!) as { appliedIntent?: DailyIntent }
+    expect(saved.appliedIntent).toEqual({ destination: '一蘭', destinationStation: 'meal', activities: ['meal'] })
   })
-  it('長意圖往返：101 字意圖經伺服器截斷到 100 字後，標記仍在、換意圖仍能更新', async () => {
-    // 伺服器 sanitize 把 place 截到 100 字（api/daily-route.ts:156）：101–120 字意圖
-    // 連保留路徑回應的 place 也是截斷版 ≠ 舊 state 的 place。restore 不得以 place
-    // 相等為準，否則長意圖第一次搜尋後標記就丟了。
-    const longIntent = '想吃拉麵' + '！'.repeat(97)
-    expect(longIntent).toHaveLength(101)
+  it('長目的地往返：101 字目的地經伺服器截斷到 100 字後，標記仍在、換目的地仍能更新', async () => {
+    const longDestination = '一蘭' + '！'.repeat(99)
+    expect(longDestination).toHaveLength(101)
     localStorage.setItem(KEY, JSON.stringify({
       day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅',
-      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: longIntent, candidate: cand('m1', '拉麵店') }],
-      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], intent: longIntent,
+      tasks: [{ id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, intentSpecified: true, place: longDestination, candidate: cand('m1', '拉麵店') }],
+      notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [],
+      intent: { destination: longDestination, destinationStation: 'meal', activities: ['meal'] },
     }))
-    const serverStop = { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, place: longIntent.slice(0, 100), candidate: cand('m1', '拉麵店') }
+    const serverStop = { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, specified: true, place: longDestination.slice(0, 100), candidate: cand('m1', '拉麵店') }
     const fetchMock = vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route')
       ? { ok: true, json: () => ({ stops: [serverStop], routeVerified: false, conflicts: [] }) }
       : { ok: false }))
@@ -485,8 +544,8 @@ describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () =
     const { fireEvent } = await import('@testing-library/react')
     fireEvent.click(screen.getByTestId('daily-generate'))
     await waitFor(() => expect(screen.getByText(/店家已確認/)).toBeTruthy())
-    fireEvent.change(screen.getByTestId('daily-intent'), { target: { value: '想吃壽司' } })
-    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('想吃壽司')
+    fireEvent.change(destInput(), { target: { value: '壽司' } })
+    expect(screen.getByLabelText<HTMLInputElement>('定食 指定地點').value).toBe('壽司')
   })
   it('空狀態文案是意圖導向、對齊實際按鈕文案（不再提模式／生成今日行程）', async () => {
     localStorage.setItem(KEY, JSON.stringify({
@@ -496,7 +555,7 @@ describe('意圖輸入（2.0：兩顆模式按鈕改為自由文字框）', () =
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     expect(screen.getByText('今天還沒有行程')).toBeTruthy()
-    expect(screen.getByText(/先在「今天想去哪裡／想做什麼」寫下今天的想法/)).toBeTruthy()
+    expect(screen.getByText(/先在「今天想去哪裡／想做什麼」選今天想做的事、想去的地方/)).toBeTruthy()
     expect(screen.getByText(/再點「搜尋店家並生成路線」/)).toBeTruthy()
     expect(screen.queryByText(/選擇模式/)).toBeNull()
     expect(screen.queryByText(/生成今日行程/)).toBeNull()

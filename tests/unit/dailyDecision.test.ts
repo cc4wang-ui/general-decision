@@ -4,7 +4,7 @@ import { buildDaily, replanDaily, withSeen, seenFor, excludeFor, excludeForInfo,
 const KEY = 'decide.daily.v1'
 const todayTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 
-const state = (): DailyState => ({ day:'2026-11-03', area:'澀谷', currentPlace:'宮下公園', intent:'', tasks:[], notes:[], avoid:[] })
+const state = (): DailyState => ({ day:'2026-11-03', area:'澀谷', currentPlace:'宮下公園', intent:{ destination:'', destinationStation:'', activities:[] }, appliedIntent:{ destination:'', destinationStation:'', activities:[] }, tasks:[], notes:[], avoid:[] })
 
 describe('Daily Decision replan',()=>{
   it('always uses FIT-EASY rather than another gym',()=>{
@@ -15,15 +15,15 @@ describe('Daily Decision replan',()=>{
     const s=state()
     s.tasks=buildDaily(s).map(t=>t.id==='gym'?{...t,done:true}:t)
     // 無意圖時 creative 站在（舊 practical 斷言「沒有 creative 站」是 split 的定義本身，已刪）
-    const noIntent=replanDaily({...s,currentPlace:'宮下公園',intent:''})
+    const noIntent=replanDaily({...s,currentPlace:'宮下公園',intent:{ destination:'', destinationStation:'', activities:[] }})
     expect(noIntent.tasks.filter(t=>t.id==='gym')).toHaveLength(1)
     expect(noIntent.tasks.find(t=>t.id==='gym')?.done).toBe(true)
     expect(noIntent.tasks.some(t=>t.id==='creative')).toBe(true)
     // 意圖命中時該站 specified、place＝原文，已完成站照留
-    const withIntent=replanDaily({...s,currentPlace:'宮下公園',intent:'想吃拉麵'})
+    const withIntent=replanDaily({...s,currentPlace:'宮下公園',intent:{ destination:'一蘭', destinationStation:'meal', activities:['meal'] }})
     expect(withIntent.tasks.find(t=>t.id==='gym')?.done).toBe(true)
     expect(withIntent.tasks.find(t=>t.id==='meal')?.specified).toBe(true)
-    expect(withIntent.tasks.find(t=>t.id==='meal')?.place).toBe('想吃拉麵')
+    expect(withIntent.tasks.find(t=>t.id==='meal')?.place).toBe('一蘭')
   })
   it('honors explicit skip',()=>{
     const result=replanDaily({...state(),avoid:['shopping']})

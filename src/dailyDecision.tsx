@@ -7,18 +7,65 @@ import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from './venueCheck.ts'
 import { AREA_NAMES, withinArea } from './areas.ts'
 
-export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied' }
+export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是結構化日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。結構化日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied' }
+/** 可被意圖指定的站：5 個可搜尋站。rest 不在內——rest 是純文字站，永遠不是搜尋目標。 */
+export type IntentStationId = 'gym' | 'meal' | 'creative' | 'coffee' | 'shopping'
+/** 5 個可搜尋站的 catalog 順序（活動顯示與存放順序）。 */
+const INTENT_CATALOG_ORDER: readonly IntentStationId[] = ['gym', 'meal', 'creative', 'coffee', 'shopping']
+const isIntentStationId = (v: unknown): v is IntentStationId => typeof v === 'string' && (INTENT_CATALOG_ORDER as readonly string[]).includes(v)
+/** 一日級結構化意圖（2.0 重做）：「今天想去哪裡／想做什麼」的兩個部分裝在同一個物件裡。
+ * destination 是「想去哪裡」（自由輸入的地名／店名原文）；activities 是「想做什麼」（明確勾選）；
+ * destinationStation 說明目的地落在哪一站（使用者明確選擇）。三個欄位都由使用者
+ * 明確給出或由 normalizeIntent 的確定性規則產生，系統絕不從文字推導任何一個欄位。 */
+export interface DailyIntent {
+  destination: string
+  destinationStation: IntentStationId | ''
+  activities: IntentStationId[]
+}
+export const EMPTY_INTENT: DailyIntent = { destination: '', destinationStation: '', activities: [] }
+/** 結構化意圖正規化（唯一規則，所有寫入點共用）：
+ * - destination：trim，截到 120 字（與舊意圖框上限、addFixedTask 的 place 上限一致）。
+ * - activities：只留 5 個合法站 id，去重，按 catalog 順序（gym／meal／creative／coffee／shopping）存放。
+ * - 不變量：destination 為空時 destinationStation 必為 ''（空目的地沒有附著對象）。
+ * - 便利預設：destination 非空、destinationStation 為 ''、且恰好選了一個活動時，
+ *   destinationStation 預設為該活動的站。預設來自使用者明確勾選的活動，不是文字推導，
+ *   且永遠顯示在選單與確認摘要裡，使用者隨時可改。
+ * 純函式，不改傳入物件，回傳新物件（activities 換新陣列）。 */
+export function normalizeIntent(intent: DailyIntent): DailyIntent {
+  const destination = typeof intent.destination === 'string' ? intent.destination.trim().slice(0, 120) : ''
+  const activities = [...new Set((Array.isArray(intent.activities) ? intent.activities : []).filter(isIntentStationId))]
+    .sort((a, b) => INTENT_CATALOG_ORDER.indexOf(a) - INTENT_CATALOG_ORDER.indexOf(b))
+  let destinationStation: IntentStationId | '' = destination === '' ? '' : (isIntentStationId(intent.destinationStation) ? intent.destinationStation : '')
+  if (destinationStation === '' && destination !== '' && activities.length === 1) {
+    const only = activities[0]
+    if (only) destinationStation = only
+  }
+  return { destination, destinationStation, activities }
+}
+/** 結構化意圖相等：逐欄位比對。destination 與 destinationStation 用 ===；
+ * activities 以集合比（長度相同且每個元素都在對方裡），不看順序——順序是顯示用的
+ * catalog 順序，不是意圖的語義。兩個意圖相等，當且唯當三個欄位都相等。 */
+export function sameIntent(a: DailyIntent, b: DailyIntent): boolean {
+  return a.destination === b.destination
+    && a.destinationStation === b.destinationStation
+    && a.activities.length === b.activities.length
+    && a.activities.every(id => b.activities.includes(id))
+}
+/** 結構化意圖複製（純複製，不正規化——寫入點收到的一定已是正規形）。
+ * 回傳新物件＋新陣列（快照，不是參照）。 */
+export function copyIntent(intent: DailyIntent): DailyIntent {
+  return { destination: intent.destination, destinationStation: intent.destinationStation, activities: [...intent.activities] }
+}
 export type DailyState = {
   day: string; area: string; currentPlace: string
-  /** 當日意圖原文（2.0）：「今天想去哪裡／想做什麼」。每天重新問，換天歸零；
-   * 同一天內存在於當日 state。舊存檔沒有此欄位時預設 ''。 */
-  intent?: string
-  /** 目前這份任務是哪份意圖長出來的（fix round 3，R2-F3）：buildDaily／replanDaily
-   * 每次生成時記下當次意圖；候選保留只比 appliedIntent === intent。存在 state 層、
+  /** 當日結構化意圖。必填（不再是可選字串）：沒有意圖就是 EMPTY_INTENT，不用 undefined 表示。 */
+  intent: DailyIntent
+  /** 目前這份任務是哪份結構化意圖長出來的（fix round 3，R2-F3）：buildDaily／replanDaily
+   * 每次生成時記下當次意圖；候選保留只比 sameIntent(appliedIntent, intent)。存在 state 層、
    * 不在 stop 陣列裡，伺服器回應洗不掉（伺服器只回 stops，不回這個欄位）；
    * 換天歸零（與 intent 同規則）；舊存檔沒有此欄位時沿用當日 intent（移轉——
    * 任務本來就是那份意圖長出來的，不是猜測）。 */
-  appliedIntent?: string
+  appliedIntent: DailyIntent
   tasks: DailyTask[]; notes: string[]; avoid: string[]
   /** 地區偏好（F7）：只在所選地區中心 1 公里內找店。預設開啟；關掉＝不限區域。 */
   areaOnly?: boolean
@@ -40,7 +87,7 @@ const KEY = 'decide.daily.v1'
 const CROSS_AREA_NOTE = '以澀谷為生活基地，避免不必要跨區'
 const dayInTokyo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date())
 const defaults = (): DailyState => ({
-  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: '', appliedIntent: '',
+  day: dayInTokyo(), area: '澀谷', areaOnly: true, currentPlace: '渋谷駅', intent: { ...EMPTY_INTENT, activities: [] }, appliedIntent: { ...EMPTY_INTENT, activities: [] },
   tasks: [], notes: ['固定健身房：FIT-EASY；不推薦其他付費健身房', '偏好安靜咖啡廳、日式定食、藝術與日本 IP'], avoid: [],
   seen: {}, disliked: [], dislikedKinds: [],
 })
@@ -119,6 +166,25 @@ export function noCandidateText(t: DailyTask, area: string): string {
   if (t.noCandidateReason === 'denied') return '這一站之前選的地點是車站或地標，不是可拜訪的店家。請按「換這一站」重新搜尋。'
   return '這一站找不到店家。換個出發地或條件再試。'
 }
+/** 舊存檔／髒存檔的意圖欄位驗證：非 null 物件才取欄位，否則回空意圖的新複製；
+ * destination 只接受字串，destinationStation 只接受 5 個合法站 id，
+ * activities 只接受陣列、元素只留合法站 id。最後一律經 normalizeIntent。 */
+const validateStructuredIntent = (v: unknown): DailyIntent => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return { ...EMPTY_INTENT, activities: [] }
+  const o = v as { destination?: unknown; destinationStation?: unknown; activities?: unknown }
+  return normalizeIntent({
+    destination: typeof o.destination === 'string' ? o.destination : '',
+    destinationStation: isIntentStationId(o.destinationStation) ? o.destinationStation : '',
+    activities: Array.isArray(o.activities) ? o.activities.filter(isIntentStationId) : [],
+  })
+}
+/** 同日 appliedIntent 是否為合法結構化物件：三個欄位都在且型別正確。
+ * 缺欄位時不由 normalizeIntent 補空意圖，改沿用當日 intent（見 loadDaily）。 */
+const isValidStructuredIntent = (v: unknown): v is DailyIntent => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false
+  const o = v as { destination?: unknown; destinationStation?: unknown; activities?: unknown }
+  return typeof o.destination === 'string' && typeof o.destinationStation === 'string' && Array.isArray(o.activities)
+}
 export function loadDaily(): DailyState {
   const fresh = defaults()
   try {
@@ -131,16 +197,21 @@ export function loadDaily(): DailyState {
     const ctx: StaleContext = { disliked, dislikedKinds, area, areaOnly }
     // 舊存檔移轉（2.0）：mode 欄位明確剝掉——{...raw} 展開會把它帶回 state，
     // 下次 saveDaily 又存回去。intent 只在同一天保留：換天歸零（{...fresh, ...raw}
-    // 展開會把舊 intent 帶過來，所以在後面的覆寫欄位裡按 raw.day 決定留或清），
-    // 且只接受字串、截到 120 字（跟輸入框上限一致）。
+    // 展開會把舊 intent 帶過來，所以在後面的覆寫欄位裡按 raw.day 決定留或清）。
+    // 舊字串意圖（自由文字，現在無法解析）直接丟棄，不解析、不轉換——轉換它的
+    // 唯一方法是再寫一次關鍵字解析，那就是被裁定刪除的東西。
     const { mode: _legacyMode, ...rest } = raw as Partial<DailyState> & { mode?: unknown }
-    const intent = raw.day === fresh.day && typeof raw.intent === 'string' ? raw.intent.slice(0, 120) : ''
-    // appliedIntent 與 intent 同規則：換天歸零；同一天沒有此欄位（舊存檔）時沿用當日
-    // intent——任務本來就是那份意圖長出來的，移轉不是猜測。
+    const legacyStringIntent = typeof (raw as { intent?: unknown }).intent === 'string'
+    const intent = raw.day === fresh.day
+      ? (legacyStringIntent ? { ...EMPTY_INTENT, activities: [] } : validateStructuredIntent((raw as { intent?: unknown }).intent))
+      : { ...EMPTY_INTENT, activities: [] }
+    // appliedIntent 與 intent 同規則：換天歸零；舊字串快照丟棄為空意圖；同一天
+    // 沒有合法結構化物件時沿用當日 intent——任務本來就是那份意圖長出來的，移轉不是猜測。
     const appliedIntent = raw.day === fresh.day
-      ? (typeof raw.appliedIntent === 'string' ? raw.appliedIntent.slice(0, 120)
-        : typeof raw.intent === 'string' ? raw.intent.slice(0, 120) : '')
-      : ''
+      ? (legacyStringIntent ? { ...EMPTY_INTENT, activities: [] }
+        : isValidStructuredIntent(raw.appliedIntent) ? normalizeIntent(raw.appliedIntent)
+        : copyIntent(intent))
+      : { ...EMPTY_INTENT, activities: [] }
     return { ...fresh, ...rest, day: fresh.day, intent, appliedIntent,
       // 地區偏好移轉（F7）：舊資料的跨區自由文字偏好對應成 area='澀谷'＋areaOnly 開啟；
       // 舊資料沒有 areaOnly 欄位時預設開啟（當時沒有關掉的辦法，開啟才是忠實轉換）。
@@ -150,7 +221,11 @@ export function loadDaily(): DailyState {
       // rest 純文字站也要留著（round 8，live N3）：它沒有候選、沒有 noCandidate 標記，
       // 舊版過濾器只留 custom／locked／done／有候選／無候選的站，rest 每次重進頁面
       // 都被濾掉（第 7 輪的 mergeScheduled 只修了「重新生成當下」，沒修載入路徑）。
-      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || t.kind === 'rest' || !!t.candidate?.id || !!t.noCandidate)).map(t => clearStaleCandidate(t, ctx)) : [], notes: raw.notes.filter(n => n !== CROSS_AREA_NOTE).slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked, dislikedKinds }
+      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || t.kind === 'rest' || !!t.candidate?.id || !!t.noCandidate)).map(t => clearStaleCandidate(t, ctx))
+        // 舊字串意圖存檔的 intentSpecified 標記剝離：該站降級為普通 specified
+        // （place 原文、候選原樣保留，標記拿掉）。新存檔的標記是結構化意圖的
+        // 合法標記，必須保留，此步只在 legacyStringIntent 時觸發。
+        .map(t => legacyStringIntent && t.intentSpecified ? { ...t, intentSpecified: undefined } : t) : [], notes: raw.notes.filter(n => n !== CROSS_AREA_NOTE).slice(0,20), avoid: Array.isArray(raw.avoid) ? raw.avoid.slice(0,20) : [], seen: raw.day === fresh.day ? sanitizeSeen(raw.seen) : {}, disliked, dislikedKinds }
   } catch { return fresh }
 }
 export function saveDaily(s: DailyState): void { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch { /* private mode */ } }
@@ -167,237 +242,68 @@ const catalog: Omit<DailyTask,'done'>[] = [
 export function catalogTitle(id: string): string | undefined {
   return catalog.find(t => t.id === id)?.title
 }
-/** 意圖解析（2.0）：把一日級自由文字意圖對應到站 id（不是 kind——kind 不是站的
- * 唯一鍵：catalog 裡探索站與咖啡站的 kind 都是 'creative'，回 kind 會讓「想喝咖啡」
- * 與「去看展覽」同時指定兩站。回傳命中的 catalog id，按 catalog 順序）。
- * 封閉關鍵字表——命中才有站，沒命中回 []（走創意預設），絕不猜測。裸字「展」不在
- * 表內（會誤命中「發展」）；單字 CJK 關鍵字「吃／飯／買」與「運動」同樣已刪
- * （吃藥／住飯店／買不到票／運動會都是同類誤命中——誤判靠刪除猜測規則修，
- * 絕不加反向規則；刪掉後的漏判由創意預設兜底，見測試「刻意的漏判取捨」）。
- * rest 列已刪：休息站是純文字站、沒有可拜訪的店家，不該是意圖目標
- * （指定後伺服器 isTextOnlyRest 不成立，會拿整句去查 Places）；「想休息」
- * 本來就由預設目錄裡的 rest 站滿足。咖啡關鍵字獨立成 coffee 列（咖啡站的 kind 仍是
- * 'creative'——那是種類系統，PR-1 不碰；這裡只改意圖對應的鍵）。
- * 否定與詞邊界（fix round 3：結構性重做，見下方各段註解，不再是刪關鍵字）：
- * - 句讀分節：否定只在同一分句內算（，。、；;！？!?\n 分節），上一分句的「不」
- *   不得否定下一分句的關鍵字（「今天不想太累，想吃拉麵」→ meal）。
- * - 否定雙向檢查：關鍵字前面 4 字內的否定標記（不／沒／別／勿），與關鍵字
- *   後面的後置否定形（ない／ません／なし／抜き／不要／不用／不想＋動詞等），
- *   任一成立即否定。英文否定（don't／no／not）不在本次範圍（已接受的殘留，見 REPORT）。
- * - CJK 關鍵字不再用子字串比對：最長匹配優先（複合詞表裡的合法複合詞是獨立
- *   詞條）＋裸詞幹邊界檢查（bareKeywordBoundaryOk）＋詞尾仍是該物（head-final：
- *   日文複合詞詞尾才是語義中心，回転寿司／渋谷ラーメン仍命中）。羅馬字關鍵字一律
- *   word-boundary regex（case-insensitive），可選的複數 s（`coffees`／`gyms`／
- *   `cafes` 皆命中），`art` 不命中 party／heart，`ramen` 不命中其他單字的一部分。
- * 回傳順序是 catalog 順序。 */
-type IntentEntry = { id: string; cjk: string[]; roman: string[]; compounds: string[] }
-const INTENT_KEYWORDS: IntentEntry[] = [
-  { id: 'gym', cjk: ['健身', '健身房', 'ジム', '筋トレ', 'トレーニング'], roman: ['gym'], compounds: ['ジム通い'] },
-  { id: 'meal', cjk: ['拉麵', 'らーめん', 'ラーメン', '壽司', '寿司', 'すし', 'ご飯', 'ごはん', '定食', '午餐', '午饭', '晚餐', '晚饭', 'ランチ', 'ディナー', '食べ', '餐廳', 'レストラン'], roman: ['ramen', 'sushi', 'restaurant'], compounds: ['食べログ', '食べ放題', '食べ物', '食べ歩き', 'ブランチ', '晚餐會', '午餐會', 'ラーメン屋', '寿司屋', 'すし屋'] },
-  { id: 'creative', cjk: ['展覽', '展覧会', '展示', '美術館', '美術', '畫廊', 'ギャラリー', '博物館', 'アート'], roman: ['art'], compounds: ['美術部', '展示会', '展示場'] },
-  { id: 'coffee', cjk: ['咖啡', 'コーヒー', '珈琲', 'カフェ'], roman: ['cafe', 'coffee'], compounds: ['カフェ巡り', 'カフェイン'] },
-  { id: 'shopping', cjk: ['購物', '買い物', 'ショッピング'], roman: ['shopping'], compounds: [] },
-]
-/** 全部 CJK 詞條（關鍵字＋複合詞），按長度由長到短排——掃描時先試長的，最長匹配優先。
- * 複合詞是封閉表：合法的長詞（食べログ／ジム通い／美術部…）列為獨立詞條；
- * 沒列進表的長詞（ジムニー／アートメイク／すし詰め／食べ過ぎ）不會被當成關鍵字命中，
- * 由創意預設兜底（漏判、安全降級）。每個增減都要有測試覆蓋正反案例。 */
-const CJK_ENTRIES: { text: string; id: string; compound: boolean }[] = INTENT_KEYWORDS.flatMap(e => [
-  ...e.cjk.map(text => ({ text, id: e.id, compound: false })),
-  ...e.compounds.map(text => ({ text, id: e.id, compound: true })),
-]).sort((a, b) => b.text.length - a.text.length)
-const isHiragana = (ch: string): boolean => ch >= '\u3040' && ch <= '\u309f'
-const isKatakana = (ch: string): boolean => ch >= '\u30a0' && ch <= '\u30ff'
-const isKanji = (ch: string): boolean => (ch >= '\u4e00' && ch <= '\u9fff') || (ch >= '\u3400' && ch <= '\u4dbf')
-/** 接在裸關鍵字後面仍表示關鍵字是獨立詞的連接成分（封閉集合，三類）：
- * 連接詞（和／與／或／及／跟／然／就／才／再／完／也／都）——「拉麵然後看展覽」
- * 「健身完去喝咖啡」；助詞（的）——「拉麵的店」；動詞（吃／食／喝／飲／去／行／
- * 看／見／觀／買）——關鍵字是動詞的受詞（「午餐吃定食」「ラーメン食べたい」「ジム行く」）。
- * 不在集合裡的漢字（過ぎ／詰め／史…）表示關鍵字是更長的詞的詞頭（食べ過ぎ／
- * すし詰め／美術史），該次出現不算命中；合法的長詞必須列進複合詞表。 */
-const FOLLOW_OK = new Set([...'和與或及跟然就才再完也都的吃食喝飲去行看見觀買'])
-/** 緊接在裸關鍵字後面、表示「下一個片語開始了」的字（封閉集合）：否定前綴
- * （不／沒／別／勿——不想／不吃／沒有）與情態／繫詞／存在動詞（想／要／是／有／
- * 無／會／能／可／來——「拉麵想吃」「拉麵是最好吃的」）。這些字不可能是一個詞的
- * 詞內延續（沒有任何關鍵字＋這些字的合法複合詞），所以關鍵字仍是獨立詞；
- * 否定與否由否定檢查另行判斷（「拉麵不想吃」在這裡過關，再由後置否定判為否定）。 */
-const PHRASE_START = new Set([...'不沒別勿想要是有無會能可來'])
-/** 裸關鍵字（非複合詞）的右邊界：下一個字元必須不是「詞內延續」。
- * 平假名（助詞／活用語尾：に／を／る／たい…）與非 CJK（空白／標點／句末）表示
- * 關鍵字是獨立詞 → 命中。片假名（ジムニー／アートメイク）與不在 FOLLOW_OK／
- * PHRASE_START 裡的漢字（過ぎ／詰め／史）表示關鍵字是更長的詞的一部分 → 不命中。
- * 詞尾（關鍵字在詞尾）不受此限：日文複合詞是 head-final，詞尾才是語義中心
- * （回転寿司／渋谷ラーメン／猫カフェ），所以左邊界不檢查。 */
-const bareKeywordBoundaryOk = (clause: string, end: number): boolean => {
-  if (end >= clause.length) return true
-  const next = clause.charAt(end)
-  if (isHiragana(next)) return true
-  if (isKatakana(next)) return false
-  if (isKanji(next)) return FOLLOW_OK.has(next) || PHRASE_START.has(next)
-  return true
-}
-/** 意圖分句裡的一個詞條命中：站 id、匹配到的詞條文字（key 是詞條在表內的寫法；
- * 羅馬字複數形時 text 是實際寫法、key 是原形）、在分句裡的位置。 */
-type IntentToken = { id: string; text: string; key: string; start: number; end: number; roman: boolean }
-/** 分句（，。、；;！？!?\n 分節）→ 詞條命中：CJK 用最長匹配掃描，羅馬字用
- * word-boundary regex。裸關鍵字要過右邊界檢查；複合詞本身就是完整詞，不檢查。 */
-const CLAUSE_SPLIT = /[，。、；;！？!?\n]+/
-const tokenizeClause = (clause: string): IntentToken[] => {
-  const tokens: IntentToken[] = []
-  let i = 0
-  while (i < clause.length) {
-    const hit = CJK_ENTRIES.find(e => clause.startsWith(e.text, i))
-    if (hit) {
-      if (hit.compound || bareKeywordBoundaryOk(clause, i + hit.text.length)) {
-        tokens.push({ id: hit.id, text: hit.text, key: hit.text, start: i, end: i + hit.text.length, roman: false })
-        i += hit.text.length
-        continue
-      }
-    }
-    i += 1
+/** 站名（目的地選單、確認摘要用）。內容與舊 INTENT_STATION_LABEL 一字不動，僅改名。 */
+export const DAILY_STATION_LABEL: Record<IntentStationId, string> =
+  { gym: '健身站', meal: '午餐站', creative: '探索站', coffee: '咖啡站', shopping: '購物站' }
+/** 活動標籤（動詞，checkbox 用）。與站名不同組文字，不得混用。 */
+export const ACTIVITY_LABEL: Record<IntentStationId, string> =
+  { gym: '健身', meal: '吃飯', creative: '看展覽', coffee: '喝咖啡', shopping: '購物' }
+/** 確認摘要：把結構化意圖原樣回饋給使用者——顯示的是使用者明確給出的選擇，
+ * 不是系統推導的結果。永遠回傳非空字串（空意圖也有空狀態文案），UI 永遠渲染。
+ * 只做顯示層整理（目的地 trim、活動按 catalog 順序列出），不套用 §2.5 的便利預設：
+ * 摘要是已存意圖的鏡子，預設是寫入時的規則——寫入時沒預設的站，摘要不得事後替它預設。 */
+export function intentSummaryText(intent: DailyIntent): string {
+  const dest = typeof intent.destination === 'string' ? intent.destination.trim() : ''
+  const station = dest === '' ? '' : (isIntentStationId(intent.destinationStation) ? intent.destinationStation : '')
+  const activities = (Array.isArray(intent.activities) ? intent.activities : []).filter(isIntentStationId)
+    .sort((a, b) => INTENT_CATALOG_ORDER.indexOf(a) - INTENT_CATALOG_ORDER.indexOf(b))
+  const others = activities.filter(id => id !== station)
+  const activityText = (ids: IntentStationId[]) => ids.map(id => ACTIVITY_LABEL[id]).join('、')
+  if (dest === '' && activities.length === 0) return '今天沒有指定目的地或活動，留空就隨興探索。'
+  if (dest === '') return `想做：${activityText(activities)}`
+  if (station === '') {
+    const base = `目的地：${dest}（請選是哪一站，否則不會進路線）`
+    return others.length ? `${base}；想做：${activityText(others)}` : base
   }
-  // 羅馬字關鍵字：word-boundary regex（可選複數 s），與 CJK 命中合併後按位置排序。
-  for (const e of INTENT_KEYWORDS) {
-    for (const k of e.roman) {
-      const re = new RegExp(`\\b${k}s?\\b`, 'gi')
-      let m: RegExpExecArray | null
-      while ((m = re.exec(clause)) !== null) {
-        tokens.push({ id: e.id, text: m[0], key: k, start: m.index, end: m.index + m[0].length, roman: true })
-      }
-    }
-  }
-  return tokens.sort((a, b) => a.start - b.start)
+  const base = `目的地：${dest} → ${DAILY_STATION_LABEL[station]}`
+  return others.length ? `${base}；還想：${activityText(others)}` : base
 }
-/** 否定標記（封閉集合）：關鍵字出現前最多 4 個字元內出現任一標記，該次出現視為被否定。 */
-const NEGATION_MARKERS = ['不', '沒', '別', '勿']
-/** 非否定詞（封閉集合）：標記字元是這些詞的一部分時不是否定——不過／不然／不如／
- * 不管／不論／不但／不僅／不只／不止是連接詞，不過是「但是」的意思；不錯／不少是
- * 「不壞／不少」的固定評價；別的／別人／別處／別樣是人稱／指示詞。
- * 檢查前先把窗口裡的這些詞抹掉（結構性排除，不是逐案反向規則）。 */
-const NON_NEGATION_WORDS = ['不過', '不然', '不如', '不管', '不論', '不但', '不僅', '不只', '不止', '不錯', '不少', '別的', '別人', '別處', '別樣']
-/** 雙重否定（封閉模式）：「不是／並不是／並非」後面再接否定標記，兩個否定相抵
- * （「不是不想吃拉麵」＝想吃）；只有一個否定的「不是拉麵」仍是否定。 */
-const DOUBLE_NEGATION = /(?:不是|並不是|並非)(?:不|沒|別)/
-const blankNonNegationWords = (s: string): string => {
-  let out = s
-  for (const w of NON_NEGATION_WORDS) out = out.split(w).join('□'.repeat(w.length))
-  return out
-}
-/** 前置否定：分句內、關鍵字出現前最多 4 字元內有否定標記（非否定詞已抹掉），
- * 且不是雙重否定（前 6 字元內有「不是＋否定」模式時相抵）。 */
-const isNegatedBefore = (clause: string, start: number): boolean => {
-  const before6 = clause.slice(Math.max(0, start - 6), start)
-  if (DOUBLE_NEGATION.test(before6)) return false
-  const before4 = clause.slice(Math.max(0, start - 4), start)
-  return NEGATION_MARKERS.some(m => blankNonNegationWords(before4).includes(m))
-}
-/** 後置否定形（封閉集合，分三組——都在同一分句內、關鍵字結束後算起）：
- * (a) 動詞否定 ない／ません：5 字以內出現（食べない／行かない／がない——
- *     じゃない／いらない／たくない都含有 ない，所以一條規則全蓋住；
- *     ジムに行きたくない的 ない在 5 字處，ラーメンを食べたくない同理）；
- * (b) 直貼否定 なし／抜き／ぬき／不要／不用：2 字以內（ラーメンなしで／
- *     今日はラーメン抜き／拉麵不要／ラーメンは不要）；
- * (c) 不＋動詞（不想／不吃／不喝／不去／不買／不看／沒吃／沒喝）：2 字以內，
- *     但若否定動詞後 6 字內有別的詞條（該否定動詞自己的受詞），否定歸後者、
- *     不歸前者（「想吃拉麵不想喝咖啡」的拉麵不否定；「拉麵不想吃」的拉麵否定）。
- * 沒有「關鍵字後面出現裸 不／沒 就否定」的規則：裸標記是下一個動詞片語的
- * 前綴（不想喝咖啡），歸那個片語管——否則「想吃拉麵不想喝咖啡」會連拉麵一起殺掉。 */
-const AFTER_NEGATION_NAI = ['ない', 'ません']
-const AFTER_NEGATION_DIRECT = ['なし', '抜き', 'ぬき', '不要', '不用']
-const AFTER_NEGATION_VERB = ['不想', '不吃', '不喝', '不去', '不買', '不看', '沒吃', '沒喝']
-const isNegatedAfter = (clause: string, end: number, allTokens: IntentToken[]): boolean => {
-  const rest = clause.slice(end)
-  for (const form of AFTER_NEGATION_NAI) {
-    const at = rest.indexOf(form)
-    if (at !== -1 && at <= 5) return true
-  }
-  for (const form of AFTER_NEGATION_DIRECT) {
-    const at = rest.indexOf(form)
-    if (at !== -1 && at <= 2) return true
-  }
-  for (const form of AFTER_NEGATION_VERB) {
-    const at = rest.indexOf(form)
-    if (at !== -1 && at <= 2) {
-      // 否定動詞自己的受詞在後面 → 否定歸後者
-      const afterVerb = end + at + form.length
-      if (!allTokens.some(t => t.start >= afterVerb && t.start < afterVerb + 6)) return true
-    }
-  }
-  return false
-}
-/** 某一詞條出現是否被否定：分句內前置檢查或後置檢查任一成立即否定。 */
-const isTokenNegated = (clause: string, token: IntentToken, allTokens: IntentToken[]): boolean =>
-  isNegatedBefore(clause, token.start) || isNegatedAfter(clause, token.end, allTokens)
-/** 第一個命中的關鍵字（parseIntent 與提示共用）：表內順序找（CJK 關鍵字→
- * 複合詞→羅馬字），只認「未被否定」的出現——被否定的關鍵字在提示裡也不出現。 */
-const firstHitKeyword = (text: string, e: IntentEntry): string | undefined => {
-  const candidates = [...e.cjk, ...e.compounds, ...e.roman]
-  const clauseTokens = text.split(CLAUSE_SPLIT).map(clause => ({ clause, tokens: tokenizeClause(clause) }))
-  for (const keyword of candidates) {
-    for (const { clause, tokens } of clauseTokens) {
-      if (tokens.some(t => t.key === keyword && !isTokenNegated(clause, t, tokens))) return keyword
-    }
-  }
-  return undefined
-}
-export function parseIntent(text: string): string[] {
-  if (!text.trim()) return []
-  const hits = new Set<string>()
-  for (const clause of text.split(CLAUSE_SPLIT)) {
-    const tokens = tokenizeClause(clause)
-    for (const t of tokens) {
-      if (!isTokenNegated(clause, t, tokens)) hits.add(t.id)
-    }
-  }
-  return INTENT_KEYWORDS.filter(e => hits.has(e.id)).map(e => e.id)
-}
-/** 意圖解析提示（UI 用）：逐字反映 parseIntent 的輸出——每站取第一個
- * 命中的關鍵字，列出該站。探索站與咖啡站分開顯示。無命中回 null。 */
-const INTENT_STATION_LABEL: Record<string, string> = { gym: '健身站', meal: '午餐站', creative: '探索站', coffee: '咖啡站', shopping: '購物站' }
-export function intentHintText(intent: string): string | null {
-  const hits = parseIntent(intent)
-  if (!hits.length) return null
-  const parts = INTENT_KEYWORDS.filter(e => hits.includes(e.id)).map(e => `${firstHitKeyword(intent, e) ?? ''} → ${INTENT_STATION_LABEL[e.id] ?? e.id}`)
-  return `已辨識：${parts.join('、')}`
-}
+/** 結構化意圖驅動（2.0 重做）：目的地附到 destinationStation 指定的站，活動勾選
+ * 本身不產生查詢字串。分支按順序判斷，第一個符合的勝出；order 固定為創意預設
+ * 再按 avoid 過濾（不動）。目的地原文逐字進 place，不做任何關鍵字比對。 */
 export function buildDaily(s: DailyState): DailyTask[] {
   const previous = new Map(s.tasks.map(t=>[t.id,t]))
   // 2.0：order 固定為創意預設（不再有 mode 分支），再按 avoid 過濾。
   const order = ['gym','meal','creative','coffee','shopping','rest']
-  const intent = (s.intent ?? '').trim()
-  const hits = parseIntent(intent)
+  const intent = normalizeIntent(s.intent ?? EMPTY_INTENT)
+  const applied = s.appliedIntent ?? EMPTY_INTENT
+  const dest = intent.destination.trim()
+  const destStation = dest !== '' ? intent.destinationStation : ''
+  const covered = (id: string) => intent.activities.includes(id as IntentStationId) || id === destStation
   return order.filter(id=>!s.avoid.includes(id)).map(id=>{
     const c = catalog.find(t=>t.id===id)!
     const prev = previous.get(id)
     const base = { ...c, ...prev, done: prev?.done ?? false }
-    if (!hits.includes(id)) {
-      // 日意圖不再命中本站：若本站是上一個日意圖指定的，回復目錄預設
-      // （place／specified／標記／候選全清，只留 done）。意圖清空時這就是
-      // 回復預設的路徑；意圖改成不再命中該站時同理——否則舊意圖的地點會
-      // 永久殘留。逐站指定的站走 base，原樣保留。
-      if (prev?.intentSpecified) return { ...c, done: prev?.done ?? false }
-      return base
-    }
-    // 逐站指定優先於日意圖：使用者親手指定的地點（specified 且無標記），
-    // 日意圖不得覆蓋——place、候選、eta 一律原樣保留。
+    // (1) 逐站指定優先於日意圖：使用者親手指定的地點，日意圖不得覆蓋。
     if (prev?.specified && !prev.intentSpecified) return base
-    // 日意圖命中的站：place＝意圖原文、specified＋intentSpecified（走既有
-    // specified 語意：查詢字串＝原話、不套類型／地區／評論門檻、完整重生時保留）。
-    // 舊候選只在「同一意圖、已是日意圖指定站」時保留——同一意圖的判斷是 state 層的
-    // appliedIntent（這份任務是哪份意圖長出來的），不是 prev.place：搜尋成功後 place
-    // 永遠是店家地址（api/daily-route.ts:277），拿 place 比 intent 在搜尋後永不成立，
-    // 每敲一個字、按「今天略過」都會靜默清掉已搜到的候選（R2-F3）。保留時 place 留著
-    // 店家地址（base 帶著 prev 的 place／candidate／eta），不重設為意圖原文；意圖換了，
-    // 舊候選就是過期的，連同 eta／departure／travelMin／conflict／noCandidate 一起清掉
-    // （noCandidate 是舊查詢的結果，留著會在新查詢下顯示過期的「沒有店」原因）。
-    if (prev?.intentSpecified && s.appliedIntent === intent && prev.candidate) return { ...base, specified: true, intentSpecified: true }
-    return { ...base, place: intent, specified: true, intentSpecified: true, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, noCandidate: undefined, noCandidateReason: undefined }
+    // (2) 意圖不再覆蓋本站：目的地移走／活動取消勾選／目的地清空時，該站回復目錄預設。
+    if (prev?.intentSpecified && !covered(id)) return { ...c, done: prev?.done ?? false }
+    // (3) 目的地站：同一意圖重跑且有候選時保留（place 留著店家地址）；否則新指定，
+    // 舊候選連同 noCandidate 一起清掉（noCandidate 是舊查詢的結果）。
+    if (id === destStation) {
+      if (prev?.intentSpecified && sameIntent(applied, intent) && prev.candidate) return { ...base, specified: true, intentSpecified: true }
+      return { ...base, place: dest, specified: true, intentSpecified: true, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, noCandidate: undefined, noCandidateReason: undefined }
+    }
+    // (4) 本站曾是目的地站，現在只是被選活動站：變回普通自動站。
+    if (prev?.intentSpecified && covered(id)) return { ...base, place: undefined, specified: false, intentSpecified: false, candidate: undefined, eta: undefined, departure: undefined, travelMin: undefined, conflict: undefined, noCandidate: undefined, noCandidateReason: undefined }
+    // (5) 未被意圖覆蓋的站：維持現有 previous 合併行為不變。
+    return base
   })
 }
 /** 伺服器回應的 stops 經 sanitize（api/daily-route.ts 只保留已知欄位），
- * intentSpecified 標記會被洗掉；搜尋前是日意圖站、回應仍是指定站的，把標記
- * 從舊 state 補回來——否則下次換意圖時該站會被誤當成逐站指定、再也跟不上日意圖。
- * 標記只看「搜尋前是日意圖站」且「回應仍是指定站」：place 被伺服器改寫成店家
+ * intentSpecified 標記會被洗掉；搜尋前是結構化日意圖站、回應仍是指定站的，把標記
+ * 從舊 state 補回來——否則下次換意圖時該站會被誤當成逐站指定、再也跟不上結構化日意圖。
+ * 標記只看「搜尋前是結構化日意圖站」且「回應仍是指定站」：place 被伺服器改寫成店家
  * 地址是正常的成功行為（api/daily-route.ts:277），不是意圖被改，所以 place
  * 相等絕不能是條件——成功路徑下它永不相等，101–120 字意圖連保留路徑都會被
  * sanitize 截到 100 字。api 檔本身不動。 */
@@ -411,7 +317,7 @@ export function replanDaily(s: DailyState): DailyState {
   const done = s.tasks.filter(t=>t.done || t.locked || t.custom)
   const pending = buildDaily(s).filter(t=>!t.done && !done.some(d=>d.id===t.id))
   // 這份任務是當次意圖長出來的：記下 appliedIntent，下次重跑比的就是它（R2-F3）。
-  return { ...s, appliedIntent: (s.intent ?? '').trim(), tasks: [...done,...pending] }
+  return { ...s, appliedIntent: copyIntent(s.intent), tasks: [...done,...pending] }
 }
 /** 出發地的身分：目前位置，或輸入的地名。 */
 export const originKey = (s: DailyState): string => s.useHere ? 'here' : 'text:' + s.currentPlace.trim()
@@ -423,7 +329,7 @@ export const originKey = (s: DailyState): string => s.useHere ? 'here' : 'text:'
 export function routeProposal(s: DailyState): DailyState {
   const from = s.routedFrom ?? 'text:' + s.currentPlace.trim()
   const base = from === originKey(s) ? s : { ...s, tasks: s.tasks.filter(t => t.done || t.locked || t.custom || t.specified) }
-  return base.tasks.length ? replanDaily(base) : { ...base, appliedIntent: (base.intent ?? '').trim(), tasks: buildDaily(base) }
+  return base.tasks.length ? replanDaily(base) : { ...base, appliedIntent: copyIntent(base.intent), tasks: buildDaily(base) }
 }
 /** 定位拿不到的原因（畫面文字）。 */
 export const GEO_FAIL_TEXT: Record<GeoReason, string> = {
@@ -557,7 +463,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
       const data=(await response.json()) as DailyRouteResponse
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
-      change(old=>({...old,tasks:restoreIntentSpecified(data.stops??old.tasks, old.tasks),appliedIntent:proposed.appliedIntent ?? (proposed.intent ?? '').trim(),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
+      change(old=>({...old,tasks:restoreIntentSpecified(data.stops??old.tasks, old.tasks),appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
       setRouteKm(data.routeVerified?data.distanceKm??null:null)
       setTravelMin(data.routeVerified?data.travelMinutes??null:null)
       setConflicts(data.conflicts??[])
@@ -642,7 +548,6 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     })()
   }
   const completed=state.tasks.filter(t=>t.done).length
-  const intentHint=intentHintText(state.intent ?? '')
   return <section className="screen dd" data-screen="daily-decision">
     <header className="dd-header">
       <button className="dd-back" onClick={onBack} aria-label="返回">← 返回</button>
@@ -666,9 +571,32 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
             ?<button className="dd-secondary" data-testid="daily-origin-typed" disabled={busy!==null} onClick={pickTyped}>改用輸入地點</button>
             :<button className="dd-secondary" data-testid="daily-origin-here" disabled={busy!==null} onClick={pickHere}>📍 用目前位置</button>}
           <small>{state.useHere?'每次搜尋都重新定位；座標只送去查店、排路線，不存在手機。':'預設以澀谷站為出發點；可輸入確切地點，或按「用目前位置」。'}</small>
-          <label htmlFor="daily-intent">今天想去哪裡／想做什麼</label>
-          <input id="daily-intent" data-testid="daily-intent" aria-label="今天想去哪裡／想做什麼" value={state.intent ?? ''} maxLength={120} placeholder="例如：想吃拉麵、去看展覽（留空就隨興探索）" onChange={e=>change(s=>replanDaily({...s,intent:e.target.value.slice(0,120)}))} />
-          {intentHint && <small data-testid="daily-intent-hint">{intentHint}</small>}
+          <fieldset className="dd-intent">
+            <legend>今天想去哪裡／想做什麼</legend>
+            <label htmlFor="daily-intent-destination">想去哪裡</label>
+            <input id="daily-intent-destination" data-testid="daily-intent-destination" aria-label="想去哪裡" value={state.intent.destination} maxLength={120} placeholder="例如：一蘭、Fuglen Tokyo、下北澤（可留空）" onChange={e=>change(s=>replanDaily({...s,intent:normalizeIntent({...s.intent,destination:e.target.value.slice(0,120)})}))} />
+            <label htmlFor="daily-intent-destination-station">目的地是哪一站</label>
+            <div className="dd-area">
+              <select id="daily-intent-destination-station" data-testid="daily-intent-destination-station" aria-label="目的地是哪一站" value={state.intent.destinationStation} onChange={e=>change(s=>replanDaily({...s,intent:normalizeIntent({...s.intent,destinationStation:e.target.value as IntentStationId | ''})}))}>
+                <option value="">請選擇是哪一站…</option>
+                {(['gym','meal','creative','coffee','shopping'] as const).map(id=><option key={id} value={id}>{DAILY_STATION_LABEL[id]}</option>)}
+              </select>
+            </div>
+            <div className="dd-intent-activities" role="group" aria-label="今天想做什麼">
+              <span className="dd-area-only">想做什麼（可多選）</span>
+              {(['gym','meal','creative','coffee','shopping'] as const).map(id=>(
+                <label key={id} className="dd-area-only">
+                  <input type="checkbox" data-testid={`daily-intent-activity-${id}`} checked={state.intent.activities.includes(id)} onChange={e=>change(s=>{
+                    const activities = e.target.checked ? [...s.intent.activities, id] : s.intent.activities.filter(x=>x!==id)
+                    const avoid = e.target.checked ? s.avoid.filter(x=>x!==id) : s.avoid
+                    return replanDaily({...s,avoid,intent:normalizeIntent({...s.intent,activities})})
+                  })} />
+                  {ACTIVITY_LABEL[id]}
+                </label>
+              ))}
+            </div>
+            <small data-testid="daily-intent-summary">{intentSummaryText(state.intent)}</small>
+          </fieldset>
           <label htmlFor="daily-area">地區偏好</label>
           <div className="dd-area">
             <select id="daily-area" aria-label="地區偏好" value={state.area} disabled={busy!==null} onChange={e=>{change(s=>({...s,area:e.target.value}));clearRoute();setStatus('地區變更，請重新搜尋路線')}}>
@@ -704,7 +632,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
         </aside>
         <div className="dd-itinerary">
           <div className="dd-section-title"><div><span>▸ 任務路線</span><h2>今日路線</h2></div><span className="dd-count">{state.tasks.length} STOPS{routeKm!==null?" · "+routeKm+" KM":""}{travelMin!==null?" · 步行 "+travelMin+" MIN":""}</span></div>
-          {state.tasks.length===0?<div className="dd-empty"><span>✳</span><h3>今天還沒有行程</h3><p>先在「今天想去哪裡／想做什麼」寫下今天的想法，留空就隨興探索；再點「搜尋店家並生成路線」，讓今天開始。</p></div>:<div className="dd-timeline" aria-label="今日任務">
+          {state.tasks.length===0?<div className="dd-empty"><span>✳</span><h3>今天還沒有行程</h3><p>先在「今天想去哪裡／想做什麼」選今天想做的事、想去的地方，留空就隨興探索；再點「搜尋店家並生成路線」，讓今天開始。</p></div>:<div className="dd-timeline" aria-label="今日任務">
             {state.tasks.map((t,i)=><article className={'dd-stop'+(t.done?' is-done':'')} key={t.id}>
               <div className="dd-marker"><span>{String(i+1).padStart(2,'0')}</span></div>
               <div className="dd-card">
@@ -730,7 +658,11 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 </div>
                 <div className="dd-actions dd-actions-secondary">
                   <label className="dd-done"><input type="checkbox" checked={t.done} onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done:e.target.checked}:x)}))}/><span>{t.done?'已完成':'標記完成'}</span></label>
-                  {t.custom?<button onClick={()=>change(s=>({...s,tasks:s.tasks.filter(x=>x.id!==t.id)}))}>移除安排</button>:!t.done&&!t.locked?<button className="dd-muted" onClick={()=>change(s=>replanDaily({...s,avoid:[...new Set([...s.avoid,t.id])]}))}>今天略過</button>:null}
+                  {/* 「今天略過」同時移除該站的活動勾選、並在它是目的地站時把站清為 ''（目的地文字保留）。
+                    這裡不經 normalizeIntent：寫入的意圖已是正規形（已正規意圖的子集），而重跑
+                    normalizeIntent 會觸發便利預設、把目的地重新附到剩下的唯一活動上，違背
+                    「把站清為 ''」的本意。見 REPORT「設計缺口註記」。 */}
+                  {t.custom?<button onClick={()=>change(s=>({...s,tasks:s.tasks.filter(x=>x.id!==t.id)}))}>移除安排</button>:!t.done&&!t.locked?<button className="dd-muted" onClick={()=>change(s=>replanDaily({...s,avoid:[...new Set([...s.avoid,t.id])],intent:{...s.intent,activities:s.intent.activities.filter(x=>x!==t.id),destinationStation:s.intent.destinationStation===t.id?'':s.intent.destinationStation}}))}>今天略過</button>:null}
                 </div>
                 {!t.done&&<details className="dd-change-place"><summary>⌖ 指定／修改這一站的地點</summary>
                   <label>輸入店家名稱或地址
