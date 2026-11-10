@@ -13,16 +13,19 @@
  * interception is missing. Do not re-enable the checker without first
  * renaming one of the two insignia files.
  *
- * No `thresholds.break` is set: the measured baseline is 48.24%
- * (170 mutants, 82 killed / 87 survived / 1 no coverage), far below any
- * useful gate. Add a threshold only after the surviving StringLiteral
- * mutants (mostly unasserted TYPE_KINDS / GENERIC_TYPES mappings) are
- * killed by stronger tests. No top-level `tsconfig` option: Stryker 10
- * warns it is unknown.
+ * `thresholds.break` is 95. Observed ceiling 98.24%–98.82% (167–168/170
+ * scored) across four runs on main 5fa0a2e6: the score fluctuates run to run
+ * because Stryker classifies borderline mutants as Timeout under timing
+ * pressure (dry run 11 s vs 15 s, total 2m50s vs 3m55s). 95 sits ≥3.2
+ * points below the lowest observed score. 98 would be too tight: only
+ * 0.24 points of headroom above the low end, and one new equivalent
+ * mutant (−0.59) would drop the score to 97.65, below 98.
+ * No top-level `tsconfig` option: Stryker 10 warns it is unknown.
  */
 export default {
   mutate: ['src/placeKind.ts'],
   testRunner: 'vitest',
   checkers: [],
   concurrency: 2,
+  thresholds: { break: 95 },
 };
