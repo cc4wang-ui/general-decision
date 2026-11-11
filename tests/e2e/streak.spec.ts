@@ -36,7 +36,10 @@ async function stableBox(page: Page, loc: Locator) {
   await page.evaluate(async () => {
     await document.fonts.ready
     await Promise.all([...document.images].filter((i) => !i.complete).map((i) => new Promise((r) => { i.onload = i.onerror = r })))
-    await Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined)))
+    // 無限循環的動畫（班長頭像的呼吸）永遠不會 finished，也不影響版面，不等它。
+    await Promise.all(document.getAnimations()
+      .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+      .map((a) => a.finished.catch(() => undefined)))
   })
   let prev = await loc.boundingBox()
   for (let i = 0; i < 30; i++) {

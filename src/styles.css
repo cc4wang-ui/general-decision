@@ -158,11 +158,13 @@ main[data-level="2"]{--lv-bg:#FFDDCF;--meme-edge:#1D2B24;--card-edge:3px;--meme-
 .avatar-button{border-radius:22px}
 .plate .name{font-size:2rem;font-weight:900}
 .back+.officer{margin-top:0}
-.topnav{gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.topnav{gap:6px;flex-wrap:nowrap;justify-content:flex-end}
 [data-screen="home"] .topnav{margin:0}
-.topnav button,.topnav .nov{min-height:44px;padding:8px 14px;font-weight:700;background:var(--card);border:var(--card-edge) solid var(--edge);border-radius:999px;box-shadow:0 3px 0 var(--edge)}
+.topnav button,.topnav .nov{flex:none;min-height:44px;padding:8px 11px;font-weight:700;white-space:nowrap;background:var(--card);border:var(--card-edge) solid var(--edge);border-radius:999px;box-shadow:0 3px 0 var(--edge)}
 .topnav button:not(.nov):after{content:none}
-.topnav .nov{margin-right:auto}
+/* 連勝標籤吃剩下的寬度，放不下就截掉，不換行：首頁格子的位置不能被它擠動。 */
+.topnav .streak{flex:1 1 0;min-width:0;overflow:hidden;white-space:nowrap}
+.topnav .nov:first-child{margin-right:auto}
 .bubble{border-color:var(--edge);border-radius:22px}
 .bubble:before{border-color:var(--edge);left:34px}
 .tile{border-color:var(--edge);border-radius:24px;color:var(--on-color);overflow:hidden}
@@ -194,3 +196,12 @@ main[data-level="2"]{--lv-bg:#FFDDCF;--meme-edge:#1D2B24;--card-edge:3px;--meme-
 @media(prefers-reduced-motion:no-preference){.officer .av svg{animation:bob 3.2s ease-in-out infinite;transform-origin:50% 100%}.tile .ico{transition:transform .18s}.tile:active .ico{transform:rotate(-8deg) scale(1.08)}@keyframes bob{0%,100%{transform:none}50%{transform:translateY(-2px) rotate(-1.5deg)}}}
 .meme.wide{border-color:var(--edge);border-top-color:var(--officer-green)}
 .stars button.lit{border-color:var(--edge)}
+/* 首頁要一屏放完（iPhone 13 可視高 664px）：名牌與主卡收一點。 */
+[data-screen="home"] .officer{padding:10px 12px}
+[data-screen="home"] .officer .av{width:76px;height:76px;border-radius:20px}
+[data-screen="home"] .plate .name{font-size:1.75rem;margin-top:2px}
+[data-screen="home"] .plate .meta,[data-screen="home"] .plate .tap{margin-top:3px}
+[data-screen="home"] .bubble{padding:14px 16px}
+[data-screen="home"] .tile:first-child{min-height:132px}
+[data-screen="home"] .tile:first-child .ico{width:108px;height:108px;margin-top:-54px}
+.stats.two .stat:nth-child(2){border-color:var(--edge)}

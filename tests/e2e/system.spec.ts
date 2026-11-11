@@ -10,14 +10,14 @@ test('深色模式：背景換成深色 token', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await page.goto('/')
   const bg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor)
-  expect(bg).toBe('rgb(0, 0, 0)') // --khaki dark = #000000（NES 色盤，階段 3b）
+  expect(bg).toBe('rgb(18, 28, 23)') // --khaki dark = #121C17（2026-11 改版）
 })
 
-test('淺色模式：背景是卡其色', async ({ page }) => {
+test('淺色模式：背景是奶油色', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await page.goto('/')
   const bg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor)
-  expect(bg).toBe('rgb(252, 224, 168)') // --khaki = #FCE0A8（NES 色盤，階段 3b）
+  expect(bg).toBe('rgb(255, 244, 220)') // --khaki = #FFF4DC（2026-11 改版）
 })
 
 test('梗圖字用 clamp，超長 big 會換行不溢出', async ({ page }) => {
