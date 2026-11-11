@@ -647,6 +647,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   /** 底部選單（版面用，不進存檔）：目前開的是哪一項設定；null＝全收起。 */
   const [sheet,setSheet] = useState<SheetId | null>(null)
   const sheetPanel = useRef<HTMLDivElement>(null)
+  /** 已安排的行程分兩步填（版面用）。名稱或地點還沒填時一律停在第一步。 */
+  const [fixedStep,setFixedStep] = useState<1 | 2>(1)
+  const fixedStepShown = fixedStep === 2 && fixedTitle.trim() && fixedPlace.trim() ? 2 : 1
   useEffect(() => {
     if (sheet === null) return
     // preventScroll：選單從畫面下方升起，升到一半就對焦會把整頁往下捲。
@@ -797,16 +800,24 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
         </div>
         <small>{state.areaOnly!==false?`只找 ${state.area} 中心 1 公里內的店；指定／固定／已完成的地點不受影響。`:'不限區域；任何地區的店都可能出現。'}</small>
         </div>
-        <div className="dd-sheet-body" hidden={sheet!=='fixed'}>
-        <div className="dd-form">
-          <label>行程名稱<input aria-label="既有行程名稱" placeholder="例如：與朋友見面" value={fixedTitle} onChange={e=>setFixedTitle(e.target.value)}/></label>
-          <label>地點<input aria-label="既有行程地點" placeholder="例如：吉祥寺" value={fixedPlace} onChange={e=>setFixedPlace(e.target.value)}/></label>
-          <div className="dd-form-row">
-            <label>開始時間<input aria-label="開始時間" type="time" value={fixedTime} onChange={e=>setFixedTime(e.target.value)}/></label>
-            <label>分鐘<input aria-label="行程長度分鐘" type="number" min="5" max="720" value={fixedMinutes} onChange={e=>setFixedMinutes(e.target.value)}/></label>
+        {/* 已安排的行程分兩步，每步兩個欄位：先填名稱與地點，再填時間與長度。 */}
+        <div className="dd-sheet-body" hidden={sheet!=='fixed'||fixedStepShown!==1}>
+          <div className="dd-form">
+            <label>行程名稱<input aria-label="既有行程名稱" placeholder="例如：與朋友見面" value={fixedTitle} onChange={e=>setFixedTitle(e.target.value)}/></label>
+            <label>地點<input aria-label="既有行程地點" placeholder="例如：吉祥寺" value={fixedPlace} onChange={e=>setFixedPlace(e.target.value)}/></label>
+            <button className="dd-secondary" data-testid="daily-fixed-next" disabled={!fixedTitle.trim()||!fixedPlace.trim()} onClick={()=>setFixedStep(2)}>下一步：填時間</button>
           </div>
-          <button className="dd-secondary" disabled={!fixedTitle.trim()||!fixedPlace.trim()||Number(fixedMinutes)<5||Number(fixedMinutes)>720} onClick={()=>{change(s=>addFixedTask(s,fixedTitle,fixedPlace,fixedTime,Number(fixedMinutes)));setFixedTitle('');setFixedPlace('');setSheet(null)}}>加入固定行程</button>
         </div>
+        <div className="dd-sheet-body" hidden={sheet!=='fixed'||fixedStepShown!==2}>
+          <div className="dd-form">
+            <p className="dd-fixed-recap">{fixedTitle.trim()}｜{fixedPlace.trim()}</p>
+            <div className="dd-form-row">
+              <label>開始時間<input aria-label="開始時間" type="time" value={fixedTime} onChange={e=>setFixedTime(e.target.value)}/></label>
+              <label>分鐘<input aria-label="行程長度分鐘" type="number" min="5" max="720" value={fixedMinutes} onChange={e=>setFixedMinutes(e.target.value)}/></label>
+            </div>
+            <button className="dd-secondary" disabled={!fixedTitle.trim()||!fixedPlace.trim()||Number(fixedMinutes)<5||Number(fixedMinutes)>720} onClick={()=>{change(s=>addFixedTask(s,fixedTitle,fixedPlace,fixedTime,Number(fixedMinutes)));setFixedTitle('');setFixedPlace('');setFixedStep(1);setSheet(null)}}>加入固定行程</button>
+            <button className="dd-secondary" data-testid="daily-fixed-back" onClick={()=>setFixedStep(1)}>← 改名稱或地點</button>
+          </div>
         </div>
         <div className="dd-sheet-body" hidden={sheet!=='notes'}>
         <div className="dd-form">

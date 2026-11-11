@@ -128,6 +128,24 @@ test('版面：設定是膠囊不是長表單；主按鍵固定在底部；第�
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('daily-sheet')).toBeHidden()
   await expect(page.getByTestId('daily-chip-acts')).toContainText('吃飯')
+  // 每一張選單打開後，看得到的欄位最多兩個（「想做什麼」那組多選算一個）。已安排的行程分兩步。
+  const shown = () => page.locator('.dd-sheet-body:not([hidden])').evaluateAll((bs) => bs.map((b) => b.querySelector('.dd-intent-activities') ? 1 : b.querySelectorAll('input,select,textarea').length))
+  for (const id of ['origin', 'time', 'dest', 'acts', 'area', 'fixed', 'notes']) {
+    await page.getByTestId('daily-chip-' + id).click()
+    const n = await shown()
+    expect(n, id).toHaveLength(1)
+    expect(n[0], id).toBeLessThanOrEqual(2)
+    if (id === 'fixed') {
+      await page.getByLabel('既有行程名稱').fill('與朋友見面')
+      await page.getByLabel('既有行程地點').fill('吉祥寺')
+      await page.getByTestId('daily-fixed-next').click()
+      const n2 = await shown()
+      expect(n2).toEqual([2])
+      await expect(page.getByLabel('行程長度分鐘')).toBeVisible()
+      await expect(page.getByLabel('既有行程名稱')).toBeHidden()
+    }
+    await page.getByTestId('daily-sheet-close').click()
+  }
   // 第一屏：行程清單的開頭在主按鍵上方。
   const dock = (await page.locator('.dd-dock').boundingBox())!
   const list = (await page.locator('.dd-itinerary').boundingBox())!

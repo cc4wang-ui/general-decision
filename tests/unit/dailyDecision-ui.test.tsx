@@ -972,15 +972,37 @@ describe('2026-11 版面重排：設定收成膠囊＋底部選單', () => {
     fireEvent.click(screen.getByLabelText('只在這一帶找店'))
     expect(screen.getByTestId('daily-chip-area').textContent).toBe('地區不限區域')
   })
-  it('一張選單最多兩個欄位（出發地、時間、想去哪、想做什麼、地區）', async () => {
+  it('每一張選單最多兩個欄位，沒有例外（已安排的行程拆成兩步）', async () => {
     seed(cand('d47', 'd47食堂'))
     render(<DailyDecision onBack={() => {}} />)
     await settlePhoto()
     const bodies = [...document.querySelectorAll<HTMLElement>('.dd-sheet-body')]
-    expect(bodies).toHaveLength(7)
+    // 出發地、時間、想去哪、想做什麼、地區、已安排（第一步）、已安排（第二步）、備註
+    expect(bodies).toHaveLength(8)
     // 「想做什麼」是一組多選，算一個欄位。
     const fields = (b: HTMLElement) => b.querySelector('.dd-intent-activities') ? 1 : b.querySelectorAll('input,select,textarea').length
-    expect(bodies.slice(0, 5).map(fields)).toEqual([1, 1, 2, 1, 2])
+    expect(bodies.map(fields)).toEqual([1, 1, 2, 1, 2, 2, 2, 1])
+    for (const n of bodies.map(fields)) expect(n).toBeLessThanOrEqual(2)
+  })
+  it('已安排的行程：一次只看得到一步；名稱與地點填完才能到第二步；可以退回', async () => {
+    seed(cand('d47', 'd47食堂'))
+    render(<DailyDecision onBack={() => {}} />)
+    await settlePhoto()
+    const { fireEvent } = await import('@testing-library/react')
+    const step = (label: string) => screen.getByLabelText(label).closest<HTMLElement>('.dd-sheet-body')!
+    fireEvent.click(screen.getByTestId('daily-chip-fixed'))
+    expect(step('既有行程名稱').hidden).toBe(false)
+    expect(step('行程長度分鐘').hidden).toBe(true)
+    expect(screen.getByTestId<HTMLButtonElement>('daily-fixed-next').disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText('既有行程名稱'), { target: { value: '與朋友見面' } })
+    fireEvent.change(screen.getByLabelText('既有行程地點'), { target: { value: '吉祥寺' } })
+    fireEvent.click(screen.getByTestId('daily-fixed-next'))
+    expect(step('既有行程名稱').hidden).toBe(true)
+    expect(step('行程長度分鐘').hidden).toBe(false)
+    expect(screen.getByText('與朋友見面｜吉祥寺')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('daily-fixed-back'))
+    expect(step('既有行程名稱').hidden).toBe(false)
+    expect(step('行程長度分鐘').hidden).toBe(true)
   })
   it('備註存檔後膠囊顯示則數；加入已安排行程後選單收起、行程出現', async () => {
     seed(cand('d47', 'd47食堂'))
@@ -995,6 +1017,7 @@ describe('2026-11 版面重排：設定收成膠囊＋底部選單', () => {
     fireEvent.click(screen.getByTestId('daily-chip-fixed'))
     fireEvent.change(screen.getByLabelText('既有行程名稱'), { target: { value: '與朋友見面' } })
     fireEvent.change(screen.getByLabelText('既有行程地點'), { target: { value: '吉祥寺' } })
+    fireEvent.click(screen.getByTestId('daily-fixed-next'))
     fireEvent.click(screen.getByText('加入固定行程'))
     expect(screen.getByTestId('daily-sheet').hidden).toBe(true)
     expect(screen.getByRole('heading', { name: '與朋友見面' })).toBeTruthy()

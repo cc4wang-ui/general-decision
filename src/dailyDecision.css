@@ -129,7 +129,9 @@
 .dd-count{max-width:none}
 .dd-chips{gap:6px}
 .dd-chip{min-height:40px;padding:6px 12px}
-.dd-live-status:empty{display:none}
+/* 沒訊息時收到看不見，但不用 display:none：狀態列是 aria-live，元素要一直在，新訊息才念得出來。 */
+.dd-live-status:empty{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%)}
+.dd-fixed-recap{font-size:.8125rem;font-weight:800;color:var(--ink);margin:0 0 4px;overflow-wrap:anywhere}
 /* 進場只淡入、不位移：位移動畫（transform）進行中，固定在視窗的底部選單會改以這個畫面為定位基準，
  * 一進來就點膠囊時選單會跑到頁尾、把整頁捲走。 */
 @media(prefers-reduced-motion:no-preference){.dd.screen{animation-name:dd-enter}@keyframes dd-enter{from{opacity:0}to{opacity:1}}}
