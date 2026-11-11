@@ -1,15 +1,7 @@
 {
- "public/design-assets/app-icon-1024.png": {
-  "sha1": "f5eb7b30a31f21e2d36db72b2999caf9fe83127b",
-  "size": 6066
- },
  "public/favicon.svg": {
   "sha1": "ef980067ad13faab4a9f9c91e5d94aa98f985bbc",
   "size": 2393
- },
- "public/icons.svg": {
-  "sha1": "f9897ac25e13de9ea601d2f1ac5d9353dfbefcda",
-  "size": 5031
  },
  "public/icons/apple-touch-icon.png": {
   "sha1": "fea94885d79678477764dd5e6b94bd6f43621aa9",
