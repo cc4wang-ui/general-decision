@@ -36,11 +36,17 @@ test.describe('允許定位', () => {
     await prime(page)
     const sent = await captureRoute(page)
     await openDaily(page)
+    // 2026-11 版面重排：出發地收在膠囊裡，先點開底部選單再操作。
+    await expect(page.getByTestId('daily-origin-here')).toBeHidden()
+    await page.getByTestId('daily-chip-origin').click()
     await page.getByTestId('daily-origin-here').click()
+    // 選了目前位置就直接搜尋：選單自己收起來，行程露出來。
+    await expect(page.getByTestId('daily-sheet')).toBeHidden()
     await expect(page.getByRole('heading', { name: '新宿的定食' })).toBeVisible()
     expect(sent).toHaveLength(1)
     expect(sent[0]!.origin).toEqual({ lat: SHINJUKU.latitude, lng: SHINJUKU.longitude })
     expect(sent[0]!.location).toBeUndefined()
+    await expect(page.getByTestId('daily-chip-origin')).toContainText('📍 目前位置')
     await expect(page.getByTestId('daily-origin')).toHaveText('📍 目前位置')
     await expect(page.locator('#daily-location')).toHaveCount(0)
 
@@ -51,14 +57,17 @@ test.describe('允許定位', () => {
     expect(saved).not.toContain(String(SHINJUKU.longitude))
     await page.reload()
     await page.getByTestId('daily-entry').click()
-    await expect(page.getByTestId('daily-origin')).toHaveText('📍 目前位置')
+    await expect(page.getByTestId('daily-chip-origin')).toContainText('📍 目前位置')
     await page.getByTestId('daily-generate').click()
     await expect.poll(() => sent.length).toBe(2)
     expect(sent[1]!.origin).toEqual({ lat: SHINJUKU.latitude, lng: SHINJUKU.longitude })
 
     // 改回輸入地點：輸入框回來，送地名、不送座標。
+    await page.getByTestId('daily-chip-origin').click()
     await page.getByTestId('daily-origin-typed').click()
     await page.locator('#daily-location').fill('吉祥寺駅')
+    await page.getByTestId('daily-sheet-close').click()
+    await expect(page.getByTestId('daily-chip-origin')).toContainText('吉祥寺駅')
     await page.getByTestId('daily-generate').click()
     await expect.poll(() => sent.length).toBe(3)
     expect(sent[2]!.location).toBe('吉祥寺駅')
@@ -82,11 +91,12 @@ test('定位被拒 → 顯示原因、原行程不動、不送請求（不改用
   const sent = await captureRoute(page)
   await openDaily(page)
   await expect(page.getByRole('heading', { name: '原本的咖啡店' })).toBeVisible()
+  await page.getByTestId('daily-chip-origin').click()
   await page.getByTestId('daily-origin-here').click()
   await expect(page.getByRole('status').filter({ hasText: '無法使用目前位置' })).toContainText('你沒有允許定位')
   await expect(page.getByRole('status').filter({ hasText: '無法使用目前位置' })).toContainText('原行程已保留')
   await expect(page.getByRole('heading', { name: '原本的咖啡店' })).toBeVisible()
-  await expect(page.getByTestId('daily-origin')).toHaveText('📍 目前位置') // 你選的是目前位置，不偷換成澀谷站
+  await expect(page.getByTestId('daily-chip-origin')).toContainText('📍 目前位置') // 你選的是目前位置，不偷換成澀谷站
   expect(sent).toHaveLength(0)
 
   // 再按搜尋：一樣先定位、一樣失敗、一樣不送。
@@ -96,4 +106,41 @@ test('定位被拒 → 顯示原因、原行程不動、不送請求（不改用
   await expect(page.getByRole('status').filter({ hasText: '無法使用目前位置' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '原本的咖啡店' })).toBeVisible()
   expect(sent).toHaveLength(0)
+})
+
+test('版面：設定是膠囊不是長表單；主按鍵固定在底部；第一屏看得到行程', async ({ page }) => {
+  await prime(page)
+  await captureRoute(page)
+  await openDaily(page)
+  const vh = page.viewportSize()!.height
+  // 進來時所有設定欄位都收著，畫面上只有膠囊。
+  for (const id of ['daily-start-time', 'daily-intent-destination', 'daily-intent-destination-station', 'daily-intent-activity-meal']) await expect(page.getByTestId(id)).toBeHidden()
+  await expect(page.locator('#daily-area')).toBeHidden()
+  for (const id of ['origin', 'time', 'dest', 'acts', 'area', 'fixed', 'notes']) await expect(page.getByTestId('daily-chip-' + id)).toBeVisible()
+  // 一次只開一項：開「想做什麼」時，其他項的欄位還是收著。
+  await page.getByTestId('daily-chip-acts').click()
+  await expect(page.getByRole('dialog', { name: '想做什麼' })).toBeVisible()
+  await expect(page.getByTestId('daily-start-time')).toBeHidden()
+  // 開選單不能把背後的頁面捲走。
+  await page.waitForTimeout(300)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  await page.getByTestId('daily-intent-activity-meal').check()
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('daily-sheet')).toBeHidden()
+  await expect(page.getByTestId('daily-chip-acts')).toContainText('吃飯')
+  // 第一屏：行程清單的開頭在主按鍵上方。
+  const dock = (await page.locator('.dd-dock').boundingBox())!
+  const list = (await page.locator('.dd-itinerary').boundingBox())!
+  expect(list.y).toBeLessThan(dock.y - 80)
+  // 產生路線後捲到底：主按鍵還貼在畫面底部，最後一張卡片在它上方、沒被蓋住。
+  await page.getByTestId('daily-generate').click()
+  await expect(page.getByRole('heading', { name: '新宿的定食' })).toBeVisible()
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight / 2))
+  const mid = (await page.getByTestId('daily-generate').boundingBox())!
+  expect(mid.y + mid.height).toBeLessThanOrEqual(vh)
+  expect(mid.y).toBeGreaterThan(vh - 140)
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  const last = (await page.locator('.dd-stop').last().boundingBox())!
+  const end = (await page.locator('.dd-dock').boundingBox())!
+  expect(last.y + last.height).toBeLessThanOrEqual(end.y + 1)
 })

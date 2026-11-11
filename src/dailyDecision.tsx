@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './dailyDecision.css'
 import { PlacePhoto } from './PlacePhoto.tsx'
 import { getLocation, type GeoReason } from './api.ts'
@@ -467,6 +467,11 @@ export function clearSeen(s: DailyState): DailyState {
  * eta 與 departure 各標各的：同一站可能 eta 當天、離開翌日。 */
 const dayMark = (offset?: number): string => !offset ? '' : offset === 1 ? '翌日 ' : `＋${offset}日 `
 
+/** 今日設定的底部選單（版面用）：一顆膠囊對一張選單，一張最多兩個欄位。 */
+const SHEET_IDS = ['origin','time','dest','acts','area','fixed','notes'] as const
+type SheetId = typeof SHEET_IDS[number]
+const SHEET_TITLE: Record<SheetId, string> = { origin:'出發地', time:'幾點開始', dest:'想去哪裡', acts:'想做什麼', area:'地區', fixed:'已安排的行程', notes:'備註' }
+
 export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [state,setState] = useState(loadDaily)
   const [feedback,setFeedback] = useState('')
@@ -639,6 +644,29 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       }
     })()
   }
+  /** 底部選單（版面用，不進存檔）：目前開的是哪一項設定；null＝全收起。 */
+  const [sheet,setSheet] = useState<SheetId | null>(null)
+  const sheetPanel = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (sheet === null) return
+    // preventScroll：選單從畫面下方升起，升到一半就對焦會把整頁往下捲。
+    sheetPanel.current?.focus({ preventScroll: true })
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSheet(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sheet])
+  // 進畫面先回到最上面：首頁捲過的位置不帶進來，否則第一屏會切掉標題與膠囊。
+  useEffect(() => { const el = document.scrollingElement; if (el) el.scrollTop = 0 }, [])
+  /** 每顆膠囊上顯示的現值：只讀 state，不改任何東西。 */
+  const chipValue: Record<SheetId, string> = {
+    origin: state.useHere ? '📍 目前位置' : state.currentPlace.trim() || '澀谷站',
+    time: state.startTime || '現在',
+    dest: state.intent.destination.trim() || '不指定',
+    acts: state.intent.activities.map(id => ACTIVITY_LABEL[id]).join('、') || '隨興',
+    area: state.areaOnly !== false ? state.area : '不限區域',
+    fixed: '＋ 加入',
+    notes: state.notes.length ? `${state.notes.length} 則` : '＋ 加入',
+  }
   const completed=state.tasks.filter(t=>t.done).length
   return <section className="screen dd" data-screen="daily-decision">
     <header className="dd-header">
@@ -648,89 +676,18 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     <div className="dd-shell">
       <div className="dd-hero">
         <div className="dd-eyebrow">{state.day} · 今日任務</div>
-        <h1>今日行程</h1>
+        <div className="dd-hero-row"><h1>今日行程</h1><div className="dd-progress"><span>{completed} / {state.tasks.length} 已完成</span><div className="dd-meter"><i style={{width:state.tasks.length?completed/state.tasks.length*100+'%':'0%'}}/></div></div></div>
         <p>班長幫你挑真店、排步行路線。每一站都能直接導航。</p>
-        <div className="dd-progress"><span>{completed} / {state.tasks.length} 已完成</span><div className="dd-meter"><i style={{width:state.tasks.length?completed/state.tasks.length*100+'%':'0%'}}/></div></div>
       </div>
-      <div className="dd-columns">
-        <aside className="dd-panel">
-          <div className="dd-panel-title"><span>▸ 今日設定</span><span>MISSION SETTINGS</span></div>
-          <label htmlFor={state.useHere?undefined:'daily-location'}>出發地</label>
-          {state.useHere
-            ?<p className="dd-origin-here" data-testid="daily-origin">📍 目前位置</p>
-            :<input id="daily-location" aria-label="出發地" value={state.currentPlace} onChange={e=>{change(s=>({...s,currentPlace:e.target.value.slice(0,80)}));clearRoute();setStatus('起點變更，請重新搜尋路線')}} placeholder="例如：宮下公園" />}
-          {state.useHere
-            ?<button className="dd-secondary" data-testid="daily-origin-typed" disabled={busy!==null} onClick={pickTyped}>改用輸入地點</button>
-            :<button className="dd-secondary" data-testid="daily-origin-here" disabled={busy!==null} onClick={pickHere}>📍 用目前位置</button>}
-          <small>{state.useHere?'每次搜尋都重新定位；座標只送去查店、排路線，不存在手機。':'預設以澀谷站為出發點；可輸入確切地點，或按「用目前位置」。'}</small>
-          <label htmlFor="daily-start-time">幾點開始</label>
-          <input id="daily-start-time" data-testid="daily-start-time" aria-label="幾點開始" type="time" value={state.startTime ?? ''} disabled={busy!==null} onChange={e=>{change(s=>({...s,startTime:normalizeStartTime(e.target.value)}));clearRoute();setStatus('開始時間變更，請重新搜尋路線')}} />
-          <small>留空＝現在就出發；填了就從那個時間開始排（比現在早的時間以現在為準）。時間以東京時間為準。</small>
-          <fieldset className="dd-intent">
-            <legend>今天想去哪裡／想做什麼</legend>
-            <label htmlFor="daily-intent-destination">想去哪裡</label>
-            <input id="daily-intent-destination" data-testid="daily-intent-destination" aria-label="想去哪裡" value={state.intent.destination} maxLength={120} placeholder="例如：一蘭、Fuglen Tokyo、下北澤（可留空）" onChange={e=>change(s=>replanDaily({...s,intent:applyConvenienceDefault(normalizeIntent({...s.intent,destination:e.target.value.slice(0,120)}))}))} />
-            <label htmlFor="daily-intent-destination-station">目的地是哪一站</label>
-            <div className="dd-area">
-              <select id="daily-intent-destination-station" data-testid="daily-intent-destination-station" aria-label="目的地是哪一站" value={state.intent.destinationStation} onChange={e=>{ const v = e.target.value as IntentStationId | ''; return change(s=>replanDaily({...s, avoid: s.avoid.filter(x=>x!==v), intent:normalizeIntent({...s.intent,destinationStation:v})})) }}>
-                {/* 站選單選站＝明確想要（RT4-F1，設計 §2.4）：該站從 avoid 移除，與 checkbox
-                  勾選解除 avoid（設計 §3.4）同一理據——新的明確表達勝過舊的「今天略過」。 */}
-                <option value="">請選擇是哪一站…</option>
-                {(['gym','meal','creative','coffee','shopping'] as const).map(id=><option key={id} value={id}>{DAILY_STATION_LABEL[id]}</option>)}
-              </select>
-            </div>
-            <div className="dd-intent-activities" role="group" aria-label="今天想做什麼">
-              <span className="dd-area-only">想做什麼（可多選）</span>
-              {(['gym','meal','creative','coffee','shopping'] as const).map(id=>(
-                <label key={id} className="dd-area-only">
-                  <input type="checkbox" data-testid={`daily-intent-activity-${id}`} checked={state.intent.activities.includes(id)} onChange={e=>change(s=>{
-                    const activities = e.target.checked ? [...s.intent.activities, id] : s.intent.activities.filter(x=>x!==id)
-                    const avoid = e.target.checked ? s.avoid.filter(x=>x!==id) : s.avoid
-                    return replanDaily({...s,avoid,intent:applyConvenienceDefault(normalizeIntent({...s.intent,activities}))})
-                  })} />
-                  {ACTIVITY_LABEL[id]}
-                </label>
-              ))}
-            </div>
-            <small data-testid="daily-intent-summary">{intentSummaryText(state.intent)}</small>
-          </fieldset>
-          <label htmlFor="daily-area">地區偏好</label>
-          <div className="dd-area">
-            <select id="daily-area" aria-label="地區偏好" value={state.area} disabled={busy!==null} onChange={e=>{change(s=>({...s,area:e.target.value}));clearRoute();setStatus('地區變更，請重新搜尋路線')}}>
-              {AREA_NAMES.map(a=><option key={a} value={a}>{a}</option>)}
-            </select>
-            <label className="dd-area-only"><input type="checkbox" aria-label="只在這一帶找店" checked={state.areaOnly!==false} disabled={busy!==null} onChange={e=>{change(s=>({...s,areaOnly:e.target.checked}));clearRoute();setStatus('地區偏好變更，請重新搜尋路線')}}/><span>只在這一帶找店</span></label>
-          </div>
-          <small>{state.areaOnly!==false?`只找 ${state.area} 中心 1 公里內的店；指定／固定／已完成的地點不受影響。`:'不限區域；任何地區的店都可能出現。'}</small>
-          <button className="dd-primary" data-testid="daily-generate" disabled={busy!==null} onClick={generate}>{busy?(busy==='all'?'搜尋中…':'正在換這一站…'):state.tasks.length?'↻ 搜尋店家並優化路線':'✦ 搜尋店家並生成路線'}</button>
-          {seenCount > 0 && <button className="dd-secondary" data-testid="daily-clear-seen" disabled={busy!==null} onClick={clearSeenRecord}>清除今天換掉的店紀錄</button>}
-          <p className="dd-live-status" role="status" aria-live="polite">{status||"搜尋將使用 Google Places 與 Google Routes"}</p>
-          {notice&&<p className="dd-live-status" role="status" aria-live="polite">{notice}</p>}
-          {conflicts.length>0&&<div className="dd-conflicts" role="alert">{conflicts.map((c,i)=><p key={i}>⚠ {c}</p>)}</div>}
-          <details className="dd-details">
-            <summary>＋ 加入已安排的行程</summary>
-            <div className="dd-form">
-              <label>行程名稱<input aria-label="既有行程名稱" placeholder="例如：與朋友見面" value={fixedTitle} onChange={e=>setFixedTitle(e.target.value)}/></label>
-              <label>地點<input aria-label="既有行程地點" placeholder="例如：吉祥寺" value={fixedPlace} onChange={e=>setFixedPlace(e.target.value)}/></label>
-              <div className="dd-form-row">
-                <label>開始時間<input aria-label="開始時間" type="time" value={fixedTime} onChange={e=>setFixedTime(e.target.value)}/></label>
-                <label>分鐘<input aria-label="行程長度分鐘" type="number" min="5" max="720" value={fixedMinutes} onChange={e=>setFixedMinutes(e.target.value)}/></label>
-              </div>
-              <button className="dd-secondary" disabled={!fixedTitle.trim()||!fixedPlace.trim()||Number(fixedMinutes)<5||Number(fixedMinutes)>720} onClick={()=>{change(s=>addFixedTask(s,fixedTitle,fixedPlace,fixedTime,Number(fixedMinutes)));setFixedTitle('');setFixedPlace('')}}>加入固定行程</button>
-            </div>
-          </details>
-          <details className="dd-details">
-            <summary>＋ 備註</summary>
-            <div className="dd-form">
-              <textarea aria-label="補充偏好" value={feedback} maxLength={160} rows={3} placeholder="例如：今天想吃拉麵（僅備註，不影響搜尋）" onChange={e=>setFeedback(e.target.value)}/>
-              <button className="dd-secondary" onClick={addFeedback} disabled={!feedback.trim()}>儲存備註</button>
-              <div className="dd-notes">{state.notes.map((n,i)=><p key={i}>· {n}</p>)}</div>
-            </div>
-          </details>
-        </aside>
-        <div className="dd-itinerary">
-          <div className="dd-section-title"><div><span>▸ 任務路線</span><h2>今日路線</h2></div><span className="dd-count">{state.tasks.length} STOPS{routeKm!==null?" · "+routeKm+" KM":""}{travelMin!==null?" · 步行 "+travelMin+" MIN":""}</span></div>
-          {state.tasks.length===0?<div className="dd-empty"><span>✳</span><h3>今天還沒有行程</h3><p>先在「今天想去哪裡／想做什麼」選今天想做的事、想去的地方，留空就隨興探索；再點「搜尋店家並生成路線」，讓今天開始。</p></div>:<div className="dd-timeline" aria-label="今日任務">
+      {/* 今日設定：一排摘要膠囊。點一顆只開那一項的底部選單，不再是一張直排長表單。 */}
+      <div className="dd-chips" role="group" aria-label="今日設定">
+        {SHEET_IDS.map(id=><button key={id} type="button" className="dd-chip" data-testid={'daily-chip-'+id} aria-haspopup="dialog" aria-expanded={sheet===id} onClick={()=>setSheet(id)}><span>{SHEET_TITLE[id]}</span><b>{chipValue[id]}</b></button>)}
+      </div>
+      <small className="dd-intent-summary" data-testid="daily-intent-summary">{intentSummaryText(state.intent)}</small>
+      {conflicts.length>0&&<div className="dd-conflicts" role="alert">{conflicts.map((c,i)=><p key={i}>⚠ {c}</p>)}</div>}
+      <div className="dd-itinerary">
+          <div className="dd-section-title"><h2>今日路線</h2><span className="dd-count">{state.tasks.length} STOPS{routeKm!==null?" · "+routeKm+" KM":""}{travelMin!==null?" · 步行 "+travelMin+" MIN":""}</span></div>
+          {state.tasks.length===0?<div className="dd-empty"><span>✳</span><h3>今天還沒有行程</h3><p>先點上面的「想去哪裡」「想做什麼」，選今天想做的事、想去的地方，留空就隨興探索；再點「搜尋店家並生成路線」，讓今天開始。</p></div>:<div className="dd-timeline" aria-label="今日任務">
             {state.tasks.map((t,i)=><article className={'dd-stop'+(t.done?' is-done':'')} key={t.id}>
               <div className="dd-marker"><span>{String(i+1).padStart(2,'0')}</span></div>
               <div className="dd-card">
@@ -742,7 +699,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                   <span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{t.candidate.openNow===true?'Google 顯示目前營業中':t.candidate.openNow===false?'Google 顯示目前未營業':'營業狀態未確認'} · Google Places</span>
                   <a className="dd-place-link" href={t.candidate.mapUrl} target="_blank" rel="noopener noreferrer">Google Maps 店家詳情 ↗</a>
                 </div> : t.noCandidate ? <div className="dd-place-unresolved" role="status">⚠ {noCandidateText(t, state.area)}
-                  {t.noCandidateReason === 'area' && <> <a className="dd-place-link" href="#daily-area">前往地區偏好設定</a></>}
+                  {t.noCandidateReason === 'area' && <> <a className="dd-place-link" href="#daily-area" onClick={e=>{e.preventDefault();setSheet('area')}}>前往地區偏好設定</a></>}
                   {t.noCandidateReason === 'filtered' && <> <button className="dd-muted" disabled={busy !== null} onClick={clearDisliked}>清除「不喜歡」的紀錄</button></>}
                 </div> : t.kind==='rest' ? <div className="dd-place-meta"><span>散步回家，不用找店家。</span></div> : <div className="dd-place-unresolved" role="status">⚠ 地點尚未確認。請搜尋行程後再導航。</div>}
                 {t.eta&&<p className="dd-eta">{dayMark(t.etaDayOffset)}{t.eta} 抵達｜{dayMark(t.departureDayOffset)}{t.departure} 離開｜步行 {t.travelMin} 分鐘</p>}
@@ -771,7 +728,94 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
             </article>)}
           </div>}
           <p className="dd-disclaimer">店家資料來源 Google Places；步行時間由 Google Routes 預估，固定行程衝突會標示；非即時交通保證。庫存與預約尚未驗證。</p>
+      </div>
+    </div>
+    {/* 唯一的主按鍵固定在畫面底部；狀態列跟著它，按完不用捲回去看結果。 */}
+    <div className="dd-dock">
+      <p className="dd-live-status" role="status" aria-live="polite">{status}</p>
+      {notice&&<p className="dd-live-status" role="status" aria-live="polite">{notice}</p>}
+      <div className="dd-dock-row">
+        <button className="dd-primary" data-testid="daily-generate" disabled={busy!==null} onClick={generate}>{busy?(busy==='all'?'搜尋中…':'正在換這一站…'):state.tasks.length?'↻ 搜尋店家並優化路線':'✦ 搜尋店家並生成路線'}</button>
+        {seenCount > 0 && <button className="dd-secondary" data-testid="daily-clear-seen" disabled={busy!==null} onClick={clearSeenRecord}>清除今天換掉的店紀錄</button>}
+      </div>
+    </div>
+    {/* 底部選單：各項設定一直掛在畫面上（只是收起來），值不會因為開關而重置。 */}
+    <div className="sheet-wrap" data-testid="daily-sheet" hidden={sheet===null}>
+      <div className="sheet-scrim" aria-hidden="true" onClick={()=>setSheet(null)} />
+      <div className="sheet dd-sheet" role="dialog" aria-modal="true" aria-label={sheet?SHEET_TITLE[sheet]:'今日設定'} tabIndex={-1} ref={sheetPanel}>
+        <div className="sheet-head"><b>{sheet?SHEET_TITLE[sheet]:'今日設定'}</b></div>
+        <div className="dd-sheet-body" hidden={sheet!=='origin'}>
+        <label htmlFor={state.useHere?undefined:'daily-location'}>出發地</label>
+        {state.useHere
+          ?<p className="dd-origin-here" data-testid="daily-origin">📍 目前位置</p>
+          :<input id="daily-location" aria-label="出發地" value={state.currentPlace} onChange={e=>{change(s=>({...s,currentPlace:e.target.value.slice(0,80)}));clearRoute();setStatus('起點變更，請重新搜尋路線')}} placeholder="例如：宮下公園" />}
+        {state.useHere
+          ?<button className="dd-secondary" data-testid="daily-origin-typed" disabled={busy!==null} onClick={pickTyped}>改用輸入地點</button>
+          :<button className="dd-secondary" data-testid="daily-origin-here" disabled={busy!==null} onClick={()=>{setSheet(null);pickHere()}}>📍 用目前位置</button>}
+        <small>{state.useHere?'每次搜尋都重新定位；座標只送去查店、排路線，不存在手機。':'預設以澀谷站為出發點；可輸入確切地點，或按「用目前位置」。'}</small>
         </div>
+        <div className="dd-sheet-body" hidden={sheet!=='time'}>
+        <label htmlFor="daily-start-time">幾點開始</label>
+        <input id="daily-start-time" data-testid="daily-start-time" aria-label="幾點開始" type="time" value={state.startTime ?? ''} disabled={busy!==null} onChange={e=>{change(s=>({...s,startTime:normalizeStartTime(e.target.value)}));clearRoute();setStatus('開始時間變更，請重新搜尋路線')}} />
+        <small>留空＝現在就出發；填了就從那個時間開始排（比現在早的時間以現在為準）。時間以東京時間為準。</small>
+        </div>
+        <div className="dd-sheet-body" hidden={sheet!=='dest'}>
+        <label htmlFor="daily-intent-destination">想去哪裡</label>
+        <input id="daily-intent-destination" data-testid="daily-intent-destination" aria-label="想去哪裡" value={state.intent.destination} maxLength={120} placeholder="例如：一蘭、Fuglen Tokyo、下北澤（可留空）" onChange={e=>change(s=>replanDaily({...s,intent:applyConvenienceDefault(normalizeIntent({...s.intent,destination:e.target.value.slice(0,120)}))}))} />
+        <label htmlFor="daily-intent-destination-station">目的地是哪一站</label>
+        <div className="dd-area">
+          <select id="daily-intent-destination-station" data-testid="daily-intent-destination-station" aria-label="目的地是哪一站" value={state.intent.destinationStation} onChange={e=>{ const v = e.target.value as IntentStationId | ''; return change(s=>replanDaily({...s, avoid: s.avoid.filter(x=>x!==v), intent:normalizeIntent({...s.intent,destinationStation:v})})) }}>
+            {/* 站選單選站＝明確想要（RT4-F1，設計 §2.4）：該站從 avoid 移除，與 checkbox
+              勾選解除 avoid（設計 §3.4）同一理據——新的明確表達勝過舊的「今天略過」。 */}
+            <option value="">請選擇是哪一站…</option>
+            {(['gym','meal','creative','coffee','shopping'] as const).map(id=><option key={id} value={id}>{DAILY_STATION_LABEL[id]}</option>)}
+          </select>
+        </div>
+        </div>
+        <div className="dd-sheet-body" hidden={sheet!=='acts'}>
+        <div className="dd-intent-activities" role="group" aria-label="今天想做什麼">
+          <span className="dd-area-only">想做什麼（可多選）</span>
+          {(['gym','meal','creative','coffee','shopping'] as const).map(id=>(
+            <label key={id} className="dd-area-only">
+              <input type="checkbox" data-testid={`daily-intent-activity-${id}`} checked={state.intent.activities.includes(id)} onChange={e=>change(s=>{
+                const activities = e.target.checked ? [...s.intent.activities, id] : s.intent.activities.filter(x=>x!==id)
+                const avoid = e.target.checked ? s.avoid.filter(x=>x!==id) : s.avoid
+                return replanDaily({...s,avoid,intent:applyConvenienceDefault(normalizeIntent({...s.intent,activities}))})
+              })} />
+              {ACTIVITY_LABEL[id]}
+            </label>
+          ))}
+        </div>
+        </div>
+        <div className="dd-sheet-body" hidden={sheet!=='area'}>
+        <label htmlFor="daily-area">地區偏好</label>
+        <div className="dd-area">
+          <select id="daily-area" aria-label="地區偏好" value={state.area} disabled={busy!==null} onChange={e=>{change(s=>({...s,area:e.target.value}));clearRoute();setStatus('地區變更，請重新搜尋路線')}}>
+            {AREA_NAMES.map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+          <label className="dd-area-only"><input type="checkbox" aria-label="只在這一帶找店" checked={state.areaOnly!==false} disabled={busy!==null} onChange={e=>{change(s=>({...s,areaOnly:e.target.checked}));clearRoute();setStatus('地區偏好變更，請重新搜尋路線')}}/><span>只在這一帶找店</span></label>
+        </div>
+        <small>{state.areaOnly!==false?`只找 ${state.area} 中心 1 公里內的店；指定／固定／已完成的地點不受影響。`:'不限區域；任何地區的店都可能出現。'}</small>
+        </div>
+        <div className="dd-sheet-body" hidden={sheet!=='fixed'}>
+        <div className="dd-form">
+          <label>行程名稱<input aria-label="既有行程名稱" placeholder="例如：與朋友見面" value={fixedTitle} onChange={e=>setFixedTitle(e.target.value)}/></label>
+          <label>地點<input aria-label="既有行程地點" placeholder="例如：吉祥寺" value={fixedPlace} onChange={e=>setFixedPlace(e.target.value)}/></label>
+          <div className="dd-form-row">
+            <label>開始時間<input aria-label="開始時間" type="time" value={fixedTime} onChange={e=>setFixedTime(e.target.value)}/></label>
+            <label>分鐘<input aria-label="行程長度分鐘" type="number" min="5" max="720" value={fixedMinutes} onChange={e=>setFixedMinutes(e.target.value)}/></label>
+          </div>
+          <button className="dd-secondary" disabled={!fixedTitle.trim()||!fixedPlace.trim()||Number(fixedMinutes)<5||Number(fixedMinutes)>720} onClick={()=>{change(s=>addFixedTask(s,fixedTitle,fixedPlace,fixedTime,Number(fixedMinutes)));setFixedTitle('');setFixedPlace('');setSheet(null)}}>加入固定行程</button>
+        </div>
+        </div>
+        <div className="dd-sheet-body" hidden={sheet!=='notes'}>
+        <div className="dd-form">
+          <textarea aria-label="補充偏好" value={feedback} maxLength={160} rows={3} placeholder="例如：今天想吃拉麵（僅備註，不影響搜尋）" onChange={e=>setFeedback(e.target.value)}/>
+          <button className="dd-secondary" onClick={addFeedback} disabled={!feedback.trim()}>儲存備註</button>
+          <div className="dd-notes">{state.notes.map((n,i)=><p key={i}>· {n}</p>)}</div>
+        </div>
+        </div>
+        <button type="button" className="sheet-cancel" data-testid="daily-sheet-close" onClick={()=>setSheet(null)}>完成</button>
       </div>
     </div>
   </section>

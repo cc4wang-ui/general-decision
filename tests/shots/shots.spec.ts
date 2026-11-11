@@ -1,4 +1,4 @@
-// 產出各畫面截圖（npm run e2e:shots → shots/*.png），供人工看版面。2026-11 改版後共 11 張。
+// 產出各畫面截圖（npm run e2e:shots → shots/*.png），供人工看版面。2026-11 改版後 11 個畫面；今日行程另拍 3 張狀態圖（09b 選單、09c 有路線、09d 捲到底）。
 import { expect, test } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
 import { openCard, prime, refuseOrder } from '../e2e/fixtures.ts'
@@ -117,7 +117,27 @@ test('09-daily', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('daily-entry').click()
   await expect(page.locator('.dd')).toBeVisible()
-  await shot(page, '09-daily')
+  // 今日行程的主按鍵固定在畫面底部；整頁長截圖會把它拍在中間，所以這幾張只拍一屏。
+  const view = async (name: string) => { await page.waitForTimeout(250); await page.screenshot({ path: `${DIR}/${name}.png` }) }
+  await view('09-daily')
+  await page.getByTestId('daily-chip-acts').click()
+  await expect(page.getByRole('dialog', { name: '想做什麼' })).toBeVisible()
+  await view('09b-daily-sheet')
+  await page.getByTestId('daily-sheet-close').click()
+  const cand = (id: string, name: string) => ({ id, name, address: '東京都渋谷区 ' + name, mapUrl: 'https://maps.google.com/?cid=' + id, lat: 35.66, lng: 139.7, rating: 4.3, openNow: true })
+  await page.route('**/api/place-photo**', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"photo_unavailable"}' }))
+  await page.route('**/api/daily-route', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+    stops: [
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45, done: false, candidate: cand('m1', 'd47食堂'), eta: '12:10', departure: '12:55', travelMin: 8 },
+      { id: 'coffee', kind: 'creative', title: '咖啡', minutes: 60, done: false, candidate: cand('c1', 'Fuglen Tokyo'), eta: '13:07', departure: '14:07', travelMin: 12 },
+    ],
+    routeVerified: true, distanceKm: 1.6, travelMinutes: 20, conflicts: [],
+  }) }))
+  await page.getByTestId('daily-generate').click()
+  await expect(page.getByRole('heading', { name: 'd47食堂' })).toBeVisible()
+  await view('09c-daily-route')
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await view('09d-daily-route-end')
 })
 
 test('10-privacy', async ({ page }) => {
