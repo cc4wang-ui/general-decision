@@ -113,6 +113,11 @@ test('版面：設定是膠囊不是長表單；主按鍵固定在底部；第�
   await captureRoute(page)
   await openDaily(page)
   const vh = page.viewportSize()!.height
+  // 空行程：整張說明卡都在第一屏、在底部按鍵上方，沒有被遮住任何一行。
+  const empty = (await page.locator('.dd-empty').boundingBox())!
+  const dock0 = (await page.locator('.dd-dock').boundingBox())!
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  expect(empty.y + empty.height).toBeLessThanOrEqual(dock0.y)
   // 進來時所有設定欄位都收著，畫面上只有膠囊。
   for (const id of ['daily-start-time', 'daily-intent-destination', 'daily-intent-destination-station', 'daily-intent-activity-meal']) await expect(page.getByTestId(id)).toBeHidden()
   await expect(page.locator('#daily-area')).toBeHidden()
