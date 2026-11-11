@@ -4,6 +4,7 @@ import { DailyDecision } from './dailyDecision.tsx'
 import { CARD_BY_ID, MAJOR_IDS, MINOR_IDS, MODULE_BARKS, SCENE_BARKS } from './cards.ts'
 import { OFFICER_BY_LEVEL } from './officers.ts'
 import { Avatar } from './avatar.tsx'
+import { CardIcon } from './icons.tsx'
 import { InsigniaMark } from './insignia.tsx'
 import { computeStreak, insigniaOf, type StreakResult } from './streak.ts'
 import { tzOf } from './tz.ts'
@@ -680,7 +681,7 @@ function Home({ level, novelty = 'balanced', onCycle, onPick, onDiary, onDebug, 
           const c = CARD_BY_ID[id]
           return (
             <button key={id} className="tile" data-card={id} onClick={() => onPick(id)}>
-              <b>{c.title}</b><span>{c.subtitle}</span>
+              <CardIcon id={id} /><b>{c.title}</b><span>{c.subtitle}</span>
             </button>
           )
         })}

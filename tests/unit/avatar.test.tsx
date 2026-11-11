@@ -1,14 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, cleanup } from '@testing-library/react'
-import { avatarSvg, Avatar, assetUrl, probeAsset, resetAssetCache, type Mood } from '../../src/avatar.tsx'
+import { describe, expect, it } from 'vitest'
+import { render, cleanup } from '@testing-library/react'
+import { avatarSvg, Avatar, MOODS } from '../../src/avatar.tsx'
 import { MemeCard, StepsCard } from '../../src/meme.tsx'
 import type { Level } from '../../src/types.ts'
 
 const LEVELS: Level[] = [0, 1, 2]
-const MOODS: Mood[] = ['idle', 'bark', 'praise', 'punish']
 
-describe('avatar（第 12 節 S3：3×4 表情不拋錯）', () => {
-  it('avatarSvg 對 3 階 × 4 表情都回傳合法 SVG', () => {
+describe('avatar（第 12 節 S3：3×5 表情不拋錯）', () => {
+  it('avatarSvg 對 3 階 × 5 表情都回傳合法 SVG', () => {
     for (const lv of LEVELS) {
       for (const mood of MOODS) {
         const svg = avatarSvg(lv, mood)
@@ -21,7 +20,7 @@ describe('avatar（第 12 節 S3：3×4 表情不拋錯）', () => {
     }
   })
 
-  it('<Avatar> 渲染 3×4 共 12 種組合都不拋錯', () => {
+  it('<Avatar> 渲染 3×5 共 15 種組合都不拋錯', () => {
     for (const lv of LEVELS) {
       for (const mood of MOODS) {
         const { container } = render(<Avatar level={lv} mood={mood} />)
@@ -31,86 +30,35 @@ describe('avatar（第 12 節 S3：3×4 表情不拋錯）', () => {
     }
   })
 
-  // 下面三條斷言的色值在階段 A 換過：舊色稿的 19 個 hex 沒有一個在 NES 色盤內（DEV-PLAN-2 附錄 A-4），
-  // 改的理由是「正確答案變了」，不是為了讓測試變綠。新色值是否合法由 palette-guard.test.ts 獨立把關。
-  it('onDark 時不畫米白底（放在梗圖卡上）', () => {
-    expect(avatarSvg(1, 'bark', true)).toContain('fill="none"')
-    expect(avatarSvg(1, 'bark', false)).toContain('fill="#FCE0A8"')
+  // 2026-11 改版：點陣圖資產退場，頭像一律由 avatarSvg() 的零件組成。
+  it('onDark（放在口令卡上）只畫圓形底，四角透明；一般頭像槽畫滿版底', () => {
+    expect(avatarSvg(1, 'bark', true)).toContain('<circle cx="60" cy="62" r="56"')
+    expect(avatarSvg(1, 'bark', true)).not.toContain('<rect width="120" height="120"')
+    expect(avatarSvg(1, 'bark', false)).toContain('<rect width="120" height="120" fill="#FFC93C"/>')
   })
 
-  it('NES 沒有漸層，底色與制服一律扁平填色', () => {
+  it('扁平填色，不用漸層', () => {
     for (const lv of LEVELS) {
       expect(avatarSvg(lv, 'idle')).not.toContain('Gradient')
-      expect(avatarSvg(lv, 'idle')).not.toContain('url(#')
     }
   })
 
-  it('各階專屬配件：值星帶（lv1）、哨子與白髮線（lv2）、歪帽與冒汗（lv0）', () => {
-    expect(avatarSvg(1, 'idle')).toContain('#F83800') // 值星帶
-    expect(avatarSvg(2, 'idle')).toContain('#BCBCBC') // 白髮線
-    expect(avatarSvg(0, 'idle')).toContain('rotate(-7 60 36)') // 歪帽
-    expect(avatarSvg(0, 'idle')).toContain('#3CBCFC') // 冒汗
+  it('三人各有專屬零件：歪帽與冒汗（lv0）、值星帶（lv1）、白鬍與墨鏡（lv2）', () => {
+    expect(avatarSvg(0, 'idle')).toContain('rotate(-8 60 38)') // 歪帽
+    expect(avatarSvg(0, 'idle')).toContain('#4DB8FF') // 冒汗
+    expect(avatarSvg(1, 'idle')).toContain('#C7361A') // 值星帶
+    expect(avatarSvg(2, 'idle')).toContain('#E6E6E6') // 白鬍、白鬢角
+    expect(avatarSvg(1, 'idle')).not.toContain('#E6E6E6')
   })
 
-  it('punish 在梗圖卡上用 currentColor，跟著卡片文字色走（卡底改中性後不能寫死白色）', () => {
-    expect(avatarSvg(1, 'punish', true)).toContain('stroke="currentColor"')
-    expect(avatarSvg(1, 'punish', false)).not.toContain('currentColor')
+  it('同一位班長的五種表情兩兩不同；三位班長的同一表情也兩兩不同', () => {
+    for (const lv of LEVELS) expect(new Set(MOODS.map((m) => avatarSvg(lv, m))).size).toBe(5)
+    for (const m of MOODS) expect(new Set(LEVELS.map((lv) => avatarSvg(lv, m))).size).toBe(3)
   })
 
-  it('第 14 節資產路徑格式正確', () => {
-    expect(assetUrl(0, 'idle')).toBe('/officers/0/idle.webp')
-    expect(assetUrl(2, 'punish')).toBe('/officers/2/punish.webp')
-  })
-})
-
-describe('avatar 資產探測快取（DEV-PLAN-2 A-1 ④：換表情不得閃回 SVG）', () => {
-  /** 假的 Image：設定 src 後在下一個 microtask 觸發 onload，並記錄每個 url 被請求幾次。 */
-  const requested: string[] = []
-  class FakeImage {
-    onload: (() => void) | null = null
-    onerror: (() => void) | null = null
-    set src(url: string) {
-      requested.push(url)
-      queueMicrotask(() => this.onload?.())
-    }
-  }
-  // 前一個 describe 用真的 jsdom Image 探測過（永遠不會 onload），先清掉那些懸著的 probe。
-  beforeEach(() => resetAssetCache())
-  afterEach(() => { vi.unstubAllGlobals(); resetAssetCache(); requested.length = 0; cleanup() })
-
-  it('資產載到後換 mood，直接渲染 <img>，中間沒有一幀退回 SVG', async () => {
-    vi.stubGlobal('Image', FakeImage)
-    const { container, rerender } = render(<Avatar level={1} mood="idle" />)
-    expect(container.querySelector('svg')).not.toBeNull() // 第一幀：還沒探測到，先畫 SVG（不閃白）
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
-    expect(container.querySelector('img')?.getAttribute('src')).toBe('/officers/1/idle.webp')
-
-    rerender(<Avatar level={1} mood="bark" />)
-    // 換表情的同步那一幀就必須是 <img>，不能先退回 SVG。
-    expect(container.querySelector('svg')).toBeNull()
-    expect(container.querySelector('img')?.getAttribute('src')).toBe('/officers/1/bark.webp')
-  })
-
-  it('掛載時預載同一位班長的四種表情，且同一個 url 只探測一次', async () => {
-    vi.stubGlobal('Image', FakeImage)
-    render(<Avatar level={2} mood="idle" />)
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
-    const lv2 = requested.filter((u) => u.startsWith('/officers/2/'))
-    expect(new Set(lv2)).toEqual(new Set(['idle', 'bark', 'praise', 'punish'].map((m) => `/officers/2/${m}.webp`)))
-    expect(lv2.length).toBe(4)
-    await expect(probeAsset('/officers/2/praise.webp')).resolves.toBe(true)
-    expect(requested.filter((u) => u === '/officers/2/praise.webp').length).toBe(1)
-  })
-
-  it('資產 404 → 留在 SVG，不會出現空 <img>', async () => {
-    class FailImage extends FakeImage {
-      override set src(url: string) { requested.push(url); queueMicrotask(() => this.onerror?.()) }
-    }
-    vi.stubGlobal('Image', FailImage)
-    const { container } = render(<Avatar level={0} mood="idle" />)
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
-    expect(container.querySelector('img')).toBeNull()
-    expect(container.querySelector('svg')).not.toBeNull()
+  it('<Avatar> 帶 data-avatar，供樣式與 e2e 定位', () => {
+    const { container } = render(<Avatar level={2} mood="soft" />)
+    expect(container.querySelector('[data-avatar="2-soft"] svg')).not.toBeNull()
   })
 })
 

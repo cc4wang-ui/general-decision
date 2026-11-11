@@ -50,7 +50,7 @@ export function Consent({ level, onAccept, onPrivacy }: {
   return (
     <section className="screen consent" data-screen="consent">
       <header className="consent-hero">
-        <Avatar className="av" level={level} mood="bark" />
+        <Avatar className="av" level={level} mood="soft" />
         <div>
           <h1>{CONSENT_PITCH.title}</h1>
           <p>{CONSENT_PITCH.line}</p>

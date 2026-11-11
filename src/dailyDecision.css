@@ -1,4 +1,4 @@
-/* Daily Decision uses the SAME 8-bit tokens, narrow layout, borders and shadows as the host App.
+/* Daily Decision uses the SAME tokens, narrow layout, borders and shadows as the host App.
  * Do not introduce a second theme or desktop-wide container; main[data-level] owns width. */
 .dd{width:100%;max-width:100%;min-width:0;color:var(--ink);background:transparent;padding:0 0 calc(14px + env(safe-area-inset-bottom));line-height:1.55;gap:14px;overflow-x:clip}
 .dd *{box-sizing:border-box;min-width:0}
@@ -72,7 +72,7 @@ fieldset.dd-intent{border:0;padding:0;margin:0}
 .dd-description{font-size:.75rem;color:var(--mute);line-height:1.65;margin:10px 0}
 .dd-actions{display:flex;align-items:stretch;flex-wrap:wrap;gap:7px;margin-top:10px}
 .dd-actions button,.dd-actions a,.dd-done{min-height:44px;min-width:0;flex:1 1 100%;display:inline-flex;align-items:center;justify-content:center;padding:10px;font-size:.8125rem;font-weight:850;border:var(--card-edge) solid var(--line);border-radius:var(--radius);color:var(--ink);background:var(--card);text-decoration:none;text-align:center;line-height:1.3;white-space:normal}
-.dd-actions .dd-navigate{background:var(--action);color:var(--on-action);border-color:var(--action);box-shadow:2px 2px 0 var(--ink)}
+.dd-actions .dd-navigate{background:var(--action);color:var(--on-action);border-color:var(--edge);box-shadow:0 3px 0 var(--edge)}
 .dd-actions-secondary{margin-top:8px}
 .dd-actions-secondary>*{flex:1 1 calc(50% - 7px)!important;font-size:.6875rem!important}
 .dd-done{gap:6px}
@@ -93,3 +93,9 @@ fieldset.dd-intent{border:0;padding:0;margin:0}
 @media(prefers-reduced-motion:reduce){.dd *{transition:none!important}}
 /* 出發地＝目前位置：跟輸入框同尺寸的唯讀框，看得出現在用的是 GPS。 */
 .dd-origin-here{min-height:47px;display:flex;align-items:center;background:var(--paper);color:var(--ink);border:var(--card-edge) solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:.875rem;font-weight:750}
+/* 2026-11 改版：跟主畫面同一套墨線外框。 */
+.dd-hero,.dd-panel,.dd-card,.dd-primary,.dd-secondary,.dd-actions button,.dd-actions a,.dd-done{border-color:var(--edge)}
+.dd-hero{border-radius:24px}
+.dd-marker span{border-radius:50%;border:2px solid var(--edge)}
+.dd-meter{border-radius:99px;overflow:hidden}
+.dd-panel input:not([type=checkbox]),.dd-panel textarea,.dd-change-place input,.dd-area select,.dd-origin-here{border-radius:14px}
