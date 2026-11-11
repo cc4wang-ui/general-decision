@@ -107,7 +107,7 @@ export const HW = {
  * 把 HW 設定攤成 sprites.mjs 吃的 PALETTES 形狀。
  *
  * 回傳的每一層都是**該角色會用到的完整色表**，可以直接當白名單用
- * （`design/8bit/normalize.mjs` 就是這樣檢查的，CI 要加色數檢查也從這裡拿）。
+ * （`docs/archive/design/8bit/normalize.mjs`（已封存） 就是這樣檢查的，CI 要加色數檢查也從這裡拿）。
  * 所以 `ink`（描邊色）與 `cord`（老郭的紅哨繩）都必須在裡面：
  * 少了它們，白名單會把畫面上真的存在的顏色判成非法色。
  * `cord` 只有 lv2 有，其餘兩層不放這個 key —— 讓 `Object.values()` 拿到的

@@ -5,7 +5,7 @@
 
 ## 起因
 
-今天 14:38–17:32 東京，另一條工作線把 PR #27–#32（今日行程）合進 `main`，Vercel 自動部署。那條線從 Round 3 長出來，正式站上的 Round 4–7 被換掉。Round 8 直傳上線因此取消（見 `state/ROUND8-PROGRESS.md` 最後一節）。
+今天 14:38–17:32 東京，另一條工作線把 PR #27–#32（今日行程）合進 `main`，Vercel 自動部署。那條線從 Round 3 長出來，正式站上的 Round 4–7 被換掉。Round 8 直傳上線因此取消（見 `docs/archive/state/ROUND8-PROGRESS.md` 最後一節）。
 
 ## 目標契約｜R9 兩線合併
 

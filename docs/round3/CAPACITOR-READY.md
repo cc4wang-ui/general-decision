@@ -44,7 +44,7 @@
 ### 2-4　資源路徑
 - 角色圖：`src/avatar.tsx:8` `assetUrl = /officers/${lv}/${mood}.webp`（`public/officers/`）；`index.html` 的 `/icons/…`、`/manifest.webmanifest`、`/src/main.tsx`。
 - 全是站內根目錄絕對路徑。Capacitor iOS 以 `capacitor://localhost/` 為根提供 `dist/`，所以 `/officers/…` 會對。**不要**改成 `./` 或 `file://`；若日後設 `base: './'` 要連 `assetUrl` 一起測。
-- `public/design-assets/`、`public/icons.svg` 沒有被 `src/` 引用（`grep -n "design-assets" src` 0 筆），打包時可以排除以縮小 App。
+- ~~`public/design-assets/`、`public/icons.svg` 沒有被 `src/` 引用，打包時可以排除以縮小 App。~~ 2026-11-11 已從 repo 刪除（`runs/hygiene-ui-1111/reports/hygiene.md`）。
 - 沒有 service worker（`grep -n "serviceWorker" src index.html` 0 筆）；Capacitor 不需要，也不要在打包版註冊（避免舊快取蓋掉新版 bundle）。
 
 ### 2-5　`start_url` 與 `scope`

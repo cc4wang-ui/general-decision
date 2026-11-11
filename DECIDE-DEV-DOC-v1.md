@@ -9,15 +9,15 @@
 
 > 給 Claude Code 的執行文件。Cross 不是工程師、不 debug。
 > 本文件的每一節都是「可以直接照做」的指令，不是討論稿。
-> 對照物：`decide-mock-v5.html`（已由 Cross 通過的畫面基準）。
+> 對照物：`docs/archive/decide-mock-v5.html`（已由 Cross 通過的畫面基準）。
 
 ---
 
 ## 0. 貼給 Claude Code 的第一句話
 
 ```
-讀 DECIDE-DEV-DOC-v1.md 全文與 decide-mock-v5.html。
-把本文件第 3 節的 LOOP CONTRACT 抄進 state/decide-mvp-build.json（第 3.2 節格式），status=running。
+讀 DECIDE-DEV-DOC-v1.md 全文與 docs/archive/decide-mock-v5.html。
+把本文件第 3 節的 LOOP CONTRACT 抄進 docs/archive/state/decide-mvp-build.json（第 3.2 節格式），status=running。
 然後從第 12 節「建置順序」第 1 步開始。每完成一步，執行第 13 節該步的檢查，寫入 state，再往下。
 任何一步檢查 FAIL 三次 → 停，寫 escalation，回報。不要自己放寬條件。
 ```
@@ -78,7 +78,7 @@
 │          A. `npm run typecheck && npm run test` 退出碼 = 0
 │          B. `npm run build` 退出碼 = 0
 │          C. `npm run e2e` 退出碼 = 0（Playwright，第 13 節 7 條 happy + 4 條 error path）
-│          D. `npm run e2e:shots` 產出 7 張截圖，且 `shots/CHECK.md` 每張標 PASS（第 13.3 節人工對照表由 checker 填）
+│          D. `npm run e2e:shots` 產出 7 張截圖，且 `docs/archive/shots/CHECK.md` 每張標 PASS（第 13.3 節人工對照表由 checker 填）
 │          E. `vercel --prod` 回傳 URL，curl 該 URL 回 200，且 `/api/order` 以 mock 定位打一次回 200 + 合法 JSON
 │ BUDGET : 最多 5 輪 ／ 最多 90 分鐘
 │ FAIL   : 暫時性（429/5xx/逾時）→ retry+backoff，不寫入部分結果
@@ -92,7 +92,7 @@ Step 0 四問結論：① 輸出（code）Cross 不會逐行讀 → 可 loop；�
 
 ### 3.2 run-state 檔
 
-路徑：`state/decide-mvp-build.json`（repo 內，`.gitignore` 不排除，但不進 Drive／vault）
+路徑：`docs/archive/state/decide-mvp-build.json`（repo 內，`.gitignore` 不排除，但不進 Drive／vault）
 
 ```json
 {
@@ -110,15 +110,15 @@ Step 0 四問結論：① 輸出（code）Cross 不會逐行讀 → 可 loop；�
 ```
 - `key` = 建置步驟編號（S1–S10，第 12 節），冪等：processed 有就跳過。
 - 每步完成**立刻**寫 processed，不批次。
-- 同時重生 `state/decide-mvp-build.md`（人類版：完成幾步／卡哪／需要 Cross 做什麼）。
+- 同時重生 `docs/archive/state/decide-mvp-build.md`（人類版：完成幾步／卡哪／需要 Cross 做什麼）。
 
 ### 3.3 checker（獨立驗證，maker 不自評）
 
 在 Claude Code 用**新對話**（或 `/clear` 後）貼：
 
 ```
-你是 checker。不修改任何檔案。只讀 state/decide-mvp-build.json、DECIDE-DEV-DOC-v1.md 第 3.1 節 STOP 與第 13 節。
-逐條執行 A–E 的命令，貼出退出碼與關鍵輸出。D 條：打開 shots/*.png 與 decide-mock-v5.html 對照第 13.3 節表格，逐格 PASS/FAIL。
+你是 checker。不修改任何檔案。只讀 docs/archive/state/decide-mvp-build.json、DECIDE-DEV-DOC-v1.md 第 3.1 節 STOP 與第 13 節。
+逐條執行 A–E 的命令，貼出退出碼與關鍵輸出。D 條：打開 shots/*.png 與 docs/archive/decide-mock-v5.html 對照第 13.3 節表格，逐格 PASS/FAIL。
 輸出固定格式：VERDICT / ROUND / 逐條判定表（含證據位置）/ OUT-OF-SCOPE / 若 FAIL 的最小修正指示（不給 code）。
 任一條 FAIL → VERDICT: FAIL。
 ```

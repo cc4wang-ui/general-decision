@@ -18,7 +18,6 @@
     "replay": "vitest run tests/unit/discovery-replay.test.ts",
     "probe:lanes": "node scripts/probe-lanes.mjs",
     "taste": "node scripts/taste-judge.mjs",
-    "route": "node scripts/effort-route.mjs docs/round3/effort-tasks.json",
     "lint": "eslint src api tests/unit",
     "lint:fix": "eslint src api tests/unit --fix",
     "prepare": "husky",
