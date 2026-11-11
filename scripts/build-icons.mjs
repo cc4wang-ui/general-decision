@@ -1,45 +1,32 @@
 /**
- * PWA 圖示產生器 —— 把 public/icons/*.png 從 HTML 版型重新輸出。
+ * App 圖示產生器：把 public/icons/*.png 與 public/favicon.svg 從班長插畫重新輸出。
  *
- * 為什麼需要這支：圖示是 PNG，換色盤時沒有人能手改二進位檔，於是每一輪都被漏掉
- * （DEV-PLAN-2 A-3 把「icons 三張還是第一輪配色」列為連帶項）。把版型寫成程式碼之後，
- * 下次改色盤只要改這裡的常數再跑一次。
- *
- * 構圖沿用第一輪：圓環 + 五角星 + 「決斷」二字，只換顏色。
+ * 構圖（2026-11 改版）：黃底＋值星班長黑面下口令的臉。插畫直接取自 src/avatarSvg.ts，
+ * 所以人物改版後重跑這支，圖示就跟著換。
  *
  *   node scripts/build-icons.mjs
  *
- * 需要 Playwright 的 Chromium。容器裡沒有 WebKit，但圖示只是點陣輸出，用哪個引擎畫都一樣。
+ * 需要 Node 22.18 以上（直接 import .ts）與 Playwright 的 Chromium。
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { chromium } from '@playwright/test'
+import { avatarSvg } from '../src/avatarSvg.ts'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const OUT = join(ROOT, 'public', 'icons')
 
-// NES 色盤（design/hwpalette.mjs 的 HW.nes）。換色盤時只改這三個值。
-const BG = '#005800'   // 底：L1 大面積，c=88，剛好在上限內
-const MARK = '#F8B800' // 圓環與星：L3 點綴
-const TEXT = '#FCFCFC' // 字
+const BG = '#FFC93C'
+/** 把 120×120 的頭像放大、往下推，讓臉佔滿圖示。zoom 越大臉越大。 */
+/** cx 往右偏一點，讓右邊的吼叫線不貼邊。size 是輸出的 width／height 屬性。 */
+const art = (zoom, size = '100%') => avatarSvg(1, 'bark')
+  .replace('viewBox="0 0 120 120"', `viewBox="${66 - 60 / zoom} ${58 - 60 / zoom} ${120 / zoom} ${120 / zoom}" width="${size}" height="${size}"`)
 
 /** @param {number} size @param {number} inset 可遮罩版要把圖縮進安全區 */
-const page = (size, inset) => {
-  const s = size * (1 - inset * 2)
-  return `<!doctype html><meta charset="utf-8"><style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:${size}px;height:${size}px;overflow:hidden}
-  body{background:${BG};display:flex;align-items:center;justify-content:center;
-       font-family:"Noto Sans TC","PingFang TC","Hiragino Sans",system-ui,sans-serif}
-  .mark{position:relative;width:${s}px;height:${s}px;display:flex;align-items:center;justify-content:center}
-  .ring{position:absolute;inset:${s * 0.06}px;border:${Math.max(2, s * 0.035)}px solid ${MARK};border-radius:50%}
-  .star{position:absolute;top:${s * 0.13}px;left:50%;transform:translateX(-50%);
-        width:${s * 0.52}px;height:${s * 0.52}px;background:${MARK};
-        clip-path:polygon(50% 0%,61.8% 34.5%,98% 34.5%,68.8% 56%,79.4% 90.5%,50% 69.5%,20.6% 90.5%,31.2% 56%,2% 34.5%,38.2% 34.5%)}
-  .word{position:absolute;bottom:${s * 0.1}px;left:0;right:0;text-align:center;
-        color:${TEXT};font-size:${s * 0.3}px;font-weight:900;letter-spacing:${s * 0.01}px;line-height:1}
-</style><div class="mark"><div class="ring"></div><div class="star"></div><div class="word">決斷</div></div>`
-}
+const page = (size, inset) => `<!doctype html><meta charset="utf-8"><style>
+  *{margin:0;padding:0}html,body{width:${size}px;height:${size}px;overflow:hidden;background:${BG}}
+  svg{display:block}
+</style>${art(inset > 0.1 ? 1.05 : 1.2)}`
 
 const TARGETS = [
   { file: 'icon-192.png', size: 192, inset: 0.04 },
@@ -67,3 +54,7 @@ try {
 } finally {
   await browser.close()
 }
+
+// favicon：同一張圖的向量版，圓角方形。
+writeFileSync(join(ROOT, 'public', 'favicon.svg'), art(1.2, '64') + '\n')
+console.log('  ok   favicon.svg')

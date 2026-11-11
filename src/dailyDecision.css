@@ -1,4 +1,4 @@
-/* Daily Decision uses the SAME 8-bit tokens, narrow layout, borders and shadows as the host App.
+/* Daily Decision uses the SAME tokens, narrow layout, borders and shadows as the host App.
  * Do not introduce a second theme or desktop-wide container; main[data-level] owns width. */
 .dd{width:100%;max-width:100%;min-width:0;color:var(--ink);background:transparent;padding:0 0 calc(14px + env(safe-area-inset-bottom));line-height:1.55;gap:14px;overflow-x:clip}
 .dd *{box-sizing:border-box;min-width:0}
@@ -18,17 +18,12 @@
 .dd-progress>span{flex:none}
 .dd-meter{height:8px;border:1px solid var(--memeText);background:transparent;flex:1}
 .dd-meter i{display:block;background:var(--gold);height:100%;max-width:100%;transition:width .18s}
-.dd-columns{display:flex;flex-direction:column;gap:23px}
-.dd-panel{background:var(--card);border:var(--card-edge) solid var(--line);border-radius:var(--radius);box-shadow:var(--hard-shadow);padding:16px}
-.dd-panel-title,.dd-section-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.dd-panel-title{border-bottom:1px dashed var(--line);padding-bottom:11px;margin-bottom:15px}
-.dd-panel-title span:first-child,.dd-section-title>div>span{font-size:.75rem;letter-spacing:.04em;color:var(--ink);font-weight:850}
-.dd-panel-title span:last-child{font-size:.625rem;color:var(--mute);letter-spacing:.05em}
-.dd-panel>label,.dd-intent>label,.dd-form label,.dd-change-place label{font-size:.8125rem;font-weight:800;display:block;margin:13px 0 8px;color:var(--ink)}
-.dd-panel input:not([type=checkbox]),.dd-panel textarea,.dd-change-place input{width:100%;max-width:100%;min-height:47px;background:var(--paper);color:var(--ink);border:var(--card-edge) solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:.875rem;box-shadow:none}
-.dd-panel small,.dd-notes p{color:var(--mute);font-size:.6875rem;line-height:1.55;display:block;margin:7px 0}
+.dd-section-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dd-section-title>div>span{font-size:.75rem;letter-spacing:.04em;color:var(--ink);font-weight:850}
+.dd-sheet-body>label,.dd-form label,.dd-change-place label{font-size:.8125rem;font-weight:800;display:block;margin:13px 0 8px;color:var(--ink)}
+.dd-sheet input:not([type=checkbox]),.dd-sheet textarea,.dd-change-place input{width:100%;max-width:100%;min-height:47px;background:var(--paper);color:var(--ink);border:var(--card-edge) solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:.875rem;box-shadow:none}
+.dd-sheet small,.dd-notes p{color:var(--mute);font-size:.6875rem;line-height:1.55;display:block;margin:7px 0}
 .dd-area{display:flex;gap:9px;align-items:center}
-fieldset.dd-intent{border:0;padding:0;margin:0}
 .dd-intent-activities{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
 .dd-area select{flex:1;min-width:0;min-height:47px;background:var(--paper);color:var(--ink);border:var(--card-edge) solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:.875rem;box-shadow:none}
 .dd-area-only{display:flex;align-items:center;gap:6px;flex:none;font-size:.8125rem;font-weight:800;color:var(--ink);white-space:nowrap}
@@ -36,10 +31,9 @@ fieldset.dd-intent{border:0;padding:0;margin:0}
 .dd-primary,.dd-secondary{display:block;width:100%;padding:12px;min-height:54px;text-align:center;font-size:.9375rem;font-weight:850;border:var(--card-edge) solid var(--action);border-radius:var(--radius);background:var(--action);color:var(--on-action);box-shadow:var(--hard-shadow);margin:15px 0 4px}
 .dd-secondary{min-height:46px;background:var(--card);color:var(--ink);border-color:var(--line);box-shadow:none;font-size:.8125rem;margin:11px 0 0}
 .dd-live-status{background:var(--paper);color:var(--ink);border-left:4px solid var(--officer-green);padding:10px 11px;margin:13px 0 0;font-size:.75rem;line-height:1.55;overflow-wrap:anywhere}
-.dd-details{border-top:1px dashed var(--line);margin-top:14px;padding-top:5px}
-.dd-details summary,.dd-change-place summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font-weight:800;font-size:.8125rem;color:var(--ink)}
-.dd-details summary::-webkit-details-marker,.dd-change-place summary::-webkit-details-marker{display:none}
-.dd-details[open] summary,.dd-change-place[open] summary{border-bottom:1px dashed var(--line);margin-bottom:9px}
+.dd-change-place summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font-weight:800;font-size:.8125rem;color:var(--ink)}
+.dd-change-place summary::-webkit-details-marker{display:none}
+.dd-change-place[open] summary{border-bottom:1px dashed var(--line);margin-bottom:9px}
 .dd-form{padding:0 0 7px}
 .dd-form-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .dd-itinerary{width:100%;min-width:0;display:flex;flex-direction:column;gap:13px}
@@ -72,7 +66,7 @@ fieldset.dd-intent{border:0;padding:0;margin:0}
 .dd-description{font-size:.75rem;color:var(--mute);line-height:1.65;margin:10px 0}
 .dd-actions{display:flex;align-items:stretch;flex-wrap:wrap;gap:7px;margin-top:10px}
 .dd-actions button,.dd-actions a,.dd-done{min-height:44px;min-width:0;flex:1 1 100%;display:inline-flex;align-items:center;justify-content:center;padding:10px;font-size:.8125rem;font-weight:850;border:var(--card-edge) solid var(--line);border-radius:var(--radius);color:var(--ink);background:var(--card);text-decoration:none;text-align:center;line-height:1.3;white-space:normal}
-.dd-actions .dd-navigate{background:var(--action);color:var(--on-action);border-color:var(--action);box-shadow:2px 2px 0 var(--ink)}
+.dd-actions .dd-navigate{background:var(--action);color:var(--on-action);border-color:var(--edge);box-shadow:0 3px 0 var(--edge)}
 .dd-actions-secondary{margin-top:8px}
 .dd-actions-secondary>*{flex:1 1 calc(50% - 7px)!important;font-size:.6875rem!important}
 .dd-done{gap:6px}
@@ -89,7 +83,55 @@ fieldset.dd-intent{border:0;padding:0;margin:0}
 .dd-disclaimer{font-size:.6875rem;line-height:1.65;color:var(--mute);padding:0 0 8px}
 .dd-conflicts,.dd-stop-conflict{padding:9px;border:2px solid var(--signal);background:var(--paper);color:var(--signal);font-size:.75rem;line-height:1.55}
 .dd-conflicts p{margin:4px 0}
-@media(max-width:350px){.dd-card{padding:9px}.dd-stop{grid-template-columns:25px minmax(0,1fr);gap:6px}.dd-marker span{width:25px;height:25px}.dd-stop:not(:last-child):before{left:12px}.dd-photo-placeholder{min-height:105px}.dd-panel{padding:12px}.dd-actions-secondary>*{flex:1 1 100%!important}}
+@media(max-width:350px){.dd-card{padding:9px}.dd-stop{grid-template-columns:25px minmax(0,1fr);gap:6px}.dd-marker span{width:25px;height:25px}.dd-stop:not(:last-child):before{left:12px}.dd-photo-placeholder{min-height:105px}.dd-actions-secondary>*{flex:1 1 100%!important}}
 @media(prefers-reduced-motion:reduce){.dd *{transition:none!important}}
 /* 出發地＝目前位置：跟輸入框同尺寸的唯讀框，看得出現在用的是 GPS。 */
 .dd-origin-here{min-height:47px;display:flex;align-items:center;background:var(--paper);color:var(--ink);border:var(--card-edge) solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:.875rem;font-weight:750}
+/* 2026-11 改版：跟主畫面同一套墨線外框。 */
+.dd-hero,.dd-card,.dd-primary,.dd-secondary,.dd-actions button,.dd-actions a,.dd-done{border-color:var(--edge)}
+.dd-hero{border-radius:24px}
+.dd-marker span{border-radius:50%;border:2px solid var(--edge)}
+.dd-meter{border-radius:99px;overflow:hidden}
+.dd-sheet input:not([type=checkbox]),.dd-sheet textarea,.dd-change-place input,.dd-area select,.dd-origin-here{border-radius:14px}
+.dd-sheet input:not([type=checkbox]),.dd-sheet textarea,.dd-change-place input,.dd-area select,.dd-origin-here,.dd-photo{border-color:var(--edge)}
+/* 「想做什麼」的勾選改成一顆一顆的膠囊，跟上面的下拉框拉開距離，好按。（design-critique 2026-11-11） */
+.dd-intent-activities{margin-top:14px;gap:8px}
+.dd-intent-activities label{display:inline-flex;align-items:center;gap:6px;min-height:40px;margin:0;padding:6px 12px;border:var(--card-edge) solid var(--edge);border-radius:999px;background:var(--paper)}
+/* 2026-11 版面重排：行程清單當主角。設定收成一排摘要膠囊，點一顆開一張底部選單；主按鍵固定在底部。
+ * 沿用主畫面的 .sheet 與 token，不另立一套。 */
+.dd [hidden]{display:none!important}
+.dd-shell{gap:14px}
+.dd-hero{padding:14px 16px}
+.dd-hero h1{font-size:1.75rem;margin:4px 0 2px}
+.dd-progress{margin-top:10px}
+.dd-chips{display:flex;flex-wrap:wrap;gap:8px}
+.dd-chip{display:inline-flex;align-items:baseline;gap:6px;max-width:100%;min-height:44px;padding:8px 13px;border:var(--card-edge) solid var(--edge);border-radius:999px;background:var(--card);color:var(--ink);text-align:left}
+.dd-chip span{flex:none;font-size:.6875rem;font-weight:750;color:var(--mute)}
+.dd-chip b{font-size:.8125rem;font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-intent-summary{display:block;color:var(--mute);font-size:.6875rem;line-height:1.55;margin-top:-6px}
+.dd-dock{position:sticky;bottom:0;z-index:5;display:flex;flex-direction:column;gap:8px;margin:0 -20px;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:var(--khaki);border-top:var(--card-edge) solid var(--edge)}
+.dd-dock .dd-live-status{margin:0;padding:6px 10px;font-size:.6875rem}
+.dd-dock-row{display:flex;gap:8px;align-items:stretch}
+.dd-dock .dd-primary,.dd-dock .dd-secondary{margin:0;min-height:54px}
+.dd-dock .dd-primary{flex:1 1 auto;box-shadow:0 3px 0 var(--edge)}
+.dd-dock .dd-secondary{flex:0 1 38%;width:auto;font-size:.6875rem;line-height:1.3;padding:8px}
+.dd-sheet{max-height:88dvh;overflow-y:auto}
+.dd-sheet-body>label:first-child,.dd-sheet-body>.dd-form>label:first-child{margin-top:0}
+.dd-sheet-body .dd-intent-activities{margin-top:0}
+/* 第一屏要看得到行程：標題與進度併成一排，路線標題縮成一行，狀態列沒話時不佔位。 */
+.dd-hero{padding:12px 16px}
+.dd-hero-row{display:flex;align-items:center;gap:14px;margin:2px 0 4px}
+.dd-hero-row h1{flex:none;font-size:1.5rem;margin:0}
+.dd-hero-row .dd-progress{flex:1;margin:0}
+.dd-hero p{font-size:.75rem}
+.dd-section-title{align-items:baseline;padding-bottom:6px}
+.dd-section-title h2{font-size:1.125rem;margin:0;flex:none}
+.dd-count{max-width:none}
+.dd-chips{gap:6px}
+.dd-chip{min-height:40px;padding:6px 12px}
+/* 沒訊息時收到看不見，但不用 display:none：狀態列是 aria-live，元素要一直在，新訊息才念得出來。 */
+.dd-live-status:empty{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%)}
+.dd-fixed-recap{font-size:.8125rem;font-weight:800;color:var(--ink);margin:0 0 4px;overflow-wrap:anywhere}
+/* 進場只淡入、不位移：位移動畫（transform）進行中，固定在視窗的底部選單會改以這個畫面為定位基準，
+ * 一進來就點膠囊時選單會跑到頁尾、把整頁捲走。 */
+@media(prefers-reduced-motion:no-preference){.dd.screen{animation-name:dd-enter}@keyframes dd-enter{from{opacity:0}to{opacity:1}}}

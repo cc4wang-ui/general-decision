@@ -1,8 +1,8 @@
 # General Decision — STATE.md
 > Canonical current project status. Updated 2026-11-10 JST. Read this before making changes.
-> Two workstreams were merged on 2026-11-03 (PR #26): the core 班長 app (Round 4–10, details in `state/ROUND*-PROGRESS.md`, handoff `state/HANDOFF-2026-11-03.md`, roadmap `docs/ROADMAP.md`) and 今日行程 (PR #27–#32, below).
+> Two workstreams were merged on 2026-11-03 (PR #26): the core 班長 app (Round 4–10, details in `state/ROUND9`–`ROUND14-PROGRESS.md`; Round 3–8 archived in `docs/archive/state/`, handoff `state/HANDOFF-2026-11-03.md`, roadmap `docs/ROADMAP.md`) and 今日行程 (PR #27–#32, below).
 > Repo: cc4wang-ui/general-decision | Production: https://general-decision.vercel.app
-> Historical `state/decide-mvp-build.md` describes September MVP, NOT current acceptance.
+> Historical `docs/archive/state/decide-mvp-build.md` describes September MVP, NOT current acceptance.
 
 ## 1. Verified facts
 - **Latest release (2026-11-10):** PR #43 step-3 config merged into `main` (`eca366cc`): tsconfig 收緊、ESLint、Husky、Stryker 設定落地。之前四個 PR：#38 Round 14 架構重設計（`766d2f49`，2026-11-09：種類只留 Google dish 級類型＋品牌表 7 筆，刪整條店名判斷；紅隊 round 14 PASS；詳見 `state/ROUND14-PROGRESS.md`）、#39 日記時區（`8ffcbda2`，2026-11-09：日記顯示本地時間）、#40 CI＋分支保護（`02999c9a`，2026-11-09：`check`／`e2e`／`required` 為 required check）、#42 分支保護測試（`1bc58506`）。單元套件：基線 1034/1034（`npm test`，2026-11-10，`eca366cc`），本 PR 合併後 1050/1050（新增 16 個測試：`place-photo` 8、`areas` 4、`venueCheck` 4）。
@@ -11,6 +11,7 @@
 - **Core app features (Round 4–10)**: scene picker for eat/rest (5 presets + free text), no empty-handed orders (convenience-store rescue), budget filter, 60-day trial log, in-train mode (report station when GPS is stale), Japanese keywords in Tokyo, exclusion lists (hookah bars, malls, karaoke, food courts, bars for takeout/date/late-night), shops must be open on arrival (≥10 min left, never relaxed).
 - **Fixed in Round 9 for 今日行程**: `addFixedTask` time regex was `\\d` (literal backslash) so every fixed appointment was rejected; `api/daily-route.ts` and `api/place-photo.ts` now export both named methods (wrong method → 405) so `npm run check:bundle` passes.
 - **PR #32 (2026-11-03)** unifies `今日行程` with the existing 8-bit App design tokens and 440px container; removes the conflicting nested `<main>`, adds Google Places on-demand photos with author attribution, exact Google Maps walking navigation and place detail links. The photo endpoint does not cache Google photo names/URIs.
+- **2026-11-11 layout rework** (`runs/daily-layout-1111/`): 今日行程 no longer has a stacked settings form. Settings are seven summary chips (`daily-chip-<id>`); each opens one bottom sheet (reuses `.sheet`). Sheet fields stay mounted and are toggled with `hidden`. The generate button lives in a sticky bottom dock with the status line. The screen's enter animation is fade-only: a transform there re-anchors the fixed sheet and scrolls the page.
 - **Verified with actual Vercel preview calls (PR #32)**: `/api/daily-route` real server smoke returned 3 named Shibuya places and addresses, HTTP 200; `/api/place-photo` returned HTTP 200 for **all 3 corresponding Google Place IDs**; single-stop Shuffle returned a different cafe while preserving the selected meal and fixed PARCO appointment.
 - **Confirmed blocker:** Google Routes matrix returned HTTP **403** in real preview runtime logs on 2026-11-03. The app now returns verified named venues and route-order approximation with a visible unverified-route warning, not fake ETAs or an empty itinerary. Direct Google Maps navigation uses Google's directions URL.
 
@@ -21,7 +22,9 @@
 - The daily state uses browser `localStorage` key `decide.daily.v1`; it is not synced between devices and does not automatically inherit ChatGPT memories.
 - UI: `src/dailyDecision.tsx`, `src/dailyDecision.css`; discovery endpoint: `api/daily-route.ts`; walking scheduler: `src/dailyRouting.ts`; scheduler tests: `tests/unit/dailyRouting.test.ts`.
 - A preview build of the route-time branch was READY. An earlier build failed TypeScript checks in newly introduced tests and was fixed by typing fixtures; this was followed by a READY build.
-- Existing historical `state/decide-mvp-build.md` and `DEPLOY.md` contain stale deployment and credential status. Do not treat them as live facts.
+- Existing historical `docs/archive/state/decide-mvp-build.md` and `docs/archive/DEPLOY.md` contain stale deployment and credential status. Do not treat them as live facts.
+- **Visual redesign (2026-11-11, PR #54, not merged):** NES palette and 8-bit sprites replaced by a sticker-style system — palette whitelist `src/palette.ts`, vector officers `src/avatarSvg.ts` (3 officers × 5 moods), tile icons `src/icons.tsx`, app icon from `scripts/build-icons.mjs`. Rules and references: `docs/DESIGN-2026-11.md`. Old sprites and `design/hwpalette.mjs` are in `docs/archive/`. Mentions of "8-bit tokens" below are historical. Not checked on a real iPhone.
+- **Repo hygiene (2026-11-11, contract `runs/hygiene-ui-1111/contract.md`)**: superseded plans, the 2026-09 design workspace (`design/` except `hwpalette.mjs`, `design.html`, `DESIGN.md`, `decide-mock-v5.html`), research notes and Round 3–8 records moved to `docs/archive/`; zero-reference `scripts/effort-route.mjs`, `docs/round3/effort-*.json`, `public/design-assets/`, `public/icons.svg` deleted. Evidence and conflict list: `runs/hygiene-ui-1111/reports/hygiene.md`. Gates on the hygiene-only branch (before the redesign was merged in): typecheck 0, lint 0, unit 1184/1184 (also with `TZ=UTC`), front-end bundle unchanged. After merging with the redesign the unit count and the bundle hash differ; see PR #54 CI for the final numbers.
 
 ## 2. General rules
 - Product is a **real, executable daily itinerary**, not a generic task list. Recommend specific verified places, preserve user-specified destinations and existing appointments, minimize detours, and show actionable details and reasons.
@@ -41,7 +44,7 @@
 - **P1 — UI device testing:** PR #32 removed independent editorial style and nested `<main>`; uses original 8-bit tokens and original 440px host container. **No verified real iPhone Safari/iPad/desktop screenshots or touch E2E** yet.
 - **P1 — live shop information:** Places returns place metadata/open-now when supplied; current implementation does not enforce opening hours for planned arrival, confirm product inventory, exhibitions, reservations or admission.
 - ~~**P1 — current location**~~ — resolved 2026-11-04 (Round 10): 今日行程 can use GPS as the origin (server validates coordinates; bad coordinates → 400; denied permission keeps the previous itinerary).
-- ~~**P1 — stale documentation**~~ — resolved 2026-11-04: README status/structure rewritten; spec, strategy and old plans annotated (`docs/ROADMAP.md` N8). `DEPLOY.md` and `state/decide-mvp-build.md` remain historical.
+- ~~**P1 — stale documentation**~~ — resolved 2026-11-04: README status/structure rewritten; spec, strategy and old plans annotated (`docs/ROADMAP.md` N8). `docs/archive/DEPLOY.md` and `docs/archive/state/decide-mvp-build.md` remain historical.
 - ~~**P1 — code hygiene**~~ — resolved 2026-11-03: `npm run typecheck` exits 0 on the merged branch (no diagnostics in `src/diary.ts`); unit 614/614.
 - **P2 — sync and memory:** local-only browser persistence; no cross-device sync, no ChatGPT memory import, no canonical project vault sync.
 
@@ -68,4 +71,4 @@
 - User explicitly rejected the mismatched Daily UI and generic non-navigable cards. PR #32 makes Daily consistent with main 8-bit App; each resolved stop has a real Google place, image (or explicit unavailable state), address, place detail and walking navigation link.
 - PR #32 merge `46579a9` production READY; the official site and actual photo endpoint return 200. Routes is still 403, so complete itinerary ETA acceptance is FAIL.
 - Preview validation: named places 3/3 PASS, real place photos 3/3 PASS, single-stop Shuffle preservation PASS, Routes matrix FAIL (403). Next: enable Google Routes for the existing key, test real walking ETA with fixed times, and run iPhone/desktop UI E2E before declaring full product PASS.
-- Handoff: read this file, `docs/FAILURE-MEMORY.md`, `src/dailyDecision.tsx`, `src/dailyRouting.ts`, `api/daily-route.ts`, `DEPLOY.md`, and the current deployment logs. Do not start a parallel app.
+- Handoff: read this file, `docs/FAILURE-MEMORY.md`, `src/dailyDecision.tsx`, `src/dailyRouting.ts`, `api/daily-route.ts`, `docs/archive/DEPLOY.md`, and the current deployment logs. Do not start a parallel app.

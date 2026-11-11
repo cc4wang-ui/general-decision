@@ -31,4 +31,15 @@ describe('manifest／index.html（上架欄位）', () => {
     const md = read('docs/round3/STORE-LISTING.md')
     expect(md).toContain(`\n${manifest.description as string}\n`)
   })
+
+  it('manifest 與 index.html 指到的圖示檔都存在；favicon.svg 的根元素屬性不重複', () => {
+    const icons = (manifest.icons as { src: string }[]).map((i) => i.src)
+    const linked = [...html.matchAll(/<link rel="(?:icon|alternate icon|apple-touch-icon)"[^>]*href="([^"]+)"/g)].map((m) => m[1]!)
+    expect(linked).toContain('/favicon.svg')
+    for (const src of [...icons, ...linked]) expect(() => read(`public${src}`), src).not.toThrow()
+    // 重複屬性會讓整張 SVG 解析失敗、瀏覽器畫不出來（2026-11-11 checker 抓到 width／height 各出現兩次）。
+    const root = read('public/favicon.svg').match(/^<svg\b[^>]*>/)![0]
+    const names = [...root.matchAll(/\s([\w:-]+)=/g)].map((m) => m[1]!)
+    expect(new Set(names).size, names.join(' ')).toBe(names.length)
+  })
 })

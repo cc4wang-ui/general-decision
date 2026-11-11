@@ -1,11 +1,10 @@
 // 階段 A 驗收標準 1、2：在瀏覽器裡量「渲染後的實際值」，不是讀 CSS 原始碼。
 // 階段 3b 的 28 項 WCAG 檢查是人工跑的，換一次色盤就全部作廢；這支把它變成會自己跑的守門。
 import { expect, test, type Page } from '@playwright/test'
-// @ts-expect-error design/ 是 .mjs，沒有型別宣告
-import { nesPalette } from '../../design/hwpalette.mjs'
+import { PALETTE_HEX } from '../../src/palette.ts'
 import { FIXED_ORDER, mockOrder, mockOrderFailure, prime, openCard, refuseOrder } from './fixtures.ts'
 
-const NES: string[] = (nesPalette() as string[]).map((h) => h.toUpperCase())
+const NES: string[] = PALETTE_HEX.map((h) => h.toUpperCase())
 
 test.beforeEach(async ({ page }) => { await prime(page) })
 
@@ -146,7 +145,7 @@ for (const scheme of ['light', 'dark'] as const) {
     test.use({ colorScheme: scheme, geolocation: { latitude: 25.033, longitude: 121.5654 }, permissions: ['geolocation'] })
 
     for (const screen of SCREENS) {
-      test(`${screen.name}：渲染後每個實色都在 NES 色盤內、文字對比過 WCAG AA`, async ({ page }) => {
+      test(`${screen.name}：渲染後每個實色都在 色盤內、文字對比過 WCAG AA`, async ({ page }) => {
         await mockOrder(page, [FIXED_ORDER])
         await page.route('**/api/weekly', (r) =>
           r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WEEKLY) }))
@@ -154,12 +153,12 @@ for (const scheme of ['light', 'dark'] as const) {
         await expect(page.locator(`[data-screen="${screen.name}"]`)).toBeVisible()
 
         const r = await audit(page, NES)
-        expect(r.offPalette, `${screen.name}/${scheme} 有色值落在 NES 色盤外`).toEqual([])
+        expect(r.offPalette, `${screen.name}/${scheme} 有色值落在 色盤外`).toEqual([])
         expect(r.contrast, `${screen.name}/${scheme} 文字對比不足`).toEqual([])
       })
     }
 
-    test(`error：渲染後每個實色都在 NES 色盤內、文字對比過 WCAG AA`, async ({ page }) => {
+    test(`error：渲染後每個實色都在 色盤內、文字對比過 WCAG AA`, async ({ page }) => {
       await mockOrderFailure(page, 502)
       await page.goto('/')
       await openCard(page, 'eat')
@@ -167,13 +166,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.locator('[data-screen="error"]')).toBeVisible()
 
       const r = await audit(page, NES)
-      expect(r.offPalette, `error/${scheme} 有色值落在 NES 色盤外`).toEqual([])
+      expect(r.offPalette, `error/${scheme} 有色值落在 色盤外`).toEqual([])
       expect(r.contrast, `error/${scheme} 文字對比不足`).toEqual([])
     })
 
     // 三段火力的綠移到邊框之後，每一層的邊框都要對卡底與頁底過 3:1（WCAG 1.4.11 非文字）。
     // 邊框色寫死預期值：光靠 3:1 抓不到「深色吃到淺色的值」——#007800 在黑底剛好也過 3.69。
-    const EDGE = { light: { 0: '#007800', 1: '#006800', 2: '#005800' }, dark: { 0: '#58D854', 1: '#00B800', 2: '#007800' } }
+    const EDGE = { light: { 0: '#1F7A4D', 1: '#14573A', 2: '#1D2B24' }, dark: { 0: '#3DBE7B', 1: '#FFC93C', 2: '#FF6B4A' } }
     for (const [level, clicks] of [[0, 2], [1, 0], [2, 1]] as const) {
       test(`lv${level} 梗圖卡邊框：色盤內且對卡底、頁底都過 3:1`, async ({ page }) => {
         await mockOrder(page, [FIXED_ORDER])
@@ -212,7 +211,7 @@ for (const scheme of ['light', 'dark'] as const) {
         await expect(page.locator('[data-screen="cmd"]')).toBeVisible()
 
         const r = await audit(page, NES)
-        expect(r.offPalette, `lv${level}/${scheme} 有色值落在 NES 色盤外`).toEqual([])
+        expect(r.offPalette, `lv${level}/${scheme} 有色值落在 色盤外`).toEqual([])
         expect(r.contrast, `lv${level}/${scheme} 文字對比不足`).toEqual([])
 
         const edge = await page.evaluate(() => {

@@ -1,0 +1,36 @@
+// 2026-11 改版色盤：畫面上能出現的實色只有這些。
+// tests/unit/palette-guard.test.ts（原始碼）與 tests/e2e/palette.spec.ts（渲染後）都以這份為白名單。
+export const PALETTE = {
+  ink: '#1D2B24',
+  cream: '#FFF4DC',
+  white: '#FFFFFF',
+  black: '#000000',
+  green: '#1F7A4D',
+  greenDeep: '#14573A',
+  greenLight: '#3DBE7B',
+  mint: '#C9EFD8',
+  sun: '#FFC93C',
+  brass: '#8A5E00',
+  coral: '#FF6B4A',
+  coralDeep: '#C7361A',
+  peach: '#FFDDCF',
+  sky: '#4DB8FF',
+  skyLight: '#D6EEFF',
+  lilac: '#E4DEFF',
+  mute: '#56635B',
+  line: '#D8CCB2',
+  nightBg: '#121C17',
+  nightCard: '#1E2C25',
+  nightMute: '#A8B8AD',
+  nightLine: '#3A4C41',
+  hair: '#E6E6E6',
+  blush: '#FF9E8A',
+  skin0: '#FFD2A6',
+  skin0Shade: '#F2B181',
+  skin1: '#C98850',
+  skin1Shade: '#A86A38',
+  skin2: '#F2BC8C',
+  skin2Shade: '#D99A66',
+} as const
+
+export const PALETTE_HEX: string[] = Object.values(PALETTE)
