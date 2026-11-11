@@ -103,7 +103,9 @@ src/
   cards.ts       8 張模組卡（第 6 節＋travel）
   officers.ts    3 位班長，語料三層各 24 句（第 7 節）
   banned.ts      護欄字表：罵行為不罵人
-  avatar.tsx     SVG 角色（第 14 節資產介面，繪師交件當天可換）
+  avatarSvg.ts   三位班長的向量造型（3 人 × 5 表情，同一套零件）；avatar.tsx 是元件
+  icons.tsx      首頁四張主卡的插圖
+  palette.ts     色盤白名單（palette 測試的唯一來源）
   meme.tsx       梗圖卡（兩欄 grid，角色不壓字）；share.ts 分享圖
   insignia.ts(x) 階級章；streak.ts 出勤連勝／公差假單／升階
   diary.ts       IndexedDB 讀寫、週統計
@@ -133,7 +135,7 @@ api/
   daily-route.ts、place-photo.ts  今日行程的地點與照片
 tests/unit/      Vitest；tests/e2e/ Playwright；tests/shots/ 截圖
 scripts/         smoke、check:bundle、probe:lanes、build-icons、taste；unpack.mjs／fetch-public.mjs 是直傳 Vercel 時代的 install／build 前置（git 部署時什麼都不做）
-design/hwpalette.mjs  NES 色盤（目前 palette 測試的白名單來源）
+docs/DESIGN-2026-11.md  視覺規則、token、得獎 app 參考（2026-11 改版）
 docs/            ROADMAP、FAILURE-MEMORY、adr/、round3/ 策略與上架文件；docs/archive/ 是歷史文件
 state/           HANDOFF、ROUND9–14 進度、evidence/
 .github/         CI（check／e2e／required）與 PR 範本
