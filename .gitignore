@@ -33,3 +33,7 @@ design-dist/
 deploy/
 coverage/
 .vercel/
+
+# Agent worktrees and generated screenshots
+.claude/worktrees/
+shots/*.png
