@@ -1,23 +1,23 @@
 {
  "public/favicon.svg": {
-  "sha1": "ef980067ad13faab4a9f9c91e5d94aa98f985bbc",
-  "size": 2393
+  "sha1": "c915110cc108db6ff6474c20bcf7be96713e4b9d",
+  "size": 2307
  },
  "public/icons/apple-touch-icon.png": {
-  "sha1": "fea94885d79678477764dd5e6b94bd6f43621aa9",
-  "size": 10945
+  "sha1": "5a11f66b6bd2592569965418cef32fde77481e8c",
+  "size": 10899
  },
  "public/icons/icon-192.png": {
-  "sha1": "dc125db279243129a9ad01be1dbba31b509037ad",
-  "size": 11630
+  "sha1": "b2a23512c246f8485629bb864ae1691215bd637a",
+  "size": 11589
  },
  "public/icons/icon-512-maskable.png": {
-  "sha1": "eed4bb94e382127d3c4507737af6f32a2a194ff6",
-  "size": 31439
+  "sha1": "51c2c13276882ccb1e343e171872037226e85058",
+  "size": 31333
  },
  "public/icons/icon-512.png": {
-  "sha1": "945b769bcfc7078161f0ce2a0d3840e0a7b28bb4",
-  "size": 32787
+  "sha1": "c6f116df608d3eccac0c35636f881794dd9c901a",
+  "size": 32008
  },
  "public/manifest.webmanifest": {
   "sha1": "205e297b2f03ac5527983f4f5b7c03a510f6cc5d",

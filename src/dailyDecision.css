@@ -100,3 +100,6 @@ fieldset.dd-intent{border:0;padding:0;margin:0}
 .dd-meter{border-radius:99px;overflow:hidden}
 .dd-panel input:not([type=checkbox]),.dd-panel textarea,.dd-change-place input,.dd-area select,.dd-origin-here{border-radius:14px}
 .dd-panel input:not([type=checkbox]),.dd-panel textarea,.dd-change-place input,.dd-area select,.dd-origin-here,.dd-photo{border-color:var(--edge)}
+/* 「想做什麼」的勾選改成一顆一顆的膠囊，跟上面的下拉框拉開距離，好按。（design-critique 2026-11-11） */
+.dd-intent-activities{margin-top:14px;gap:8px}
+.dd-intent-activities label{display:inline-flex;align-items:center;gap:6px;min-height:40px;margin:0;padding:6px 12px;border:var(--card-edge) solid var(--edge);border-radius:999px;background:var(--paper)}

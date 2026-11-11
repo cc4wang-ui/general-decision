@@ -18,6 +18,8 @@ STOP 條件：
 8. `TZ=Asia/Taipei npm run typecheck`、`npm test`、`npm run build`、`npx playwright test --browser=chromium tests/e2e` 全過。不跳過、不停用測試。
 9. 草稿 PR 已開。不合併。
 
+10. （2026-11-11 把關第 1 輪後補齊，對應原話「Fable帶領opus」「使用design相關skill」）`docs/DESIGN-2026-11.md` 列出用過的 design skill 與各自的產出，並寫明 Fable／Opus 的分工。
+
 等級：L（整理線可並行；設計線留主對話）
 預算：預估 ~650k token，上限 ~950k
 保留事項：合併 PR 會自動部署正式站＝對外發布 🔒。本次不合併。

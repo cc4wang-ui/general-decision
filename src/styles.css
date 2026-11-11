@@ -205,3 +205,9 @@ main[data-level="2"]{--lv-bg:#FFDDCF;--meme-edge:#1D2B24;--card-edge:3px;--meme-
 [data-screen="home"] .tile:first-child{min-height:132px}
 [data-screen="home"] .tile:first-child .ico{width:108px;height:108px;margin-top:-54px}
 .stats.two .stat:nth-child(2){border-color:var(--edge)}
+/* 隱私頁：是長文，不是警告。拿掉紅邊與整片粗體，標題粗、內文一般字重。（design-critique 2026-11-11） */
+[data-screen="privacy"] .notice{border-left:var(--card-edge) solid var(--edge);font-weight:400;font-size:.9375rem;line-height:1.7;padding:16px 18px}
+[data-screen="privacy"] .notice b{display:block;font-size:1.0625rem;font-weight:850;margin-bottom:6px}
+[data-screen="privacy"] .notice p+p{margin-top:8px}
+[data-screen="privacy"] .notice a{color:var(--ink);font-weight:700;text-underline-offset:3px}
+[data-screen="privacy"] .notice:first-of-type{background:var(--t-go);color:var(--on-color);--mute:#3A4C41}

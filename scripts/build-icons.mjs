@@ -18,14 +18,15 @@ const OUT = join(ROOT, 'public', 'icons')
 
 const BG = '#FFC93C'
 /** 把 120×120 的頭像放大、往下推，讓臉佔滿圖示。zoom 越大臉越大。 */
-const art = (zoom) => avatarSvg(1, 'bark')
-  .replace('viewBox="0 0 120 120"', `viewBox="${60 - 60 / zoom} ${58 - 60 / zoom} ${120 / zoom} ${120 / zoom}" width="100%" height="100%"`)
+/** cx 往右偏一點，讓右邊的吼叫線不貼邊。size 是輸出的 width／height 屬性。 */
+const art = (zoom, size = '100%') => avatarSvg(1, 'bark')
+  .replace('viewBox="0 0 120 120"', `viewBox="${66 - 60 / zoom} ${58 - 60 / zoom} ${120 / zoom} ${120 / zoom}" width="${size}" height="${size}"`)
 
 /** @param {number} size @param {number} inset 可遮罩版要把圖縮進安全區 */
 const page = (size, inset) => `<!doctype html><meta charset="utf-8"><style>
   *{margin:0;padding:0}html,body{width:${size}px;height:${size}px;overflow:hidden;background:${BG}}
   svg{display:block}
-</style>${art(inset > 0.1 ? 1.05 : 1.3)}`
+</style>${art(inset > 0.1 ? 1.05 : 1.2)}`
 
 const TARGETS = [
   { file: 'icon-192.png', size: 192, inset: 0.04 },
@@ -55,6 +56,5 @@ try {
 }
 
 // favicon：同一張圖的向量版，圓角方形。
-const fav = art(1.3).replace('<svg ', '<svg width="64" height="64" ')
-writeFileSync(join(ROOT, 'public', 'favicon.svg'), fav + '\n')
+writeFileSync(join(ROOT, 'public', 'favicon.svg'), art(1.2, '64') + '\n')
 console.log('  ok   favicon.svg')
