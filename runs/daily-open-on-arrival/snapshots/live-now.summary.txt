@@ -1,0 +1,8 @@
+routeVerified true anchorTime 17:13 partial false missing [] 
+shopping | 17:17 | 0 | open | オーエス薬局 渋谷店 |  | hours:7
+meal | 17:50 | 0 | open | 寿司 魚がし日本一 渋谷道玄坂店 (SUSHI UOGASHI-NIHON-ICHI) |  | hours:7
+lunch-fixed | 18:42 | 0 | open | 一蘭 渋谷店 |  | hours:1
+creative | 19:31 | 0 | open | GALLERY X BY PARCO |  | hours:7
+coffee | 20:32 | 0 | open | 虎へび珈琲 |  | hours:7
+gym | 21:32 | 0 | open | フィットイージー 渋谷店 |  | hours:1
+rest | - |  | - | (none) |  | no-hours

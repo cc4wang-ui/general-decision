@@ -1,0 +1,179 @@
+
+ RUN  v5.0.0 /home/user/general-decision
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts (16 tests | 8 failed) 105ms
+   ❯ daily-route：自動站到店時要開著（STOP 1） (4)
+     × 最近的店在 ETA（12:10）已打烊 → 不派，換下一個營業中的候選 70ms
+     × ETA 時剩不到 10 分鐘（12:15 打烊，12:10 到）→ 不派 4ms
+     × ETA 時還沒開門（13:00 才開）→ 不派 4ms
+     × 全部候選在 ETA 都不營業 → 該站無候選，原因 closed，列進 missingStops 7ms
+   ❯ daily-route：指定站、固定安排不換店（STOP 2） (2)
+     × 指定站在 ETA 不營業 → 店不換，回應標 openAtEta=closed 讓卡片警告 3ms
+     × 固定安排在 ETA 快打烊 → 店不換，openAtEta=closing 3ms
+   ❯ daily-route：沒有營業時間資料不擋（STOP 3） (1)
+     × 候選沒有 periods → 照派，openAtEta=unknown 2ms
+   ❯ daily-route：午夜跨日用翌日的營業時間（STOP 4） (1)
+     × 23:55 出發、00:05 翌日到：星期四凌晨營業的店不派，星期五凌晨營業的店才派 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/daily-open-on-arrival.test.ts > daily-route：自動站到店時要開著（STOP 1） > 最近的店在 ETA（12:10）已打烊 → 不派，換下一個營業中的候選
+AssertionError: expected 'closes-1205' to be 'open-all-day' // Object.is equality
+
+Expected: "open-all-day"
+Received: "closes-1205"
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts:75:29
+     73|     expect(data.routeVerified).toBe(true)
+     74|     const m = data.stops.find((s) => s.id === 'meal')!
+     75|     expect(m.candidate?.id).toBe('open-all-day')
+       |                             ^
+     76|     expect(m.eta).toBe('12:10')
+     77|     expect(m.openAtEta).toBe('open')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/unit/daily-open-on-arrival.test.ts > daily-route：自動站到店時要開著（STOP 1） > ETA 時剩不到 10 分鐘（12:15 打烊，12:10 到）→ 不派
+AssertionError: expected 'closes-1215' to be 'open-all-day' // Object.is equality
+
+Expected: "open-all-day"
+Received: "closes-1215"
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts:82:29
+     80|     mockGoogle([shop('closes-1215', 0, [weekly(THU, 9, 0, 12, 15)]), s…
+     81|     const m = (await run({ origin: SHIBUYA, stops: meal() })).stops.fi…
+     82|     expect(m.candidate?.id).toBe('open-all-day')
+       |                             ^
+     83|   })
+     84|   it('ETA 時還沒開門（13:00 才開）→ 不派', async () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  tests/unit/daily-open-on-arrival.test.ts > daily-route：自動站到店時要開著（STOP 1） > ETA 時還沒開門（13:00 才開）→ 不派
+AssertionError: expected 'opens-1300' to be 'open-all-day' // Object.is equality
+
+Expected: "open-all-day"
+Received: "opens-1300"
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts:87:29
+     85|     mockGoogle([shop('opens-1300', 0, [weekly(THU, 13, 0, 22, 0)], fal…
+     86|     const m = (await run({ origin: SHIBUYA, stops: meal() })).stops.fi…
+     87|     expect(m.candidate?.id).toBe('open-all-day')
+       |                             ^
+     88|   })
+     89|   it('全部候選在 ETA 都不營業 → 該站無候選，原因 closed，列進 missingStops', async () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  tests/unit/daily-open-on-arrival.test.ts > daily-route：自動站到店時要開著（STOP 1） > 全部候選在 ETA 都不營業 → 該站無候選，原因 closed，列進 missingStops
+AssertionError: expected { id: 'closes-1205', …(10) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "address": "closes-1205 地址",
+  "id": "closes-1205",
+  "lat": 35.6595,
+  "lng": 139.7005,
+  "mapUrl": "https://maps.google.com/?cid=closes-1205",
+  "name": "closes-1205",
+  "openNow": true,
+  "primaryType": "restaurant",
+  "rating": 4.5,
+  "types": [
+    "restaurant",
+  ],
+  "userRatingCount": 120,
+}
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts:93:25
+     91|     const data = await run({ origin: SHIBUYA, stops: meal() })
+     92|     const m = data.stops.find((s) => s.id === 'meal')!
+     93|     expect(m.candidate).toBeUndefined()
+       |                         ^
+     94|     expect(m.noCandidate).toBe(true)
+     95|     expect(m.noCandidateReason).toBe('closed')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  tests/unit/daily-open-on-arrival.test.ts > daily-route：指定站、固定安排不換店（STOP 2） > 指定站在 ETA 不營業 → 店不換，回應標 openAtEta=closed 讓卡片警告
+AssertionError: expected undefined to be 'closed' // Object.is equality
+
+- Expected:
+"closed"
+
++ Received:
+undefined
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts:107:25
+    105|     expect(m.candidate?.id).toBe('closes-1205')
+    106|     expect(m.noCandidate).toBeFalsy()
+    107|     expect(m.openAtEta).toBe('closed')
+       |                         ^
+    108|   })
+    109|   it('固定安排在 ETA 快打烊 → 店不換，openAtEta=closing', async () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  tests/unit/daily-open-on-arrival.test.ts > daily-route：指定站、固定安排不換店（STOP 2） > 固定安排在 ETA 快打烊 → 店不換，openAtEta=closing
+AssertionError: expected undefined to be 'closing' // Object.is equality
+
+- Expected:
+"closing"
+
++ Received:
+undefined
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts:113:25
+    111|     const m = (await run({ origin: SHIBUYA, stops: [{ id: 'fixed-1', k…
+    112|     expect(m.candidate?.id).toBe('closes-1215')
+    113|     expect(m.openAtEta).toBe('closing')
+       |                         ^
+    114|   })
+    115| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  tests/unit/daily-open-on-arrival.test.ts > daily-route：沒有營業時間資料不擋（STOP 3） > 候選沒有 periods → 照派，openAtEta=unknown
+AssertionError: expected undefined to be 'unknown' // Object.is equality
+
+- Expected:
+"unknown"
+
++ Received:
+undefined
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts:122:25
+    120|     const m = (await run({ origin: SHIBUYA, stops: meal() })).stops.fi…
+    121|     expect(m.candidate?.id).toBe('no-hours')
+    122|     expect(m.openAtEta).toBe('unknown')
+       |                         ^
+    123|   })
+    124| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  tests/unit/daily-open-on-arrival.test.ts > daily-route：午夜跨日用翌日的營業時間（STOP 4） > 23:55 出發、00:05 翌日到：星期四凌晨營業的店不派，星期五凌晨營業的店才派
+AssertionError: expected 'thu-0000-0100' to be 'fri-0000-0300' // Object.is equality
+
+Expected: "fri-0000-0300"
+Received: "thu-0000-0100"
+
+ ❯ tests/unit/daily-open-on-arrival.test.ts:135:29
+    133|     expect(m.eta).toBe('00:05')
+    134|     expect(m.etaDayOffset).toBe(1)
+    135|     expect(m.candidate?.id).toBe('fri-0000-0300')
+       |                             ^
+    136|     expect(m.openAtEta).toBe('open')
+    137|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 8 passed (16)
+   Start at  08:07:56
+   Duration  356ms (transform 48%, tests 42%, import 8%, worker 2%)
+

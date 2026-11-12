@@ -149,6 +149,7 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 | 2.4 回饋迴圈設計 | ✅ 設計完成 | 設計稿待使用者核准（Q1–Q11），未實作；見 §7 |
 | 步驟 4 | ⏳ 進行中 | ADR-001／ADR-002 已合併（PR #48／#49）；錯誤分類統計在 workspace（`~/workspace/improvement-research/ERROR-TAXONOMY-STATS.md`），defect escape rate 追蹤未確認（repo 內無對應檔案） |
 | 分支清理 | ⏳ 部分 | PR #44／#45／#46 的分支已刪；遠端仍有 `feature/daily-intent-first`、`docs/adr-001`、`docs/adr-002`、`step3/stryker-threshold`（2026-11-10 查 `git branch -r`） |
+| 今日行程到店要開著 | ⏳ PR 待合併 🔒 | 自動站依預估到店時間（含跨日）檢查營業時間，剩不到 10 分鐘也不派，換同池下一間；全不符標 `closed`。指定／固定站不換，只在卡片警告。沒有營業時間資料不擋。契約：`runs/daily-open-on-arrival/contract.md` |
 
 ~~已知未修：早上「約會吃好一點」常找不到 4.3★，改派附近最高分（4.1–4.2★），可能走 30 分以上（checker 第 2 輪）。~~ Round 11（2026-11-04 19:21 上線）：約會最多走 15 分；放寬評分時派 15 分內最高分。早上實測排在 11-05。
 

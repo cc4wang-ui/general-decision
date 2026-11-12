@@ -1,4 +1,5 @@
 import { travelMatrix, scheduleRoute, validPoint, effectiveStartTime } from '../src/dailyRouting.ts'
+import { openAtEta, dispatchableAt, type HoursPeriod, type OpenAtEta } from '../src/openAtEta.ts'
 import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from '../src/venueCheck.ts'
 import { areaCenter, AREA_RADIUS_M, distanceKm } from '../src/areas.ts'
@@ -9,8 +10,9 @@ const BASE=process.env.PLACES_BASE_URL??'https://places.googleapis.com'
 const MASK='places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri,places.currentOpeningHours,places.rating,places.userRatingCount,places.types,places.primaryType'
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}})
 type Coord={lat:number;lng:number}
-type Candidate={id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types:string[];primaryType?:string;userRatingCount?:number}
-type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;done?:boolean;custom?:boolean;specified?:boolean;start?:string;minutes?:number;candidate?:Candidate;noCandidate?:boolean;noCandidateReason?:'area'|'filtered'|'empty'}
+/** hours：Google currentOpeningHours.periods（已在 MASK 裡，不加費用），到店營業判斷用。 */
+type Candidate={id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types:string[];primaryType?:string;userRatingCount?:number;hours?:HoursPeriod[]}
+type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;done?:boolean;custom?:boolean;specified?:boolean;start?:string;minutes?:number;candidate?:Candidate;noCandidate?:boolean;noCandidateReason?:'area'|'filtered'|'empty'|'closed';eta?:string;etaDayOffset?:number;travelMin?:number;openAtEta?:OpenAtEta}
 const queries:Record<string,string>={gym:'FIT-EASY Shibuya Sakura Stage',meal:'Japanese set meal restaurant',creative:'art gallery exhibition',coffee:'quiet specialty coffee cafe',shopping:'sports goods drugstore'}
 /** 每一站的 Places includedType（Table A）。沒有這一層，通用查詢字串回什麼全憑 Google 相關度，車站／地標／商場都會混進來。 */
 const includedTypes:Record<string,string>={gym:'gym',meal:'restaurant',creative:'art_gallery',coffee:'cafe',shopping:'drugstore'}
@@ -40,8 +42,8 @@ async function search(key:string,q:string,center?:Coord,count=20,opts:{includedT
  if(center)body.locationBias={circle:{center:{latitude:center.lat,longitude:center.lng},radius:opts.biasRadiusM??3500}}
  const r=await fetch(BASE+'/v1/places:searchText',{method:'POST',headers:{'content-type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':MASK},body:JSON.stringify(body),signal:AbortSignal.timeout(9000)})
  if(!r.ok)throw new Error(r.status===429?'搜尋額度暫時用完':'店家搜尋暫時無法使用')
- const data=await r.json() as {places?:Array<{id?:string;displayName?:{text?:string};formattedAddress?:string;location?:{latitude?:number;longitude?:number};googleMapsUri?:string;currentOpeningHours?:{openNow?:boolean};rating?:number;userRatingCount?:number;types?:string[];primaryType?:string}>;nextPageToken?:string}
- return {places:(data.places??[]).filter(p=>p.id&&p.location&&Number.isFinite(p.location.latitude)&&Number.isFinite(p.location.longitude)).map(p=>({id:p.id!,name:p.displayName?.text??'未命名店家',address:p.formattedAddress??'',mapUrl:p.googleMapsUri??'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.displayName?.text??''),lat:p.location!.latitude!,lng:p.location!.longitude!,rating:p.rating,openNow:p.currentOpeningHours?.openNow,types:Array.isArray(p.types)?p.types.filter(t=>typeof t==='string'):[],primaryType:typeof p.primaryType==='string'?p.primaryType:undefined,userRatingCount:typeof p.userRatingCount==='number'?p.userRatingCount:undefined})),nextPageToken:typeof data.nextPageToken==='string'?data.nextPageToken:undefined}
+ const data=await r.json() as {places?:Array<{id?:string;displayName?:{text?:string};formattedAddress?:string;location?:{latitude?:number;longitude?:number};googleMapsUri?:string;currentOpeningHours?:{openNow?:boolean;periods?:HoursPeriod[]};rating?:number;userRatingCount?:number;types?:string[];primaryType?:string}>;nextPageToken?:string}
+ return {places:(data.places??[]).filter(p=>p.id&&p.location&&Number.isFinite(p.location.latitude)&&Number.isFinite(p.location.longitude)).map(p=>({id:p.id!,name:p.displayName?.text??'未命名店家',address:p.formattedAddress??'',mapUrl:p.googleMapsUri??'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.displayName?.text??''),lat:p.location!.latitude!,lng:p.location!.longitude!,rating:p.rating,openNow:p.currentOpeningHours?.openNow,hours:Array.isArray(p.currentOpeningHours?.periods)?p.currentOpeningHours.periods:undefined,types:Array.isArray(p.types)?p.types.filter(t=>typeof t==='string'):[],primaryType:typeof p.primaryType==='string'?p.primaryType:undefined,userRatingCount:typeof p.userRatingCount==='number'?p.userRatingCount:undefined})),nextPageToken:typeof data.nextPageToken==='string'?data.nextPageToken:undefined}
 }
 /**
  * 新解析候選的過濾條件。id 排除與種類排除對所有站生效；DENY 檢查（車站／地標
@@ -207,32 +209,17 @@ async function handler(req:Request):Promise<Response>{
    * 合開始，只在迴圈內累積：保留的站加進去、新挑的站加進去。
    */
   const picked = new Set<string>()
-  for(const s of stops){
-   // 「散步回家」不查店：只是一段文字提醒。舊資料裡殘留的車站候選也在這裡清掉。
-   if(isTextOnlyRest(s)){result.push({...s,candidate:undefined});continue}
-   // 既有候選先重驗（round 7，L1／L2）：通過才保留；不通過就清掉重找，不再原樣推回。
-   // 規則見 retentionOk：id／種類排除對所有站生效，DENY／評論／地區只對自動站。
-   // round 10：已經被本請求前面站挑走（或保留）的店不能再保留——否則同一家店
-   // 出現在行程兩站（R9-K1：兩站舊候選本來就是同一間，或前面站剛挑了這間）。
-   // round 11（用戶 2026-11-08 21:22 決定：完整重新生成必須隨機化）：沒有帶 shuffle
-   // 就是完整重新生成，自動挑的站不保留既有候選、全部重找——舊版不管按幾次重新產生，
-   // 通過重驗的候選都原樣留著，整條路線完全一樣（live round 7 N4）。隨機挑選在
-   // 下方的新搜尋（前 5 名裡隨機挑）本來就有，確定性只來自這一層保留；跳過保留，
-   // 重新生成才會真的換店。指定／固定／已完成站照樣保留（item 7：那是使用者的選擇，
-   // 不是系統自動挑的）。rest 純文字站前面已經處理過，不走這裡。
+  /**
+   * 查一站的候選池（daily-open-on-arrival 起搬成函式：第一次挑店與「到店時沒開」換店共用）。
+   * 回傳依距離＋評分排好的全部合格候選；沒有查詢字串時回 null。
+   */
+  const searchStop=async(s:Stop,stop:Stop):Promise<{ranked:Candidate[];sawAny:boolean;sawAreaBlocked:boolean}|null>=>{
    const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
-   const fullRegen=!shuffle
-   const retained=!!s.candidate&&!picked.has(s.candidate.id)&&retentionOk(s.candidate,s,{excluded,excludeKinds,areaPref})&&(!fullRegen||!auto)
-   if(retained&&(!shuffle||s.id!==shuffle)){picked.add(s.candidate!.id);result.push(s);continue}
-   // 候選沒通過重驗（或本來就沒有、或是要換的站）：清掉再重找。自動站的 place
-   // 是候選帶來的地名，一起丟掉；指定／固定站的 place 是使用者輸入的，留著
-   // （重找失敗時該站顯示無候選，地點文字還在）。
-   const stop=s.candidate&&!retained?{...s,candidate:undefined,noCandidate:undefined,noCandidateReason:undefined,...(auto?{place:undefined}:{})}:s
    // Explicitly named or fixed locations are resolved, never replaced by another business.
    const preserve=s.done||s.locked||s.custom
    const named=stop.place&&stop.place!== '澀谷站周邊'&&!stop.place.includes('周邊')&&!stop.place.includes('／')&&!stop.place.includes('（')
    const q=s.specified?stop.place:(preserve||(named&&shuffle!==s.id)?stop.place:queries[stop.id]??queries[stop.kind]??stop.title)
-   if(!q){result.push({...stop,candidate:undefined,title:CATALOG_TITLES[stop.id]??stop.title,noCandidate:true,noCandidateReason:'empty'});continue}
+   if(!q)return null
    // 自動挑店才送 includedType：指定／固定地點的類型由使用者決定，不由系統收窄。
    const stopType=preserve||s.specified?undefined:(includedTypes[stop.id]??includedTypes[stop.kind])
    // 目前位置模式沒有地名可附加：只靠 locationBias（中心＝目前位置）找附近的店。
@@ -259,30 +246,63 @@ async function handler(req:Request):Promise<Response>{
     if(eligible.length||!found.nextPageToken)break
     pageToken=found.nextPageToken
    }
-   if(!eligible.length){
+   const ranked=eligible.sort((a,b)=>distanceKm(center,a)-distanceKm(center,b)+((b.rating??0)-(a.rating??0))*.18)
+   return {ranked,sawAny,sawAreaBlocked}
+  }
+  /** 每個自動站第一次搜尋剩下的候選（已排序、不含已挑的那間）：到店時沒開就從這裡換，不多打 Places（契約 STOP 7）。 */
+  const pools=new Map<string,Candidate[]>()
+  for(const s of stops){
+   // 「散步回家」不查店：只是一段文字提醒。舊資料裡殘留的車站候選也在這裡清掉。
+   if(isTextOnlyRest(s)){result.push({...s,candidate:undefined});continue}
+   // 既有候選先重驗（round 7，L1／L2）：通過才保留；不通過就清掉重找，不再原樣推回。
+   // 規則見 retentionOk：id／種類排除對所有站生效，DENY／評論／地區只對自動站。
+   // round 10：已經被本請求前面站挑走（或保留）的店不能再保留——否則同一家店
+   // 出現在行程兩站（R9-K1：兩站舊候選本來就是同一間，或前面站剛挑了這間）。
+   // round 11（用戶 2026-11-08 21:22 決定：完整重新生成必須隨機化）：沒有帶 shuffle
+   // 就是完整重新生成，自動挑的站不保留既有候選、全部重找——舊版不管按幾次重新產生，
+   // 通過重驗的候選都原樣留著，整條路線完全一樣（live round 7 N4）。隨機挑選在
+   // 下方的新搜尋（前 5 名裡隨機挑）本來就有，確定性只來自這一層保留；跳過保留，
+   // 重新生成才會真的換店。指定／固定／已完成站照樣保留（item 7：那是使用者的選擇，
+   // 不是系統自動挑的）。rest 純文字站前面已經處理過，不走這裡。
+   const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
+   const fullRegen=!shuffle
+   const retained=!!s.candidate&&!picked.has(s.candidate.id)&&retentionOk(s.candidate,s,{excluded,excludeKinds,areaPref})&&(!fullRegen||!auto)
+   if(retained&&(!shuffle||s.id!==shuffle)){picked.add(s.candidate!.id);result.push(s);continue}
+   // 候選沒通過重驗（或本來就沒有、或是要換的站）：清掉再重找。自動站的 place
+   // 是候選帶來的地名，一起丟掉；指定／固定站的 place 是使用者輸入的，留著
+   // （重找失敗時該站顯示無候選，地點文字還在）。
+   const stop=s.candidate&&!retained?{...s,candidate:undefined,noCandidate:undefined,noCandidateReason:undefined,...(auto?{place:undefined}:{})}:s
+   const preserve=s.done||s.locked||s.custom
+   const found=await searchStop(s,stop)
+   if(!found){result.push({...stop,candidate:undefined,title:CATALOG_TITLES[stop.id]??stop.title,noCandidate:true,noCandidateReason:'empty'});continue}
+   if(!found.ranked.length){
     // 無候選：該站顯示「無候選」，路線繼續——整單不再為了一站回 422
     // （no_more_options 已刪除），也不再把被排除的店留著當候選（L2）。
     // 原因寫進回應，前端照原因顯示提示（地區偏好擋住時寫明要關偏好或換地區）。
     // title 還原成目錄標題：被不喜歡店家的店名不能留在卡片標題上（紅隊 round 7 §3 第 9 項）。
-    result.push({...stop,candidate:undefined,place:auto?undefined:stop.place,title:CATALOG_TITLES[stop.id]??stop.title,noCandidate:true,noCandidateReason:sawAreaBlocked?'area':sawAny?'filtered':'empty'})
+    result.push({...stop,candidate:undefined,place:auto?undefined:stop.place,title:CATALOG_TITLES[stop.id]??stop.title,noCandidate:true,noCandidateReason:found.sawAreaBlocked?'area':found.sawAny?'filtered':'empty'})
     continue
    }
-   const ranked=eligible.sort((a,b)=>distanceKm(center,a)-distanceKm(center,b)+((b.rating??0)-(a.rating??0))*.18)
    // 打破確定性排序：不在固定取第一名，改在前 5 名裡隨機挑。seen-list 存在時，
    // 每次 shuffle 排除掉已出現的，本來就會往下走；隨機是為了每天開局不永遠是同一間。
-   const top=ranked.slice(0,5)
+   const top=found.ranked.slice(0,5)
    const selected=top[randomIndex(top.length)]!
    // 本請求已挑出：後面站的 eligible 過濾與保留重驗都要排除這間（round 10 R9-K1）。
    picked.add(selected.id)
+   if(auto)pools.set(s.id,found.ranked.filter(p=>p.id!==selected.id))
    result.push({...stop,title:preserve?stop.title:selected.name,place:selected.address,candidate:selected,noCandidate:undefined,noCandidateReason:undefined})
   }
-  const ordered=order(result,center)
   // 開始時間（PR-4）：使用者開始時間合法且比當下晚才取代伺服器當下時間；
   // 未指定／不合法／已過去時就是伺服器當下時間——跟今天完全相同。
   // 09:00 不是這裡的預設值（見 src/dailyRouting.ts scheduleRoute 的防禦 fallback）。
-  const serverNow=new Date().toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'})
+  // anchorDate：錨點當天的東京日期，到店營業判斷用（ETA＋etaDayOffset 換成實際日期與星期幾）。
+  // 時刻與日期取自同一個 Date，午夜前後不會一個算今天、一個算明天。
+  const clockAt=new Date()
+  const serverNow=clockAt.toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'})
+  const anchorDate=clockAt.toLocaleDateString('en-CA',{timeZone:'Asia/Tokyo'})
   const now=effectiveStartTime(input.startTime,serverNow)
-  const located=ordered.stops.filter(s=>s.candidate)
+  let current=result
+  let ordered=order(current,center)
   // 無候選站不是未解決：它已有 noCandidate 標記與原因，前端照原因顯示；只有
   // 「沒候選又沒標記」的站才算未解決（防禦檢查，正常流程走不到）。
   const unresolved=ordered.stops.filter(s=>!s.candidate&&!isTextOnlyRest(s)&&!s.noCandidate)
@@ -290,24 +310,90 @@ async function handler(req:Request):Promise<Response>{
   // 2.1 O1（使用者 2026-11-10 已裁定：回傳部分行程並標示缺站）：逐站 noCandidate
   // 早已存在（round 7 起，薄池時 200＋逐站標示、不整單 422）；這裡再加頂層契約欄位
   // partial＋missingStops，讓呼叫端不用掃描 stops 就知道缺了哪幾站、為什麼缺。
-  // rest 純文字站從來不是缺站，不列入。
-  const missingStops=ordered.stops.filter(s=>!s.candidate&&!isTextOnlyRest(s)&&s.noCandidate).map(s=>({id:s.id,reason:s.noCandidateReason??'empty'}))
-  const partial=missingStops.length>0
+  // rest 純文字站從來不是缺站，不列入。到店營業判斷可能新增缺站（closed），所以最後才算。
+  const missingOf=(list:Stop[])=>list.filter(s=>!s.candidate&&!isTextOnlyRest(s)&&s.noCandidate).map(s=>({id:s.id,reason:s.noCandidateReason??'empty'}))
   try{
-   const {matrix,distances}=await travelMatrix(key,center,located)
-   const schedule=scheduleRoute(located,matrix,distances,now)
+   /**
+    * 到店時要開著（daily-open-on-arrival）：排完路線才知道 ETA，所以先排、再檢查。
+    * 自動站的店在 ETA 已打烊／未開門／剩不到 10 分鐘 → 從同一池候選換下一個，重新排路線
+    * 再檢查；最多 MAX_ROUTE_ROUNDS 次 Routes 呼叫。換哪一間：先估新店的到店時間（同一段
+    * 路的實際步行速度 × 上一站到新店的直線距離），優先選估計時營業的；其次沒有營業時間
+    * 資料的；最後才選舊 ETA 時營業的（把關第 1 輪：只看舊 ETA 會一間一間往遠處換、把輪數
+    * 用完）。估計只用來挑順序，派不派一律以重排後 Routes 的實際 ETA 判斷。池子用完就標無候選（closed）。最後一輪還不合格的站直接標 closed，
+    * 用同一份步行矩陣的子矩陣重排（不再打 API），重排後新的不合格站也一樣處理，直到沒有。
+    * 指定／固定／已完成站不換店，只回 openAtEta 讓卡片警告。沒有營業時間資料＝unknown，不擋。
+    */
+   const MAX_ROUTE_ROUNDS=5
+   const isAuto=(s:Stop)=>!s.done&&!s.locked&&!s.custom&&!s.specified
+   const stateOf=(s:Stop)=>openAtEta(s.candidate?.hours,anchorDate,s.eta,s.etaDayOffset??0)
+   const badOf=(list:Stop[])=>list.filter(s=>isAuto(s)&&!!s.candidate&&!dispatchableAt(stateOf(s)))
+   const closedStop=(s:Stop):Stop=>({...s,candidate:undefined,place:undefined,title:CATALOG_TITLES[s.id]??s.title,noCandidate:true,noCandidateReason:'closed'})
+   const banned=new Map<string,Set<string>>()
+   let located=ordered.stops.filter(s=>s.candidate)
+   let {matrix,distances}=await travelMatrix(key,center,located)
+   let schedule=scheduleRoute(located,matrix,distances,now)
+   for(let round=1;round<MAX_ROUTE_ROUNDS;round++){
+    const bad=badOf(schedule.stops)
+    if(!bad.length)break
+    for(const b of bad){
+     const s=current.find(x=>x.id===b.id)
+     if(!s?.candidate)continue
+     const ban=banned.get(s.id)??new Set<string>()
+     ban.add(s.candidate.id);banned.set(s.id,ban)
+     const taken=new Set(current.filter(x=>x.id!==s.id&&x.candidate).map(x=>x.candidate!.id))
+     let pool=pools.get(s.id)
+     if(!pool){
+      // 保留下來的既有候選（單站 shuffle 時的其他站）沒有池子：這一站重查一次。
+      picked.clear();taken.forEach(id=>picked.add(id));ban.forEach(id=>picked.add(id))
+      pool=(await searchStop(s,{...s,candidate:undefined,place:undefined}))?.ranked??[]
+      pools.set(s.id,pool)
+     }
+     const usable=pool.filter(p=>!ban.has(p.id)&&!taken.has(p.id))
+     const at=(p:Candidate)=>openAtEta(p.hours,anchorDate,b.eta,b.etaDayOffset??0)
+     // 估新店的到店時間：上一站（或出發點）→舊店的實際步行分鐘數／直線距離＝步速，套到上一站→新店。
+     const i=schedule.stops.findIndex(x=>x.id===b.id)
+     const prev:Coord=(i>0?schedule.stops[i-1]?.candidate:undefined)??center
+     const oldKm=Math.max(distanceKm(prev,s.candidate),0.01)
+     const [eh,em]=(b.eta??'00:00').split(':').map(Number)
+     const oldAbs=(b.etaDayOffset??0)*1440+eh!*60+em!
+     const estAt=(p:Candidate)=>{
+      const abs=Math.max(0,Math.round(oldAbs-(b.travelMin??0)+(b.travelMin??0)*distanceKm(prev,p)/oldKm))
+      return openAtEta(p.hours,anchorDate,String(Math.floor(abs/60)%24).padStart(2,'0')+':'+String(abs%60).padStart(2,'0'),Math.floor(abs/1440))
+     }
+     const next=usable.find(p=>estAt(p)==='open')??usable.find(p=>estAt(p)==='unknown')??usable.find(p=>at(p)==='open')
+     current=current.map(x=>x.id!==s.id?x:next?{...x,title:next.name,place:next.address,candidate:next,noCandidate:undefined,noCandidateReason:undefined}:closedStop(x))
+    }
+    ordered=order(current,center)
+    located=ordered.stops.filter(s=>s.candidate);
+    ({matrix,distances}=await travelMatrix(key,center,located))
+    schedule=scheduleRoute(located,matrix,distances,now)
+   }
+   // 最後一輪：還不合格的站標 closed，用子矩陣重排（不打 API），直到沒有不合格的站。
+   const base=new Map(located.map((s,i)=>[s.id,i+1]))
+   for(let bad=badOf(schedule.stops);bad.length;bad=badOf(schedule.stops)){
+    const ids=new Set(bad.map(s=>s.id))
+    current=current.map(x=>ids.has(x.id)?closedStop(x):x)
+    ordered=order(current,center)
+    const sub=ordered.stops.filter(s=>s.candidate)
+    const ix=[0,...sub.map(s=>base.get(s.id)!)]
+    schedule=scheduleRoute(sub,ix.map(i=>ix.map(j=>matrix[i]![j]!)),ix.map(i=>ix.map(j=>distances[i]![j]!)),now)
+   }
+   const withState=schedule.stops.map(s=>s.candidate?{...s,openAtEta:stateOf(s)}:s)
    // 成功路徑也要把沒地點的站合併回來：舊版只回 schedule.stops（只有有候選的
    // 站），rest 純文字站與無候選站在 Routes 成功時會整站消失（實測確認；這
    // 也是 live 三輪從沒看到休息站的原因）。失敗路徑本來就回 ordered 全單，不用改。
-   const merged=mergeScheduled(ordered.stops,schedule.stops)
+   const merged=mergeScheduled(ordered.stops,withState)
+   const missingStops=missingOf(ordered.stops)
    // anchorTime（PR-4 修正輪，O2）：回傳實際用的錨點——過去時間被 clamp 時，
    // 前端才能在狀態列寫明「已以現在 HH:MM 開始排」。新欄位，舊客戶端不讀就忽略。
-   return respond({origin,...schedule,stops:merged,partial,missingStops,anchorTime:now,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
+   return respond({origin,...schedule,stops:merged,partial:missingStops.length>0,missingStops,anchorTime:now,routeVerified:true,travelMode:'WALK',verifiedSource:'Google Places + Google Routes',searchedAt:new Date().toISOString(),warning:'步行時間為 Google Routes 預估；到店營業判斷依 Google 營業時間，交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。'})
   }catch(e){
    console.warn('[daily-route] Routes matrix unavailable:', e instanceof Error?e.message:'unknown')
    // Keep verified names, photos and navigation functional even if the separate Routes API is not enabled.
    // Do NOT label these geographically grouped stops as verified walking ETAs.
-   return respond({origin,stops:ordered.stops.map(({candidate,...rest})=>({...rest,candidate})),partial,missingStops,routeVerified:false,travelMode:null,verifiedSource:'Google Places',searchedAt:new Date().toISOString(),conflicts:[],warning:'Google Routes 暫時無法驗證；僅依地理接近程度排順序。每站請開啟 Google Maps 取得實際導航時間。'})
+   // 沒有 ETA 就無法做到店營業判斷：維持搜尋當下的營業狀態（openNow）顯示，不擋。
+   const missingStops=missingOf(ordered.stops)
+   return respond({origin,stops:ordered.stops.map(({candidate,...rest})=>({...rest,candidate})),partial:missingStops.length>0,missingStops,routeVerified:false,travelMode:null,verifiedSource:'Google Places',searchedAt:new Date().toISOString(),conflicts:[],warning:'Google Routes 暫時無法驗證；僅依地理接近程度排順序。每站請開啟 Google Maps 取得實際導航時間。'})
   }
  }catch(e){return respond({error:'places_unavailable',message:e instanceof Error?e.message:'店家搜尋失敗'},502)}
 }
