@@ -89,3 +89,33 @@ describe('PR-2：loadDaily 的 seen 換天語意（2.2 O2：day-scoped，過期�
     expect(out.disliked).toEqual(['d1'])
   })
 })
+
+describe('§7.6 O2：重開頁面時，還沒搜尋過的指定站不從路線掉落', () => {
+  const seedRaw = (raw: Record<string, unknown>) => {
+    localStorage.setItem(KEY, JSON.stringify({ day: todayTokyo(), area: '澀谷', currentPlace: '渋谷駅', notes: [], avoid: [], seen: {}, disliked: [], dislikedKinds: [], ...raw }))
+  }
+  it('意圖目的地站（intentSpecified、無候選、無 noCandidate）載入後仍在，place 與標記照留', () => {
+    const intent = { destination: '一蘭', destinationStation: 'meal', activities: ['meal'] }
+    seedRaw({ intent, appliedIntent: intent, tasks: [
+      { id: 'meal', title: '定食', minutes: 45, kind: 'meal', done: false, place: '一蘭', specified: true, intentSpecified: true },
+      { id: 'coffee', title: '咖啡', minutes: 60, kind: 'creative', done: false, candidate: cand('c1') },
+    ] })
+    const out = loadDaily()
+    const meal = out.tasks.find(t => t.id === 'meal')
+    expect(meal).toBeTruthy()
+    expect(meal?.place).toBe('一蘭')
+    expect(meal?.specified).toBe(true)
+    expect(meal?.intentSpecified).toBe(true)
+    expect(out.intent.destinationStation).toBe('meal')
+  })
+  it('逐站指定（使用者輸入地點、還沒搜尋）載入後仍在：使用者輸入的地點不能丟', () => {
+    seedRaw({ tasks: [{ id: 'coffee', title: '咖啡', minutes: 60, kind: 'creative', done: false, place: 'Fuglen Tokyo', specified: true }] })
+    const out = loadDaily()
+    expect(out.tasks.map(t => t.id)).toEqual(['coffee'])
+    expect(out.tasks[0]?.place).toBe('Fuglen Tokyo')
+  })
+  it('未搜尋的自動站（無候選、無標記、非指定）照舊濾掉：行為只放寬指定站', () => {
+    seedRaw({ tasks: [{ id: 'shopping', title: '購物', minutes: 55, kind: 'shopping', done: false }] })
+    expect(loadDaily().tasks).toEqual([])
+  })
+})
