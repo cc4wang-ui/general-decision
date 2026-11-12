@@ -269,6 +269,15 @@ describe('把關第 1 輪回歸', () => {
     expect(m.candidate).toBeUndefined()
     expect(m.noCandidateReason).toBe('closed')
   })
+  it('把關第 2 輪：開地區偏好時，換店半徑以地區中心為準；出發點離地區 4.4 km 也要派得出地區內營業的店', async () => {
+    mockGoogle([shop('A', 1, [weekly(THU, 9, 0, 12, 5)]), shop('B', 2, everyDay(11, 22))])
+    const home = { lat: SHIBUYA.lat - 0.04, lng: SHIBUYA.lng }
+    const data = await run({ origin: home, area: '澀谷', areaOnly: true, stops: meal() })
+    const m = data.stops.find((s) => s.id === 'meal')!
+    expect(m.candidate?.id).toBe('B')
+    expect(m.openAtEta).toBe('open')
+    expect(data.missingStops).toEqual([])
+  })
   it('R2：24 小時店用 23:59 表示午夜，23:52 到店不算快打烊', () => {
     const d = (day: number) => ({ year: 2026, month: 11, day })
     const h24: HoursPeriod[] = [{ open: { day: THU, hour: 0, minute: 0, date: d(12) }, close: { day: 3, hour: 23, minute: 59, date: d(18) } }]

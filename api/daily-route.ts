@@ -352,7 +352,8 @@ async function handler(req:Request):Promise<Response>{
       pools.set(s.id,pool)
      }
      // 預覽站實測：池裡可能有很遠的店（locationBias 只是偏好；曾派到阿曼的咖啡廳）。換店只用搜尋半徑內的店。
-     const usable=pool.filter(p=>!ban.has(p.id)&&!taken.has(p.id)&&distanceKm(center,p)*1000<=SEARCH_BIAS_M)
+     // 開地區偏好時以地區中心為準（把關第 2 輪：出發點離地區很遠時，不能把地區內的店丟掉）。
+     const usable=pool.filter(p=>!ban.has(p.id)&&!taken.has(p.id)&&distanceKm(areaPref??center,p)*1000<=SEARCH_BIAS_M)
      const at=(p:Candidate)=>openAtEta(p.hours,anchorDate,b.eta,b.etaDayOffset??0)
      // 估新店的到店時間：上一站（或出發點）→舊店的實際步行分鐘數／直線距離＝步速，套到上一站→新店。
      const i=schedule.stops.findIndex(x=>x.id===b.id)
