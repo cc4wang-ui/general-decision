@@ -1,0 +1,8 @@
+routeVerified true anchorTime 22:30 partial false missing [] travelMinutes 53
+coffee | 22:33 | 0 | unknown | MAGNET COFFEE |  | 3 | 35.6601,139.7015
+lunch-fixed | 23:21 | 0 | open | 一蘭 渋谷店 |  | 3 | 35.6611,139.7010
+shopping | 00:11 | 1 | open | スギ薬局 道玄坂店 |  | 5 | 35.6594,139.6997
+meal | 00:49 | 1 | open | 権八 |  | 8 | 35.6575,139.6956
+gym | 01:46 | 1 | open | フィットイージー 渋谷店 |  | 12 | 35.6565,139.7025
+creative | 03:28 | 1 | unknown | バツアートギャラリー |  | 22 | 35.6669,139.7066
+rest | - |  | - | (none) |  |  | 
