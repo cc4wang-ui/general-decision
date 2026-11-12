@@ -246,7 +246,11 @@ export function loadDaily(): DailyState {
       // rest 純文字站也要留著（round 8，live N3）：它沒有候選、沒有 noCandidate 標記，
       // 舊版過濾器只留 custom／locked／done／有候選／無候選的站，rest 每次重進頁面
       // 都被濾掉（第 7 輪的 mergeScheduled 只修了「重新生成當下」，沒修載入路徑）。
-      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || t.kind === 'rest' || !!t.candidate?.id || !!t.noCandidate)).map(t => clearStaleCandidate(t, ctx))
+      // 指定站（逐站指定與意圖目的地站）也要留著（§7.6 O2）：還沒搜尋過的指定站沒有候選、
+      // 也沒有 noCandidate 標記，舊過濾器把它濾掉，摘要卻仍說目的地已附著；逐站指定的
+      // 地點是使用者輸入的，濾掉等於丟資料。不改成掛載重跑 replanDaily：重跑會替空行程
+      // 自動長出整條目錄行程，改變「今天還沒有行程」的空狀態。
+      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || t.specified || t.kind === 'rest' || !!t.candidate?.id || !!t.noCandidate)).map(t => clearStaleCandidate(t, ctx))
         // 舊字串意圖存檔的 intentSpecified 標記剝離：該站降級為普通 specified
         // （place 原文、候選原樣保留，標記拿掉）。新存檔的標記是結構化意圖的
         // 合法標記，必須保留，此步只在 legacyStringIntent 時觸發。
@@ -337,6 +341,9 @@ const restoreIntentSpecified = (stops: DailyTask[], old: DailyTask[]): DailyTask
     const prev = old.find(x => x.id === t.id)
     return prev?.intentSpecified && t.specified ? { ...t, intentSpecified: true } : t
   })
+/** rest 純文字站（「散步回家」）：不需要找店家。與伺服器 api/daily-route.ts 的
+ * isTextOnlyRest 同一規則——固定安排／自訂／指定了地點的 rest 不算。 */
+export const isTextOnlyRest = (t: DailyTask): boolean => t.id === 'rest' && !t.locked && !t.custom && !t.specified
 export function replanDaily(s: DailyState): DailyState {
   // Keep completed tasks and their state. Only uncompleted tasks are rebuilt.
   const done = s.tasks.filter(t=>t.done || t.locked || t.custom)
@@ -549,9 +556,13 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       const mappedMissing=data.missingStops
         ? data.missingStops.map(m=>(data.stops??[]).find((t: DailyTask)=>t.id===m.id)).filter((t): t is DailyTask=>!!t)
         : undefined
-      const noCand=mappedMissing!==undefined&&!(data.partial===true&&mappedMissing.length===0)
-        ? mappedMissing
-        : (data.stops??[]).filter((t: DailyTask)=>t.noCandidate)
+      // RT2-F2：missingStops 不完整（漏列某個帶 noCandidate 的站）時，舊碼只信 missingStops、
+      // 漏點名那一站。改成兩者聯集：missingStops 排前面（伺服器順序），再補逐站 noCandidate
+      // 裡沒列到的站。missingStops 為空或缺失時，聯集就等於逐站掃描（F3 行為不變）。
+      const flagged=(data.stops??[]).filter((t: DailyTask)=>t.noCandidate)
+      const noCand=mappedMissing!==undefined
+        ? [...mappedMissing,...flagged.filter(t=>!mappedMissing.some(m=>m.id===t.id))]
+        : flagged
       const noCandNote=noCand.length?`；${data.partial===true?'部分行程：':''}${noCand.map((t: DailyTask)=>t.title||t.id).join('、')}沒有符合條件的店家`:''
       // F2（修正輪）：沒有任何站有候選時（空行程，或全站缺站），「店家已確認」是假陳述，
       // 不寫。空行程只說今天還沒有行程；全站缺站只說缺站（noCandNote 已含「部分行程：」）。
@@ -560,7 +571,10 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       // 規則；只有「使用者填了合法時間、伺服器卻用了另一個時間」時才顯示——未指定／
       // 不合法／未來時間時不顯示。路線沒驗證成功時也沒有排程，不顯示。
       const anchorNote=data.routeVerified&&data.anchorTime&&normalizeStartTime(s.startTime)!==''&&data.anchorTime!==s.startTime?`；已以現在 ${data.anchorTime} 開始排`:''
-      if(!hasCandidate)setStatus((data.stops??[]).length===0?'今天還沒有行程。':`沒有找到符合條件的店家${noCandNote}${anchorNote}`)
+      // RT2-F1：只剩 rest 純文字站（其他站都略過）時，沒有任何站需要找店家，
+      // 「沒有找到符合條件的店家」是假陳述。改說行程不用找店家。
+      const needsStore=(data.stops??[]).some((t: DailyTask)=>!isTextOnlyRest(t))
+      if(!hasCandidate)setStatus((data.stops??[]).length===0?'今天還沒有行程。':!needsStore?`今天的行程不用找店家。${anchorNote}`:`沒有找到符合條件的店家${noCandNote}${anchorNote}`)
       else setStatus(data.routeVerified?'店家已確認 · 已更新 Google Routes 步行路線'+(data.conflicts?.length?'；請留意時間衝突':'')+noCandNote+anchorNote:'店家已確認，但步行路線目前無法驗證。請用 Google Maps 導航確認。'+noCandNote+anchorNote)
     }catch(e){setStatus('無法更新：'+(e instanceof Error?e.message:'未知錯誤')+'；原行程已保留')}
     finally{setBusy(null)}

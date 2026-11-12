@@ -250,6 +250,8 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 
 來源：`~/workspace/general-decision-core-loop-2.0/pr1/redteam/REPORT-5.md` 觀察 O2；`pr1/pr-body.md` Known residuals O2。
 
+**狀態（2026-11-12）：已修，分支 `claude/busy-hamilton-4fsj04`。** 採「過濾器保留指定站」：`loadDaily` 過濾器加 `t.specified`（意圖目的地站與逐站指定都留）。不採「掛載重跑 `replanDaily`」，因為重跑會替空行程自動長出整條目錄行程，改掉「今天還沒有行程」的空狀態。同一批修掉 §7.4 RT2-F1（只剩 rest 時狀態列改說「今天的行程不用找店家。」）與 RT2-F2（缺站點名改為 `missingStops` 與逐站 `noCandidate` 的聯集）。已知未修：沒搜尋過的自動站重開頁面後仍被濾掉（既有行為，按一次搜尋即恢復）。
+
 ### 7.7 本節未改的守則
 
 - 錯判（種類判錯、雙向誤導排除）與資料遺失（清掉使用者明確封鎖）永遠不接受，每輪仍是 blocking 條件。
