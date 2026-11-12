@@ -219,7 +219,7 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 | 改動 | `git diff 5bf71a87..HEAD --stat`：5 檔，543 insertions、7 deletions（`api/daily-route.ts`、`src/dailyDecision.tsx`、`tests/unit/daily-route.test.ts`、`tests/unit/dailyDecision-pr2.test.ts`（新）、`tests/unit/dailyDecision-ui.test.tsx`） |
 | 內容 | (a) creative 表項驗證為活碼、不退役（三張表一字未動）；(b) intent 請求欄位不需要、不加（目的地已編碼為指定站，活動勾選不改變伺服器行為）；(c) 2.1 O1：頂層 `partial`＋`missingStops: {id, reason}[]`（兩個成功回應都帶；`reason` 為 `area`／`filtered`／`empty`；純文字 rest 不列入，被指定了地點的 rest 查無店家時列入）；前端 `partial` 為真時明寫「部分行程：」；(d) 2.2 O2：完整重生路徑新增 `withCurrentAsSeen` 寫回 `state.seen`（只記自動站），＋設定面板「清除今天換掉的店紀錄」按鈕（只清 seen，disliked 不動）；換天過期（既有） |
 | 測試 | 全套 1152/1152（53 檔）；lint 0；tsc exit 0；e2e `daily-location` 2 passed |
-| 紅隊 | 第 1 輪 PASS（0 blocking、3 non-blocking 已於修正輪 `dd9ed65` 修掉：F1 說法更正、F2 空行程文案、F3 空 `missingStops` 退回掃描）；第 2 輪 PASS（0 blocking、2 non-blocking 殘留：RT2-F1 rest-only 行程狀態列說錯話、RT2-F2 `missingStops` 不完整時漏缺站） |
+| 紅隊 | 第 1 輪 PASS（0 blocking、3 non-blocking 已於修正輪 `dd9ed65` 修掉：F1 說法更正、F2 空行程文案、F3 空 `missingStops` 退回掃描）；第 2 輪 PASS（0 blocking、2 non-blocking 殘留：RT2-F1 rest-only 行程狀態列說錯話、RT2-F2 `missingStops` 不完整時漏缺站）。**2026-11-12 兩項都已修**（見 §7.6 下方） |
 
 來源：`~/workspace/general-decision-core-loop-2.0/pr2/REPORT.md`、`pr2/pr-body.md`、`pr2/redteam2/REPORT.md`。
 
@@ -249,6 +249,12 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 重開頁面後，未搜尋過的意圖附著站會從路線掉落（`loadDaily` 過濾器濾掉無候選的指定站，掛載不重跑 `replanDaily`），而摘要仍宣稱附著，直到下一次改動意圖觸發 `replanDaily` 才自癒。`e547894` 上一模一樣，既有行為、非 PR-1 迴歸。**明確不在 Wave-2 批次內**，需使用者另行裁定（掛載重跑 `replanDaily`，或過濾器保留意圖站）。PR-2／PR-4 皆未碰。
 
 來源：`~/workspace/general-decision-core-loop-2.0/pr1/redteam/REPORT-5.md` 觀察 O2；`pr1/pr-body.md` Known residuals O2。
+
+**2026-11-12 已修（O2＋RT2-F1＋RT2-F2）**：
+- O2：選了「過濾器保留指定站」，不是「掛載重跑 `replanDaily`」。理由：重跑只救得回意圖站；逐站指定（使用者自己打的地點）還沒搜尋就重開頁面，一樣會被濾掉，下次搜尋時地點遺失。`loadDaily` 過濾器多留 `specified` 的站，兩種都救到。沒指定、沒候選的自動站照舊濾掉。
+- RT2-F1：只剩純文字 rest 時，狀態列改寫「行程已更新：今天只剩散步回家，不用找店家。」，不再說「沒有找到符合條件的店家」。
+- RT2-F2：缺站清單改成 `missingStops` 與逐站 `noCandidate` 取聯集，依站序、不重複。F3 的空清單／缺清單情況也由聯集涵蓋。
+- 測試：`tests/unit/dailyDecision-intent.test.ts`（O2 三條）、`tests/unit/dailyDecision-ui.test.tsx`（RT2 三條）；舊程式上這些新測試有 4 條失敗。
 
 ### 7.7 本節未改的守則
 

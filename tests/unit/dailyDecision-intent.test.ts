@@ -411,3 +411,34 @@ describe('G5 — loadDaily：舊存檔移轉', () => {
     expect(out.tasks.find(t => t.id === 'meal')?.candidate?.id).toBe('m1')
   })
 })
+
+describe('ROADMAP §7.6 O2（2026-11-12）：重開頁面後指定地點的站不再掉落', () => {
+  it('意圖目的地站還沒搜尋（沒候選、沒 noCandidate）：存檔→重開，該站與 place 都還在，摘要說的站真的在路線上', () => {
+    const intent = mkIntent('一蘭', 'meal')
+    const s = { ...state(intent), day: todayTokyo() }
+    const planned = replanDaily(s)
+    expect(planned.tasks.find(t => t.id === 'meal')).toMatchObject({ place: '一蘭', specified: true, intentSpecified: true })
+    localStorage.setItem(KEY, JSON.stringify(planned))
+    const out = loadDaily()
+    const meal = out.tasks.find(t => t.id === 'meal')
+    expect(meal).toMatchObject({ place: '一蘭', specified: true, intentSpecified: true })
+    expect(meal?.candidate).toBeUndefined()
+    expect(intentSummaryText(out.intent)).toBe('目的地：一蘭 → 午餐站')
+  })
+  it('逐站指定的地點（不是意圖）還沒搜尋：重開後也還在，下次搜尋的提案仍帶著它', () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      ...state(), day: todayTokyo(),
+      tasks: [{ id: 'coffee', title: '安靜咖啡廳｜閱讀、寫下 3 個新觀察', minutes: 60, kind: 'creative', done: false, specified: true, intentSpecified: false, place: 'Fuglen Tokyo' }],
+    }))
+    const out = loadDaily()
+    expect(out.tasks.find(t => t.id === 'coffee')).toMatchObject({ place: 'Fuglen Tokyo', specified: true })
+    expect(routeProposal(out).tasks.find(t => t.id === 'coffee')).toMatchObject({ place: 'Fuglen Tokyo', specified: true })
+  })
+  it('沒指定、沒候選的自動站照舊濾掉（範圍只擴到指定站）', () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      ...state(), day: todayTokyo(),
+      tasks: [{ id: 'gym', title: 'FIT-EASY｜80 分鐘力量訓練', minutes: 80, kind: 'gym', done: false }],
+    }))
+    expect(loadDaily().tasks.find(t => t.id === 'gym')).toBeUndefined()
+  })
+})
