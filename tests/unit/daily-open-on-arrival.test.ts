@@ -261,6 +261,14 @@ describe('把關第 1 輪回歸', () => {
     expect(data.missingStops).toEqual([])
     expect(routes).toBeLessThanOrEqual(5)
   })
+  it('R3 預覽站實測：池裡很遠的店（Places 只是偏好附近）不能被拿來換；只換搜尋半徑 3.5 km 內的店', async () => {
+    // 預覽站 22:30 實測：fallback 派了阿曼馬斯喀特的咖啡廳（步行 161849 分鐘）。
+    mockGoogle([shop('A', 1, [weekly(THU, 9, 0, 12, 5)]), shop('far-away', 12000, everyDay(0, 23))])
+    const data = await run({ origin: SHIBUYA, stops: meal() })
+    const m = data.stops.find((s) => s.id === 'meal')!
+    expect(m.candidate).toBeUndefined()
+    expect(m.noCandidateReason).toBe('closed')
+  })
   it('R2：24 小時店用 23:59 表示午夜，23:52 到店不算快打烊', () => {
     const d = (day: number) => ({ year: 2026, month: 11, day })
     const h24: HoursPeriod[] = [{ open: { day: THU, hour: 0, minute: 0, date: d(12) }, close: { day: 3, hour: 23, minute: 59, date: d(18) } }]

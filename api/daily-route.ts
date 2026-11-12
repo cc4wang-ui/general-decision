@@ -35,11 +35,13 @@ function randomIndex(n:number):number{
 /** 「散步回家」不是要拜訪的店家：不帶 candidate 的純文字站，不發 Places 查詢、不參與未解決檢查。固定安排／指定地點的不算。已完成也不算——rest 從來沒有可拜訪的店家，已完成與否都不帶候選；否則標記完成後整單 422（item 7：已完成 rest 無候選時，舊版 isTextOnlyRest 排除 done，會被未解決檢查擋下）。 */
 const isTextOnlyRest=(s:Stop)=>s.id==='rest'&&!s.locked&&!s.custom&&!s.specified
 type SearchPage={places:Candidate[];nextPageToken?:string}
+/** Places 搜尋的 locationBias 半徑（公尺）。只是偏好，Google 仍可能回很遠的店。 */
+const SEARCH_BIAS_M=3500
 async function search(key:string,q:string,center?:Coord,count=20,opts:{includedType?:string;pageToken?:string;biasRadiusM?:number}={}):Promise<SearchPage>{
  const body:Record<string,unknown>={textQuery:q,pageSize:count,languageCode:'ja'}
  if(opts.includedType)body.includedType=opts.includedType
  if(opts.pageToken)body.pageToken=opts.pageToken
- if(center)body.locationBias={circle:{center:{latitude:center.lat,longitude:center.lng},radius:opts.biasRadiusM??3500}}
+ if(center)body.locationBias={circle:{center:{latitude:center.lat,longitude:center.lng},radius:opts.biasRadiusM??SEARCH_BIAS_M}}
  const r=await fetch(BASE+'/v1/places:searchText',{method:'POST',headers:{'content-type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':MASK},body:JSON.stringify(body),signal:AbortSignal.timeout(9000)})
  if(!r.ok)throw new Error(r.status===429?'搜尋額度暫時用完':'店家搜尋暫時無法使用')
  const data=await r.json() as {places?:Array<{id?:string;displayName?:{text?:string};formattedAddress?:string;location?:{latitude?:number;longitude?:number};googleMapsUri?:string;currentOpeningHours?:{openNow?:boolean;periods?:HoursPeriod[]};rating?:number;userRatingCount?:number;types?:string[];primaryType?:string}>;nextPageToken?:string}
@@ -349,7 +351,8 @@ async function handler(req:Request):Promise<Response>{
       pool=(await searchStop(s,{...s,candidate:undefined,place:undefined}))?.ranked??[]
       pools.set(s.id,pool)
      }
-     const usable=pool.filter(p=>!ban.has(p.id)&&!taken.has(p.id))
+     // 預覽站實測：池裡可能有很遠的店（locationBias 只是偏好；曾派到阿曼的咖啡廳）。換店只用搜尋半徑內的店。
+     const usable=pool.filter(p=>!ban.has(p.id)&&!taken.has(p.id)&&distanceKm(center,p)*1000<=SEARCH_BIAS_M)
      const at=(p:Candidate)=>openAtEta(p.hours,anchorDate,b.eta,b.etaDayOffset??0)
      // 估新店的到店時間：上一站（或出發點）→舊店的實際步行分鐘數／直線距離＝步速，套到上一站→新店。
      const i=schedule.stops.findIndex(x=>x.id===b.id)
