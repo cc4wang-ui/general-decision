@@ -114,8 +114,18 @@ describe('§7.6 O2：重開頁面時，還沒搜尋過的指定站不從路線�
     expect(out.tasks.map(t => t.id)).toEqual(['coffee'])
     expect(out.tasks[0]?.place).toBe('Fuglen Tokyo')
   })
-  it('未搜尋的自動站（無候選、無標記、非指定）照舊濾掉：行為只放寬指定站', () => {
-    seedRaw({ tasks: [{ id: 'shopping', title: '購物', minutes: 55, kind: 'shopping', done: false }] })
+  it('未搜尋的目錄自動站（無候選、無標記、非指定）載入後仍在：重開頁面不從 6 張卡變 2 張', () => {
+    seedRaw({ tasks: [
+      { id: 'gym', title: 'FIT-EASY', minutes: 80, kind: 'gym', done: false },
+      { id: 'shopping', title: '購物', minutes: 55, kind: 'shopping', done: false },
+      { id: 'rest', title: '散步', minutes: 75, kind: 'rest', done: false },
+    ] })
+    expect(loadDaily().tasks.map(t => t.id)).toEqual(['gym', 'shopping', 'rest'])
+  })
+  it('非目錄 id 的未搜尋自動站照舊濾掉；空行程載入後仍是空的', () => {
+    seedRaw({ tasks: [{ id: 'mystery', title: '?', minutes: 30, kind: 'meal', done: false }] })
+    expect(loadDaily().tasks).toEqual([])
+    seedRaw({ tasks: [] })
     expect(loadDaily().tasks).toEqual([])
   })
 })

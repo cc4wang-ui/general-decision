@@ -250,7 +250,10 @@ export function loadDaily(): DailyState {
       // 也沒有 noCandidate 標記，舊過濾器把它濾掉，摘要卻仍說目的地已附著；逐站指定的
       // 地點是使用者輸入的，濾掉等於丟資料。不改成掛載重跑 replanDaily：重跑會替空行程
       // 自動長出整條目錄行程，改變「今天還沒有行程」的空狀態。
-      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || t.specified || t.kind === 'rest' || !!t.candidate?.id || !!t.noCandidate)).map(t => clearStaleCandidate(t, ctx))
+      // 還沒搜尋過的目錄站（gym／meal／creative／coffee／shopping）也留著：它們是當天
+      // buildDaily 長出來、使用者看過的行程，舊過濾器重開頁面就濾掉（實測 6 張卡變 2 張）。
+      // 只留目錄 id，來路不明的非目錄自動站照舊濾掉；空行程（tasks: []）不會長出新站。
+      tasks: raw.day === fresh.day ? raw.tasks.filter(t => typeof t.id === 'string' && (t.custom || t.locked || t.done || t.specified || t.kind === 'rest' || !!t.candidate?.id || !!t.noCandidate || catalogTitle(t.id) !== undefined)).map(t => clearStaleCandidate(t, ctx))
         // 舊字串意圖存檔的 intentSpecified 標記剝離：該站降級為普通 specified
         // （place 原文、候選原樣保留，標記拿掉）。新存檔的標記是結構化意圖的
         // 合法標記，必須保留，此步只在 legacyStringIntent 時觸發。
