@@ -1,0 +1,8 @@
+routeVerified true anchorTime 22:30 partial true missing [{"id":"creative","reason":"closed"},{"id":"coffee","reason":"closed"}] 
+creative | - |  | - | (none) | closed | no-hours
+coffee | - |  | - | (none) | closed | no-hours
+shopping | 22:34 | 0 | open | スギ薬局 道玄坂店 |  | hours:1
+lunch-fixed | 23:09 | 0 | open | 一蘭 渋谷店 |  | hours:1
+gym | 00:06 | 1 | open | フィットイージー 渋谷店 |  | hours:1
+meal | 01:39 | 1 | open | 権八 |  | hours:8
+rest | - |  | - | (none) |  | no-hours
