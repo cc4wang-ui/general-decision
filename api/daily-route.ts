@@ -319,7 +319,8 @@ async function handler(req:Request):Promise<Response>{
     * 再檢查；最多 MAX_ROUTE_ROUNDS 次 Routes 呼叫。換哪一間：先估新店的到店時間（同一段
     * 路的實際步行速度 × 上一站到新店的直線距離），優先選估計時營業的；其次沒有營業時間
     * 資料的；最後才選舊 ETA 時營業的（把關第 1 輪：只看舊 ETA 會一間一間往遠處換、把輪數
-    * 用完）。估計只用來挑順序，派不派一律以重排後 Routes 的實際 ETA 判斷。池子用完就標無候選（closed）。最後一輪還不合格的站直接標 closed，
+    * 用完）。估計都不營業時，仍先派池裡第一個沒試過的候選（把關第 2 輪 R3：估計可能偏快）。
+    * 估計只用來挑順序，派不派一律以重排後 Routes 的實際 ETA 判斷。池子用完就標無候選（closed）。最後一輪還不合格的站直接標 closed，
     * 用同一份步行矩陣的子矩陣重排（不再打 API），重排後新的不合格站也一樣處理，直到沒有。
     * 指定／固定／已完成站不換店，只回 openAtEta 讓卡片警告。沒有營業時間資料＝unknown，不擋。
     */
@@ -360,7 +361,9 @@ async function handler(req:Request):Promise<Response>{
       const abs=Math.max(0,Math.round(oldAbs-(b.travelMin??0)+(b.travelMin??0)*distanceKm(prev,p)/oldKm))
       return openAtEta(p.hours,anchorDate,String(Math.floor(abs/60)%24).padStart(2,'0')+':'+String(abs%60).padStart(2,'0'),Math.floor(abs/1440))
      }
-     const next=usable.find(p=>estAt(p)==='open')??usable.find(p=>estAt(p)==='unknown')??usable.find(p=>at(p)==='open')
+     // 把關第 2 輪 R3：估計只是排順序。估計挑不到（例如繞路使估計偏快，店還沒開）不直接標 closed，
+     // 改派池裡第一個還沒試過的候選，交給下一輪 Routes 實算 ETA 驗證；不合格會進 banned。輪數上限不變。
+     const next=usable.find(p=>estAt(p)==='open')??usable.find(p=>estAt(p)==='unknown')??usable.find(p=>at(p)==='open')??usable[0]
      current=current.map(x=>x.id!==s.id?x:next?{...x,title:next.name,place:next.address,candidate:next,noCandidate:undefined,noCandidateReason:undefined}:closedStop(x))
     }
     ordered=order(current,center)

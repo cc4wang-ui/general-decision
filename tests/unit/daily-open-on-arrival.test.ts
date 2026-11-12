@@ -232,6 +232,35 @@ describe('把關第 1 輪回歸', () => {
     expect(m.openAtEta).toBe('open')
     expect(routes).toBeLessThanOrEqual(5)
   })
+  it('R3：估計到店比實際快（繞路），估計時還沒開、實際到店已開的店不能被跳過', async () => {
+    // A 12:05 打烊（10 分鐘到 → 不合格）。B 直線距離是 A 的 2 倍 → 估 12:20 到（12:40 才開＝closed），
+    // 但實際要繞路 45 分鐘 → 12:45 到＝open。舊版估計挑不到就直接標 closed。
+    const places = [shop('A', 1, [weekly(THU, 9, 0, 12, 5)]), shop('B', 2, [weekly(THU, 12, 40, 22, 0)], false)]
+    const bLat = SHIBUYA.lat + 0.002
+    let routes = 0
+    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(bodyText(init?.body, '{}')) as { origins?: { waypoint: { location: { latLng: { latitude: number } } } }[] }
+      if (urlText(url).includes('routes.googleapis.com')) {
+        routes++
+        const lat = (body.origins ?? []).map((o) => o.waypoint.location.latLng.latitude)
+        const el = []
+        for (let i = 0; i < lat.length; i++) for (let j = 0; j < lat.length; j++) {
+          const detour = Math.abs(lat[i]! - bLat) < 1e-9 || Math.abs(lat[j]! - bLat) < 1e-9
+          const m = i === j ? 0 : detour ? 45 : Math.max(1, Math.round(Math.abs(lat[i]! - lat[j]!) * 10000))
+          el.push({ originIndex: i, destinationIndex: j, duration: m * 60 + 's', distanceMeters: m * 80 })
+        }
+        return Promise.resolve(new Response(JSON.stringify(el), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify({ places }), { status: 200 }))
+    }))
+    const data = await run({ origin: SHIBUYA, stops: meal() })
+    const m = data.stops.find((s) => s.id === 'meal')!
+    expect(m.candidate?.id).toBe('B')
+    expect(m.eta).toBe('12:45')
+    expect(m.openAtEta).toBe('open')
+    expect(data.missingStops).toEqual([])
+    expect(routes).toBeLessThanOrEqual(5)
+  })
   it('R2：24 小時店用 23:59 表示午夜，23:52 到店不算快打烊', () => {
     const d = (day: number) => ({ year: 2026, month: 11, day })
     const h24: HoursPeriod[] = [{ open: { day: THU, hour: 0, minute: 0, date: d(12) }, close: { day: 3, hour: 23, minute: 59, date: d(18) } }]
