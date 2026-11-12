@@ -95,8 +95,18 @@ jobs:
       # 升級 Playwright = 換瀏覽器版本，必須是有意的 commit，不可順手升級。
       # --with-deps 同時裝系統依賴（本機 VM 換機後缺 libgtk-4 等系統庫、
       # install-deps exit 0 卻沒裝上的教訓，見 AGENTS.md round-14 F5）。
+      # 重試（2026-11-11）：執行機偶爾解析不到 Ubuntu 套件伺服器
+      # （`Temporary failure resolving 'azure.archive.ubuntu.com'`），測試還沒跑就紅燈。
+      # 最多試 3 次，每次間隔遞增，並先 apt-get update 換一次索引。只重試安裝，不重試測試。
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do
+            npx playwright install --with-deps chromium && exit 0
+            echo "安裝失敗（第 $i 次），$((i * 30)) 秒後重試"
+            sleep $((i * 30))
+            sudo apt-get update || true
+          done
+          exit 1
 
       # 版本寫進 run log：門檻的一部分。將來 e2e 全敗時，第一件事是對照
       # 這裡的 revision，而不是先猜 flaky。
