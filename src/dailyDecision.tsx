@@ -7,7 +7,7 @@ import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from './venueCheck.ts'
 import { AREA_NAMES, withinArea } from './areas.ts'
 
-export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是結構化日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。結構化日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number}; eta?:string;departure?:string;travelMin?:number;conflict?:string; /** 跨日偏移（PR-4 修正輪）：錨點當日 0，跨過午夜 1，依此類推；與 eta／departure 同一束，清掉 ETA 時一起清。舊存檔／舊回應沒有此欄位時視為 0（當天）。 */ etaDayOffset?:number;departureDayOffset?:number; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied' }
+export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是結構化日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。結構化日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number;hours?:unknown[]}; eta?:string;departure?:string;travelMin?:number;conflict?:string; /** 跨日偏移（PR-4 修正輪）：錨點當日 0，跨過午夜 1，依此類推；與 eta／departure 同一束，清掉 ETA 時一起清。舊存檔／舊回應沒有此欄位時視為 0（當天）。 */ etaDayOffset?:number;departureDayOffset?:number; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied'|'closed'; /** 伺服器依 ETA 判斷的到店營業狀態（daily-open-on-arrival）。只在有 eta 時顯示。 */ openAtEta?: 'open'|'closing'|'closed'|'unknown' }
 /** 可被意圖指定的站：5 個可搜尋站。rest 不在內——rest 是純文字站，永遠不是搜尋目標。 */
 export type IntentStationId = 'gym' | 'meal' | 'creative' | 'coffee' | 'shopping'
 /** 5 個可搜尋站的 catalog 順序（活動顯示與存放順序）。 */
@@ -182,11 +182,20 @@ export function clearStaleCandidate(t: DailyTask, ctx: StaleContext = { disliked
   if (ctx.areaOnly && !withinArea(ctx.area, t.candidate)) return { ...clearedKeepTitle, noCandidate: true, noCandidateReason: 'area' }
   return t
 }
+/** 卡片上的營業狀態：有 ETA 與到店判斷時講「到店時」，否則沿用搜尋當下的 openNow。 */
+export function openStatusText(t: DailyTask): string {
+  if (t.eta && t.openAtEta === 'open') return '預計到店時營業中'
+  if (t.eta && t.openAtEta === 'closing') return '預計到店時快打烊'
+  if (t.eta && t.openAtEta === 'closed') return '預計到店時未營業'
+  if (t.eta && t.openAtEta === 'unknown') return '營業狀態未確認'
+  return t.candidate?.openNow === true ? 'Google 顯示目前營業中' : t.candidate?.openNow === false ? 'Google 顯示目前未營業' : '營業狀態未確認'
+}
 /** 無候選站的顯示文字：按原因給不同的下一步（area 時寫明地區偏好是原因）。 */
 export function noCandidateText(t: DailyTask, area: string): string {
   if (t.noCandidateReason === 'area') return `這一站沒有符合條件的店家。地區偏好（${area}，1 公里內）可能擋住了附近的店：關掉「只在這一帶找店」或改選其他地區再試。`
   if (t.noCandidateReason === 'filtered') return '這一站沒有符合條件的店家：符合的店都被排除了（不喜歡／種類／評論數）。清除「不喜歡」的紀錄或放寬條件再試。'
   if (t.noCandidateReason === 'denied') return '這一站之前選的地點是車站或地標，不是可拜訪的店家。請按「換這一站」重新搜尋。'
+  if (t.noCandidateReason === 'closed') return '這一站找不到到店時還開著的店家：附近的店在預計到店時已打烊、還沒開門，或離打烊不到 10 分鐘。改開始時間或出發地再試。'
   return '這一站找不到店家。換個出發地或條件再試。'
 }
 /** 舊存檔／髒存檔的意圖欄位驗證：非 null 物件才取欄位，否則回空意圖的新複製；
@@ -716,7 +725,8 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 {t.candidate && <PlacePhoto placeId={t.candidate.id} placeName={t.candidate.name} mapUrl={t.candidate.mapUrl}/>}
                 {t.candidate ? <div className="dd-place-meta">
                   <strong>⌖ {t.candidate.address}</strong>
-                  <span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{t.candidate.openNow===true?'Google 顯示目前營業中':t.candidate.openNow===false?'Google 顯示目前未營業':'營業狀態未確認'} · Google Places</span>
+                  <span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{openStatusText(t)} · Google Places</span>
+                  {t.eta&&(t.openAtEta==='closed'||t.openAtEta==='closing')&&<span className="dd-place-unresolved" role="status">⚠ {t.openAtEta==='closed'?'預計 '+t.eta+' 到店時，這間店沒有營業。請先確認營業時間。':'預計 '+t.eta+' 到店時，離打烊不到 10 分鐘。'}</span>}
                   <a className="dd-place-link" href={t.candidate.mapUrl} target="_blank" rel="noopener noreferrer">Google Maps 店家詳情 ↗</a>
                 </div> : t.noCandidate ? <div className="dd-place-unresolved" role="status">⚠ {noCandidateText(t, state.area)}
                   {t.noCandidateReason === 'area' && <> <a className="dd-place-link" href="#daily-area" onClick={e=>{e.preventDefault();setSheet('area')}}>前往地區偏好設定</a></>}
