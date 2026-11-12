@@ -1,49 +1,50 @@
-# 交接｜next-dev
+# 交接｜daily-open-on-arrival
 狀態：待接手
-建立：2026-11-12 03:40 UTC（03:48 更新）｜環境：Claude Code（雲端容器）｜上下文：約 255k／400k
+建立：2026-11-12 10:10 UTC｜環境：Claude Code（雲端容器）｜上下文：`323,354`／400k（已過軟上限，所以交接）
 
 ## 1. 下一個對話先做什麼
-1. 用 `mcp__github__pull_request_read`（method `get`，owner `cc4wang-ui`，repo `general-decision`，pullNumber `61`）看 `merged`。沒合併就看第 2 段「進行中」，照那裡做；已合併就用 `mcp__Vercel__list_deployments`（projectId `prj_bKA0WAdn6Nm03CaN5bDARIVAkLmi`，teamId `team_6HL0acbpoaKW1HCfcLy7fA0h`，target `production`）確認最新一筆 `READY`。
-2. 問 Cross 一題（AskUserQuestion，第一個選項標「（建議）」）：「下一步開發哪一項？」選項照第 2 段「未開始」的 B、C、D。Cross 已選就跳過這條。
-3. Cross 選 B、C、D：照第 2 段該項寫的「要 Cross 給什麼」，用一句話請他給，給了再開工。
+1. 準備 repo：工作目錄沒有 `general-decision` 就用 `add_repo`（owner `cc4wang-ui`，repo `general-decision`）再 clone。然後 `git fetch origin main && git checkout -B <系統指定的分支> origin/main && npm ci`。系統沒指定分支就用 `claude/daily-open-r3`。
+2. 修「已知未修 R3」（同一份目標契約 STOP 1，契約全文在 `runs/daily-open-on-arrival/contract.md`）：`api/daily-route.ts` 換店挑選（搜 `const estAt=`、`const next=usable.find`）只用估計到店時間挑。估計比實際快時，實際到店營業的店被跳過，該站被標 `closed`。修法建議：估計挑不到時，不要直接 `closedStop`；改挑池裡第一個還沒試過的候選，交給下一輪 Routes 實算 ETA 驗證（被驗證不合格就進 `banned`）。仍受 `MAX_ROUTE_ROUNDS=5` 上限。
+3. 先把第 5 段「原文摘錄」的 R3 重現寫成測試，加到 `tests/unit/daily-open-on-arrival.test.ts` 的「把關第 1 輪回歸」後面，確認修正前失敗、修正後通過。
+4. 同一個 PR 把 `docs/ROADMAP.md` §6「今日行程到店要開著」那列改成 `✅ 2026-11-12`，附 `PR #63（c7579984）`；R3 修好後再補一句。
+5. 跑 `npm run typecheck`、`npm run lint`、`npx vitest run`、`git add` 後 `npm run check:bundle`。開草稿 PR、訂閱、等 CI。
+6. M 級把關：開獨立 Opus 子代理載入 `anthropic-skills:checker`，只給 Cross 原話、契約、PR、證據。審查最多兩輪。
+7. 合併 main 會更新正式站 🔒：要 Cross 在對話裡說 `核准` 才合併。自動 session 不問問題：停在這一步，送停止報告。
 
 ## 2. 做到哪
-- 已完成：候選 A 三個小錯修好，PR #59（分支 `claude/busy-hamilton-4fsj04`）。
-  - O2：`loadDaily` 過濾器加 `t.specified`，重開頁面後指定站不再掉落。Chromium 實測：main 重開後 `stopCards` 是 `1`，修正後是 `2`。
-  - RT2-F1：只剩 rest 時狀態列改說 `今天的行程不用找店家。`。
-  - RT2-F2：缺站點名改成 `missingStops` 與逐站 `noCandidate` 的聯集，依 id 去重。
-  - 測試：`Tests  1195 passed (1195)`；修正前新測試 `Tests  4 failed | 69 passed (73)`；lint 0；`npm run typecheck` exit 0。
-  - CI：`check (tsc + lint + vitest)` success；Vercel 預覽 Ready。
-- 外部動作（做了，不要重做）：push 分支、開草稿 PR #59、訂閱 PR #59、設備援檢查排程 `trig_0172q2gd8EqvRppoyFdSuGwF`（04:25 UTC 觸發）。本交接檔也 commit 到 PR #59 同一分支。
-- 已完成（03:45 起）：PR #59 合併（merge `73725ec8c09afcd8f9407324de05c99ddb367c57`），正式部署 `dpl_81csT3HrcZ763eqtoLJPLBkFfeZN` 寫檔時 `BUILDING`；#59 訂閱已取消、排程 `trig_0172q2gd8EqvRppoyFdSuGwF` 已刪。Cross 選 E（AskUserQuestion 回答 `E 修自動站消失（建議）`）；E 已修、開草稿 PR #61（同分支，從 main 重開），已訂閱，備援排程 `trig_014oixDQTGY2jL5dGRzVWRwB`（04:37 UTC）。E 實測：重開前 `6`、重開後 `6`、第一次進來 `0`；`Tests  1196 passed (1196)`。
-- 進行中：PR #61 等 CI。合併 main 會觸發正式部署（保留事項），要 Cross 說 `核准`；寫檔時還沒核准。本 session 還訂閱著。
-- 未開始：下一步開發，等 Cross 選。候選（依建議順序）：
-  - B 2.4 行為回饋迴圈（新功能）。要 Cross 給：核准 Q1–Q11。⚠️ 設計稿在 `~/workspace/general-decision-core-loop-2.0/design-2.4/DESIGN-feedback-loop.md`，不在 repo、容器裡也沒有；Cross 手上沒有就要重寫設計稿。
-  - C 用試用資料調派店規則（ROADMAP N4、N6）。要 Cross 給：在 App 除錯畫面按一次「匯出」，把檔案給我們。
-  - D Cross 的待決清單，只要裁定：hygiene 報告 #10 試用結束日（12-30 或 12-29）、#14 產品主次（核心班長 vs 今日行程）、#19 直傳時代部署工具要不要拿掉、#20 `npm run taste` 要不要留；ROADMAP N5 Places 上限 🔒、L3 聯絡信箱、L6 GCP 帳單上限 🔒、L7 遙測 🔒。另 2.3 AKOMEYA 按鈕文案待裁。
-  - 舊分支清理（被擋）：已合併的 9 個遠端分支要刪：`claude/fable-repo-hygiene-ui-redesign-6h7sxl`、`claude/handoff-daily-layout-hha4hi`、`docs/adr-001`、`docs/adr-002`、`docs/roadmap-2.0`、`feature/daily-intent-first`、`feature/start-time-input`、`server/pr2-partial-seen`、`step3/stryker-threshold`。未合併的不刪：`claude/vigilant-clarke-dsrqfi`（9 commits）、`progress/memory-sync`（1 commit）。
-  - 上一份交接檔的草稿 PR（分支 `claude/handoff-daily-layout-j63hzm`）被本檔取代，要不要關由 Cross 決定。
+- 已完成（本棒）：
+  - PR #63 合併（merge `c7579984df7573fc748b048db99fa151d1817f66`）。Cross 原話 `deploy and handoff to next session`，我當作這次合併的核准。
+  - 正式部署 `dpl_6v1cygK11ZQkHjZoD3qVYTQFmWz3`（`general-decision-oqjn9r7zk-cc4wang-uis-projects.vercel.app`）上線。真送 POST（`startTime` 22:30）：`routeVerified true`、coffee `closed`、其他站 `open`，creative 沒有營業時間資料 → `unknown` 照派。存檔 `runs/daily-open-on-arrival/snapshots/prod-2230.json`。
+  - 新檔 `src/openAtEta.ts`；改 `api/daily-route.ts`、`src/dailyDecision.tsx`；新測試 `tests/unit/daily-open-on-arrival.test.ts`（20 條）。全套 `Tests 1216 passed (1216)`。CI run `43182011394` 全綠。
+  - 把關兩輪：第 1 輪 FAIL（R1 換店輪數用完、R2 23:59 縫）→ commit `7d67adc` 修好。第 2 輪 FAIL 只剩「其他」類 R3 → 依 board-intake §7 照樣交付，列已知未修。
+- 外部動作（做了，不要重做）：PR #63 已合併、已取消訂閱。兩個 Vercel 分享連結已建（23 小時後失效）。本交接檔 push 到分支 `claude/zen-knuth-vvuu5a`（已合併的分支，只放交接檔與正式站證據）。
+- 進行中：無。沒有寫到一半的檔案。
+- 未開始：
+  - R3 修正（第 1 段第 2–7 條）。
+  - ROADMAP §6 那列改 ✅（第 1 段第 4 條）。
+  - 之後的候選（要 Cross 選，不自動做）：2 有固定行程時排程可能遲到（`STATE.md` P0）；3 手機畫面驗收；4 試用資料匯出 N4；5 試用結束後路線 Q2（12-30 前裁定）；6 🔒 N5 Places 上限、L6 GCP 帳單上限。
+  - 舊分支清理：自動模式擋刪遠端分支，要 Cross 加權限或在 GitHub 網頁刪。
 
 ## 3. 做了哪些決定和為什麼
-- 把 Cross 的 `核准` 當成選 A，因為上一棒建議 A，而且 A 不用拍板方向；Claude.md「能假設就不問」。
-- O2 用「過濾器保留指定站」，不用上一份交接檔預設的「掛載重跑 `replanDaily`」，因為重跑會替 `tasks: []` 的空行程自動長出整條目錄行程，改掉「今天還沒有行程」空狀態（PR #57 才剛修過這個畫面）。
-- 過濾器保留範圍是 `t.specified`（不只 `intentSpecified`），因為逐站指定的地點是使用者輸入的，濾掉等於丟資料。
-- 前端 `isTextOnlyRest` 照抄伺服器 `api/daily-route.ts:34` 的規則，因為兩邊判斷「不用找店」必須一致。
-- 分級 S（同一 context 自查，沒開獨立把關者），因為只是可復原的修錯，不對外、不動錢。
-- 交接檔加進 PR #59 同一分支，因為合併 main 會觸發正式部署（保留事項）；併在一起只部署一次。
-- E 的修法是過濾器保留目錄 id（`catalogTitle(t.id) !== undefined`），因為目錄站都能重建、來路不明的 id 照舊濾掉才安全；空行程不受影響。
-- 這一棒不自動開下一棒，因為「下一步做什麼」是定目標，屬 Cross（Claude.md §4）；Cross 原話：`寫交接檔 看下一步要開發甚麼`。
+- 用 `currentOpeningHours.periods` 判斷，不加 Places 欄位，因為契約 STOP 7：`不改 MASK 加新欄位`。
+- 先排路線、再檢查、不合格就換店重排，因為 ETA 要排完路線才知道。換店從第一次搜尋的同一池候選拿，因為不多打 Places。
+- 最後一輪還不合格的站標 `closed`，用子矩陣重排、不再打 Routes，因為要保證迴圈會結束、Routes 呼叫有上限。
+- 帶日期的 periods 用實際日期判斷；ETA 不在資料涵蓋範圍（舊存檔）就退回星期幾規則，因為舊存檔的日期會過期，直接用會誤判全部打烊。
+- R3 沒在本棒修，因為已過軟上限（`323,354` token），而且 board-intake §7 規定兩輪後只擋「跑不完」「壞資料」。R3 不會派到關門的店，最壞是少一站並標原因。
+- Routes 失敗時維持舊行為（只看 openNow），因為沒有 ETA 就無法判斷。
 
 ## 4. 試過但行不通的
-- 試了用 `git push origin --delete <9 個分支>` 刪已合併舊分支：失敗，錯誤 `Permission for this action was denied by the Claude Code auto mode classifier. Reason: [Git Destructive].`。原因：自動模式把刪遠端分支當破壞性動作。不要再試同一指令；要 Cross 加權限規則，或他在 GitHub 網頁刪。
-- 試了用讀 localStorage 驗 O2：失敗，修正前後都印 `"after":["meal:一蘭"]`。原因：`loadDaily` 只過濾記憶體裡的狀態，不改存檔。要數畫面上的 `article.dd-stop` 卡片才驗得到。
-- 上一棒的坑仍有效：CI 安裝瀏覽器 DNS 失敗已用重試解決，不要手動重跑等它好；今日行程不要加位移進場動畫（會捲走 `151` px）。
+- 試了只用「舊店的 ETA」挑替代店（`cce761f`）：把關 R1 失敗，`noCandidateReason:"closed"` 但池裡 D 在 12:50 是 `open`。原因：越遠的店越晚到，一間一間換把 3 次上限用完。已在 `7d67adc` 改。不要退回。
+- 試了用直線距離 × 步速估新店 ETA（`7d67adc`）：把關 R3 失敗。原因：繞路時估計偏快，實際營業的店被跳過。這是下一棒要修的。
+- 試了在 `git add` 前跑 `npm run check:bundle`：失敗，錯誤 `FAIL api/daily-route 載不起來：ERR_MODULE_NOT_FOUND Cannot find module '/tmp/vartask-Q06WBF/src/openAtEta.ts'`。原因：腳本用 `git ls-files` 展開，新檔要先 `git add`。
+- 摘要腳本用 `require('runs/...')` 相對路徑：失敗，錯誤 `Cannot find module 'runs/daily-open-on-arrival/snapshots/live-now.json'`。原因：node require 不吃相對路徑，要 `path.resolve`。
+- 舊 commit 的 CI `required` 顯示失敗：不是程式錯，是新 push 取消舊 run。只看最新 commit。
 
 ## 5. 要讀哪些檔
-1. 原文：`/root/.claude/projects/-home-user-general-decision/f9810b10-d9f8-5b15-8cdf-d4b248337a25.jsonl`。⚠️ 雲端容器回收後就沒了；讀不到時以本檔為準。對話網址：`https://claude.ai/code/session_01NsUyzm3MPvrwvRa4Q3HvYQ`。檢索方法見 §7。不要整份讀。
-2. `docs/ROADMAP.md` — §0 試用期規則、§6 待 Cross 清單、§7.5 2.4 狀態、§7.6 O2 修法紀錄。
-3. `runs/hygiene-ui-1111/reports/hygiene.md` — 24 條衝突清單，#10、#14、#19、#20 待 Cross。
-4. `src/dailyDecision.tsx` — `loadDaily` 過濾器（O2、E 都改在這）；`buildDaily`、`replanDaily` 決定站怎麼長出來。
-5. `STATE.md` — 產品規則與踩過的坑；開工前先讀。
-6. `.handoff/20261111-0627-daily-layout.md` — 今日行程的 testid、色盤守門、版面坑。
-7. `/tmp/claude-0/e2e/o2.cjs` — Chromium 驗 O2 的腳本（容器回收就沒了；寫法：vite dev 開 5179 port，`page.route('**/api/**')` 回 503，數 `article.dd-stop`）。
+1. 原文：`/root/.claude/projects/-home-user-general-decision/b841f238-59f7-58e6-84a0-243b63e49cc3.jsonl`。⚠️ 雲端容器回收後就沒了；讀不到時以本檔和「原文摘錄」為準。檢索方法見 session-handoff §7。不要整份讀。
+2. `runs/daily-open-on-arrival/contract.md` — 凍結的目標契約（7 條 STOP）。
+3. `api/daily-route.ts` — 搜 `MAX_ROUTE_ROUNDS`：到店營業檢查、換店、子矩陣重排都在這段。
+4. `src/openAtEta.ts` — 營業狀態純函式。
+5. `tests/unit/daily-open-on-arrival.test.ts` — 現有 20 條測試與 Routes mock 寫法。
+6. `runs/daily-open-on-arrival/snapshots/live-README.md`、`prod-2230.json` — 真 API 證據。
+7. `docs/ROADMAP.md` — §6 要改的那一列。

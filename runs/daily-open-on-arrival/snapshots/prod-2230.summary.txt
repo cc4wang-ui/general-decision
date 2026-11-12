@@ -1,0 +1,8 @@
+routeVerified true anchorTime 22:30 partial true missing [{"id":"coffee","reason":"closed"}]
+coffee | - |  | - | (none) | closed | no-hours
+shopping | 22:34 | 0 | open | サンドラッグ 渋谷店 |  | hours:7
+lunch-fixed | 23:09 | 0 | open | 一蘭 渋谷店 |  | hours:1
+gym | 00:06 | 1 | open | フィットイージー 渋谷店 |  | hours:1
+meal | 01:39 | 1 | open | 権八 |  | hours:8
+creative | 02:48 | 1 | unknown | バツアートギャラリー |  | no-hours
+rest | - |  | - | (none) |  | no-hours
