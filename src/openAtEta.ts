@@ -29,7 +29,7 @@ const wall = (y: number, mo: number, d: number, h: number, mi: number) => Date.U
  * 2. 有 period 沒有 close → Google 的 24 小時營業表示法 → open。
  * 3. periods 都帶日期而且 ETA 落在資料涵蓋的日期內 → 用實際日期判斷（含特殊休業日）。
  * 4. 否則（舊存檔的過期資料、ETA 超出涵蓋範圍）→ 用星期幾＋時間的每週規則判斷。
- * 相鄰時段（例：到 24:00、隔天 00:00 再開）會合併，不會把跨午夜營業誤判成快打烊。
+ * 相鄰時段（例：到 24:00 或 23:59、隔天 00:00 再開）會合併，不會把跨午夜營業誤判成快打烊。
  */
 export function openAtEta(periods: unknown, anchorDate: string, eta: string | undefined, dayOffset = 0, minLeft = MIN_OPEN_AT_ETA): OpenAtEta {
   if (!Array.isArray(periods) || !periods.length || typeof eta !== 'string') return 'unknown'
@@ -66,12 +66,12 @@ export function openAtEta(periods: unknown, anchorDate: string, eta: string | un
       for (const shift of [-WEEK, 0, WEEK]) intervals.push([o + shift, c + shift])
     }
   }
-  // 合併重疊／相鄰時段。
+  // 合併重疊／相鄰時段。Google 常用 23:59 表示營業到午夜：差 1 分鐘以內也算相連（把關第 1 輪 R2）。
   const sorted = intervals.filter(([o, c]) => c > o).sort((a, b) => a[0] - b[0])
   const merged: [number, number][] = []
   for (const [o, c] of sorted) {
     const last = merged.at(-1)
-    if (last && o <= last[1]) last[1] = Math.max(last[1], c)
+    if (last && o <= last[1] + 1) last[1] = Math.max(last[1], c)
     else merged.push([o, c])
   }
   const hit = merged.find(([o, c]) => o <= t && t < c)

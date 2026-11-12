@@ -207,3 +207,36 @@ describe('卡片文案（前端）', async () => {
     expect(noCandidateText({ ...base, candidate: undefined, noCandidate: true, noCandidateReason: 'closed' }, '澀谷')).toContain('到店時還開著')
   })
 })
+
+describe('把關第 1 輪回歸', () => {
+  it('R1：越遠的店越晚到，一間一間換不能把輪數用完；池裡有到店營業的店就要派它', async () => {
+    const places = [shop('A', 1, [weekly(THU, 9, 0, 12, 5)]), shop('B', 2, [weekly(THU, 9, 0, 12, 25)]), shop('C', 3, [weekly(THU, 9, 0, 12, 35)]), shop('D', 5, [weekly(THU, 9, 0, 23, 0)])]
+    let routes = 0
+    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(bodyText(init?.body, '{}')) as { origins?: { waypoint: { location: { latLng: { latitude: number } } } }[] }
+      if (urlText(url).includes('routes.googleapis.com')) {
+        routes++
+        // 步行分鐘數跟緯度差成正比（0.001 度＝10 分鐘）。
+        const lat = (body.origins ?? []).map((o) => o.waypoint.location.latLng.latitude)
+        const el = []
+        for (let i = 0; i < lat.length; i++) for (let j = 0; j < lat.length; j++) {
+          const m = i === j ? 0 : Math.max(1, Math.round(Math.abs(lat[i]! - lat[j]!) * 10000))
+          el.push({ originIndex: i, destinationIndex: j, duration: m * 60 + 's', distanceMeters: m * 80 })
+        }
+        return Promise.resolve(new Response(JSON.stringify(el), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify({ places }), { status: 200 }))
+    }))
+    const m = (await run({ origin: SHIBUYA, stops: meal() })).stops.find((s) => s.id === 'meal')!
+    expect(m.candidate?.id).toBe('D')
+    expect(m.openAtEta).toBe('open')
+    expect(routes).toBeLessThanOrEqual(5)
+  })
+  it('R2：24 小時店用 23:59 表示午夜，23:52 到店不算快打烊', () => {
+    const d = (day: number) => ({ year: 2026, month: 11, day })
+    const h24: HoursPeriod[] = [{ open: { day: THU, hour: 0, minute: 0, date: d(12) }, close: { day: 3, hour: 23, minute: 59, date: d(18) } }]
+    expect(openAtEta(h24, '2026-11-25', '23:52')).toBe('open')
+    expect(openAtEta(h24, '2026-11-25', '23:59')).toBe('open')
+    expect(openAtEta([weekly(THU, 11, 0, 23, 59), weekly(FRI, 0, 0, 2, 0)], '2026-11-12', '23:55')).toBe('open')
+  })
+})
