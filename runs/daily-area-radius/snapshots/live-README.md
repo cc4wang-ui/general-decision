@@ -17,3 +17,8 @@
 - `final-area-2230.*`：沒有 `area`。shopping 派 スギ薬局 道玄坂店（0.07 km）。creative、coffee、meal `closed`（到店時打烊，跟正式站同時段一致）。
 - `final-noarea-2230.*`：跟正式站、上一版預覽站一致（creative、coffee、meal `closed`）。
 - ⚠️ 直接用部署網址 `general-decision-fdfml4xft` 的分享連結回 302 轉登入頁（HTTP 401）；改用分支別名的分享連結就成功。
+
+## PR #67 合併後正式站驗收（2026-11-13 04:37 UTC）
+- 部署 `dpl_5aq7SQLex3oNk4Pr26BnQGKKngJ8`（`general-decision-lyno3uyzy`，merge `1b2fca1`），別名 `general-decision.vercel.app`。
+- `prod-area-2230.*`：沒有 `area`。shopping 派 スギ薬局 道玄坂店（離澀谷 0.07 km）。修正前同一份請求（`main-area-2230.*`）shopping、meal 是 `area`。
+- `prod-noarea-2230.*`：跟修正前一致（creative、coffee、meal `closed`）。
