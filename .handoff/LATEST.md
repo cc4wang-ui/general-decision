@@ -11,8 +11,9 @@ Cross 原話（逐字，2026-11-13）：`合併完之後，handoff 換到下個�
    - `**P1 — UI device testing:** ... **No verified real iPhone Safari/iPad/desktop screenshots or touch E2E** yet.`
    - 本次新上線的「段內步行最短」：在瀏覽器上看今日行程的順序與 ETA（正式站）。
 3. 做法建議：Playwright 對正式站 `general-decision.vercel.app` 跑瀏覽器 E2E 與截圖（iPhone、iPad、桌機尺寸；用 Playwright 內建裝置名）。容器只有 Chromium（`/opt/pw-browsers/chromium`）。⚠️ `docs/FAILURE-MEMORY.md:9`：Chromium 結果不等於 Safari／WebKit PASS；試裝 WebKit，裝不了就照實標「WebKit 未驗」，真 iPhone 留給 Cross 一次性確認（附精確步驟）。
-4. 不要改產品程式，除非測出 bug；測出 bug 照 board-intake 開 PR 修（合併已授權：`merge不用再我批准` `一律核准`）。
-5. 做完：證據存 `runs/pending-tests/`，更新 `STATE.md` 第 3 段各項狀態，獨立 Opus 把關（checker）PASS，更新本檔。
+4. ⚠️ Vercel 免費方案每日部署上限已用完（2026-11-13 10:00 UTC，錯誤逐字：`Resource is limited - try again in 24 hours (more than 100, code: "api-deployments-free-per-day")`）。約 2026-11-14 10:00 UTC 前，push 不會產生預覽站，合併 main 也不會更新正式站（正式站停在已驗收的 `fe0b9dd`）。測試只對正式站做不受影響。修 bug 時：先用本機 `npm run build`＋`npx vite preview` 驗；預覽站／正式站驗收等上限恢復後再做。改方案＝動錢 🔒，不要做。
+5. 不要改產品程式，除非測出 bug；測出 bug 照 board-intake 開 PR 修（合併已授權：`merge不用再我批准` `一律核准`）。
+6. 做完：證據存 `runs/pending-tests/`，更新 `STATE.md` 第 3 段各項狀態，獨立 Opus 把關（checker）PASS，更新本檔。
 
 ## 2. 做到哪
 - 已完成（daily-walk-shortest，P0「總步行最短」，全部上線）：
@@ -46,6 +47,7 @@ Cross 原話（逐字，2026-11-13）：`合併完之後，handoff 換到下個�
 - 商場類地點（渋谷パルコ、MIYASHITA PARK、渋谷ヒカリエ、SHIBUYA TSUTAYA、渋谷ストリーム）被過濾成 `filtered`，不能當指定店。
 - vitest 會吃掉 `console.log`；探測腳本改用 `writeFileSync` 寫到 scratchpad。放在 `tests/unit/.probe/`（隱藏資料夾）不會被執行，要放 `tests/unit/zzprobe/`，跑完刪掉。
 - 停掉的把關子代理會留下 `tests/unit/zz-checker-*`，要手動刪。
+- Vercel 每日 100 次部署上限：這次一天內 push 太多次（每次 push 都部署）。少 push，改完一批再推。
 - 每次 push 取消上一個 commit 的 CI，`required` 顯示 failure（實際是 `cancelled`）。看 run 的 conclusion。
 
 ## 5. 要讀哪些檔
