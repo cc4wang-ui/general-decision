@@ -20,3 +20,8 @@
 - 一蘭、代官山 蔦屋書店每次解析到不同分店，所以總步行只當參考；重點是 v3 沒有 v1 的空等行為。
 
 備：v2（`1b31e87`）的對照在舊版 git 歷史；最終交付版是 v3。
+
+## 4. 合併後正式站驗收（2026-11-13 09:57 UTC）
+- PR #75 合併（merge `fe0b9dd`）。正式部署 `dpl_7mXffyDvhx6ZoVtKHKW8cNcbvvf9` READY，別名 `general-decision.vercel.app`。
+- `prod-pinned3.json`：總步行 53 分鐘（合併前正式站 62 分鐘，同一組 Place ID），`conflicts []`、`routeVerified true`，タワーレコード 21:30 準時。
+- `prod-pinned.json`：一蘭 22:00 準時，排在第 7 站（沒有 v1 的「先去空等」），`conflicts []`、`routeVerified true`。
