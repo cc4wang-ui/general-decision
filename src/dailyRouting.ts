@@ -139,5 +139,62 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
  // If a fixed appointment cannot be met, surface the conflict, never silently discard stops.
  // leg 未知（矩陣缺列）時以 Infinity 計：排到最後，visit 會因非有限時間而 throw，不靜默丟站。
  while(flexible.length){const row=matrix[position];const ranked=flexible.map((s,i)=>({i,leg:row?.[idx.get(s.id)??-1]??Infinity})).sort((a,b)=>a.leg-b.leg);const first=ranked[0];if(!first)break;const removed=flexible.splice(first.i,1)[0];if(!removed)break;visit(removed)}
+ // daily-fixed-ontime（P0）：貪婪排法報晚到時，再找一次「所有有時間的站都準時」的排法；
+ // 找到就改用它，找不到才保留貪婪結果與晚到警告。貪婪沒有衝突時完全不進這裡（行為不變）。
+ if(conflicts.length){
+  const seq=onTimeOrder(stops,idx,matrix,anchorMin,deadlineAbs)
+  if(seq){
+   ordered.length=0;conflicts.length=0;position=originIndex;at=anchorMin;travelMinutes=0;distanceKm=0
+   for(const s of seq)visit(s)
+  }
+ }
  return {stops:ordered,distanceKm:Math.round(distanceKm*10)/10,travelMinutes,conflicts}
+}
+/** 搜尋節點上限：站多又趕不上時不卡住請求；超過就放棄（回 null），呼叫端保留貪婪結果與警告。 */
+export const ONTIME_SEARCH_NODES=20000
+/**
+ * 窮舉（有剪枝）找一種讓每個有時間的站都不晚到的排法。每一步先試步行最近的站。
+ * 剪枝只用「到不了」的下界：現在時間＋任何站走到該站的最短步行分鐘數 > 期限。
+ * 不用「直走」當下界，因為 Google 步行矩陣不保證三角不等式（繞經別站可能比直走快）。
+ * 有時間的站都排完後，其餘站照貪婪的收尾規則：可移動站由近到遠，再接沒有時間的固定站。
+ */
+function onTimeOrder<T extends ScheduledStop>(stops:T[],idx:Map<string,number>,matrix:number[][],anchorMin:number,deadlineAbs:(start?:string)=>number|null):T[]|null{
+ const n=stops.length
+ const node=stops.map(s=>idx.get(s.id)??-1)
+ if(node.some(p=>p<0||!matrix[p]))return null
+ const deadline=stops.map(s=>deadlineAbs(s.start))
+ const stay=stops.map(s=>s.minutes??45)
+ const fixed=stops.map(s=>!!(s.locked||s.custom||s.done))
+ const leg=(from:number,to:number)=>{const v=matrix[from]?.[to];return v!==undefined&&Number.isFinite(v)?v:Infinity}
+ const minIn=node.map(p=>Math.min(...matrix.map((row,i)=>i===p?Infinity:(Number.isFinite(row[p]??NaN)?row[p]!:Infinity))))
+ const used=new Array<boolean>(n).fill(false)
+ const seq:number[]=[]
+ let budget=ONTIME_SEARCH_NODES
+ const tail=(pos:number):number[]=>{
+  const rest=stops.map((_,i)=>i).filter(i=>!used[i])
+  const flex=rest.filter(i=>!fixed[i]),late=rest.filter(i=>fixed[i])
+  const out:number[]=[]
+  let p=pos
+  while(flex.length){let best=0;flex.forEach((i,k)=>{if(leg(p,node[i]!)<leg(p,node[flex[best]!]!))best=k});const i=flex.splice(best,1)[0]!;out.push(i);p=node[i]!}
+  return [...out,...late]
+ }
+ const dfs=(pos:number,at:number):number[]|null=>{
+  if(--budget<0)return null
+  const open=stops.map((_,i)=>i).filter(i=>!used[i]&&deadline[i]!==null)
+  if(!open.length)return [...seq,...tail(pos)]
+  if(open.some(i=>at+minIn[i]!>deadline[i]!))return null
+  const next=stops.map((_,i)=>i).filter(i=>!used[i]).map(i=>({i,l:leg(pos,node[i]!)})).filter(x=>Number.isFinite(x.l)).sort((a,b)=>a.l-b.l)
+  for(const {i,l} of next){
+   const arrival=at+l,dl=deadline[i]??null
+   if(dl!==null&&arrival>dl)continue
+   used[i]=true;seq.push(i)
+   const found=dfs(node[i]!,(dl!==null&&arrival<dl?dl:arrival)+stay[i]!)
+   if(found)return found
+   used[i]=false;seq.pop()
+   if(budget<0)return null
+  }
+  return null
+ }
+ const found=dfs(0,anchorMin)
+ return found?found.map(i=>stops[i]!):null
 }
