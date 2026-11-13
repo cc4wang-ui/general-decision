@@ -1,0 +1,19 @@
+ RUN  v5.0.0 /home/user/general-decision
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 換 coffee；meal 舊店在 12 km 外 → 不保留，重新搜尋派半徑內的店 40ms
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > meal 舊店在 3.3 km（半徑內）→ 照舊保留，不重新搜尋 3ms
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 固定站不套半徑：12 km 外的固定店照舊保留 3ms
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 指定站不套半徑：12 km 外的指定店照舊保留 3ms
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 開地區偏好：中心是地區中心；地區內 1 km 的舊店照舊保留 3ms
+ ✓ tests/unit/daily-area-radius.test.ts > A：開地區偏好時，自動站搜尋以地區中心為準 > 目前位置在地區外 4.4 km → locationBias 中心＝地區中心，派出地區內的店，不標 area 38ms
+ ✓ tests/unit/daily-area-radius.test.ts > A：開地區偏好時，自動站搜尋以地區中心為準 > 文字出發地（大井町）＋地區偏好 → 查詢字串不附加出發地名，派出地區內的店 4ms
+ ✓ tests/unit/daily-area-radius.test.ts > A：開地區偏好時，自動站搜尋以地區中心為準 > 沒開地區偏好 → 行為不變：中心＝出發點，查詢字串照舊附加出發地名 3ms
+ ✓ tests/unit/daily-area-radius.test.ts > A：開地區偏好時，自動站搜尋以地區中心為準 > 指定站不改：查詢字串仍是使用者輸入的地名，不套地區中心以外的限制 3ms
+ ✓ tests/unit/daily-area-radius.test.ts > B：第一次挑店只從搜尋半徑內挑 > 池子只有 2 家、隨機抽到第 2 名（12 km 外）→ 不派遠店，改派半徑內的店 3ms
+ ✓ tests/unit/daily-area-radius.test.ts > B：第一次挑店只從搜尋半徑內挑 > 池裡只有遠店 → 不派，該站標無候選 empty 4ms
+ ✓ tests/unit/daily-area-radius.test.ts > B：第一次挑店只從搜尋半徑內挑 > 指定站不套半徑：使用者指定的遠店照派 2ms
+ ✓ tests/unit/daily-area-radius.test.ts > STOP 8：Places 次數不增加 > 第 1 頁只有遠店、還有下一頁 → 不往下翻（跟修正前一樣只查 1 頁） 3ms
+ ✓ tests/unit/daily-area-radius.test.ts > 把關第 1 輪：已排除的遠店不能讓翻頁提早停 > 第 1 頁只有被換掉的遠店（目前候選）＋已排除的近店 → 照樣翻第 2 頁，派出第 2 頁的近店 3ms
+ Test Files  2 passed (2)
+      Tests  14 passed (14)
+   Start at  07:55:37
+   Duration  339ms (transform 62%, tests 26%, import 10%, worker 3%)

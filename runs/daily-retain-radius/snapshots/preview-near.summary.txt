@@ -1,0 +1,3 @@
+routeVerified True missing []
+shopping | ChIJaSICMKiMGGARsZUzhVVYnBQ | 薬 マツモトキヨシ SHIBUYA DOGENZAKA FLAG | 0.10 km | 
+meal | ChIJ3TUL91WLGGARNQVCAWLb0kw | 権八 | 0.50 km | 
