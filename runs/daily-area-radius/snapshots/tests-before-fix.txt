@@ -1,0 +1,10 @@
+     × 目前位置在地區外 4.4 km → locationBias 中心＝地區中心，派出地區內的店，不標 area 47ms
+     × 文字出發地（大井町）＋地區偏好 → 查詢字串不附加出發地名，派出地區內的店 4ms
+     × 池子只有 2 家、隨機抽到第 2 名（12 km 外）→ 不派遠店，改派半徑內的店 6ms
+     × 池裡只有遠店 → 不派，該站標無候選 empty 4ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected undefined to be 'area-1' // Object.is equality
+AssertionError: expected undefined to be 'area-1' // Object.is equality
+AssertionError: expected 'far-12km' to be 'near-1' // Object.is equality
+AssertionError: expected { id: 'far-12km', …(11) } to be undefined
+      Tests  4 failed | 3 passed (7)
