@@ -1,0 +1,8 @@
+routeVerified True partial True missing [{"id": "creative", "reason": "closed"}, {"id": "coffee", "reason": "closed"}, {"id": "meal", "reason": "closed"}] travelMinutes 22
+creative | - | - | (none) | closed | 
+coffee | - | - | (none) | closed | 
+shopping | 22:34 | open | スギ薬局 道玄坂店 |  | km-from-shibuya 0.07
+lunch-fixed | 23:09 | open | 一蘭 渋谷スペイン坂店 |  | km-from-shibuya 0.23
+gym | 00:07 | open | フィットイージー 渋谷店 |  | km-from-shibuya 0.38
+meal | - | - | (none) | closed | 
+rest | - | - | (none) |  | 

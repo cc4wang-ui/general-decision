@@ -215,7 +215,7 @@ async function handler(req:Request):Promise<Response>{
    * 查一站的候選池（daily-open-on-arrival 起搬成函式：第一次挑店與「到店時沒開」換店共用）。
    * 回傳依距離＋評分排好的全部合格候選；沒有查詢字串時回 null。
    */
-  const searchStop=async(s:Stop,stop:Stop):Promise<{ranked:Candidate[];sawAny:boolean;sawAreaBlocked:boolean}|null>=>{
+  const searchStop=async(s:Stop,stop:Stop):Promise<{ranked:Candidate[];sawAny:boolean;sawAreaBlocked:boolean;sawFar:boolean}|null>=>{
    const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
    // Explicitly named or fixed locations are resolved, never replaced by another business.
    const preserve=s.done||s.locked||s.custom
@@ -225,15 +225,25 @@ async function handler(req:Request):Promise<Response>{
    // 自動挑店才送 includedType：指定／固定地點的類型由使用者決定，不由系統收窄。
    const stopType=preserve||s.specified?undefined:(includedTypes[stop.id]??includedTypes[stop.kind])
    // 目前位置模式沒有地名可附加：只靠 locationBias（中心＝目前位置）找附近的店。
-   const queryText=q+(preserve||s.specified||!location?'':' '+location)
+   // 地區偏好開啟時（A，daily-area-radius）：自動站的搜尋中心改地區中心，也不附加出發地名——
+   // 出發點離地區很遠時，以出發點為中心或帶出發地名，Google 只回出發點附近的店，全被 areaOk 擋成 area。
+   // 指定／固定站不改：查的是使用者自己的地名，中心照舊。
+   const inArea=!!areaPref&&auto
+   const queryText=q+(preserve||s.specified||!location||inArea?'':' '+location)
+   const searchCenter=inArea&&areaPref?areaPref:center
    // 排除清單一長就可能一頁翻完都沒得選：eligible 為空時用 pageToken 往下一頁翻，最多 3 頁。
    // 地區偏好開啟時，查詢的 locationBias 半徑也縮到地區半徑，讓 Google 先回附近的店；真正的保證是 areaOk 的硬過濾。
    let eligible:Candidate[]=[]
    let sawAny=false
    let sawAreaBlocked=false
+   let sawFar=false
+   // B（daily-area-radius）：自動站只收搜尋半徑內的店——第一次挑店（前 5 名隨機）與換店池共用這一份。
+   // locationBias 只是偏好，Google 仍會回很遠的店（預覽站曾派到阿曼）；池子不到 5 家時隨機可能抽到它。
+   // 中心：開地區偏好用地區中心（池子已被 areaOk 限在地區內），否則用出發點。指定／固定站不套。
+   const nearOk=(p:Candidate)=>distanceKm(areaPref??center,p)*1000<=SEARCH_BIAS_M
    let pageToken:string|undefined
    for(let page=0;page<3;page++){
-    const found=await search(key,queryText,center,20,{includedType:stopType,pageToken,biasRadiusM:areaPref?AREA_RADIUS_M:undefined})
+    const found=await search(key,queryText,searchCenter,20,{includedType:stopType,pageToken,biasRadiusM:areaPref?AREA_RADIUS_M:undefined})
     sawAny=sawAny||found.places.length>0
     // 翻頁時也要記錄「有店回來但被地區擋掉」：那是無候選的原因（area），不是「什麼都沒有」（empty）。
     if(areaPref&&found.places.some(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&!areaOk(p,s,areaPref)))sawAreaBlocked=true
@@ -244,12 +254,17 @@ async function handler(req:Request):Promise<Response>{
     // 查的是使用者自己的地名，seen 不能把那間店擋掉）。
     // others 只在這裡用，絕對不進 retentionOk（round 8 K1：否則單站 shuffle
     // 會連帶清掉其他站的候選）；seen 也一樣不進 retentionOk（見上方 seen 的說明）。
-    eligible=found.places.filter(p=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&(!auto||!seen.includes(p.id))&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
-    if(eligible.length||!found.nextPageToken)break
+    const usableHere=(p:Candidate)=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&(!auto||!seen.includes(p.id))&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id)
+    eligible=found.places.filter(p=>usableHere(p)&&(!auto||nearOk(p)))
+    // 只有遠店（B）：本來會被挑、只因太遠被擋的店。原因寫 empty（附近找不到），不寫 filtered（那是被不喜歡／評論數擋掉）。
+    // 用跟 eligible 同一份條件判斷（把關第 1 輪：已被其他站挑走／換掉過的遠店不算，否則會少翻一頁、誤標找不到店）。
+    if(auto&&found.places.some(p=>usableHere(p)&&!nearOk(p)))sawFar=true
+    // 只剩遠店就不往下翻：下一頁只會更遠，而且修正前這種情況也只查 1 頁（Places 次數不增加，契約 STOP 8）。
+    if(eligible.length||!found.nextPageToken||sawFar)break
     pageToken=found.nextPageToken
    }
    const ranked=eligible.sort((a,b)=>distanceKm(center,a)-distanceKm(center,b)+((b.rating??0)-(a.rating??0))*.18)
-   return {ranked,sawAny,sawAreaBlocked}
+   return {ranked,sawAny,sawAreaBlocked,sawFar}
   }
   /** 每個自動站第一次搜尋剩下的候選（已排序、不含已挑的那間）：到店時沒開就從這裡換，不多打 Places（契約 STOP 7）。 */
   const pools=new Map<string,Candidate[]>()
@@ -282,7 +297,7 @@ async function handler(req:Request):Promise<Response>{
     // （no_more_options 已刪除），也不再把被排除的店留著當候選（L2）。
     // 原因寫進回應，前端照原因顯示提示（地區偏好擋住時寫明要關偏好或換地區）。
     // title 還原成目錄標題：被不喜歡店家的店名不能留在卡片標題上（紅隊 round 7 §3 第 9 項）。
-    result.push({...stop,candidate:undefined,place:auto?undefined:stop.place,title:CATALOG_TITLES[stop.id]??stop.title,noCandidate:true,noCandidateReason:found.sawAreaBlocked?'area':found.sawAny?'filtered':'empty'})
+    result.push({...stop,candidate:undefined,place:auto?undefined:stop.place,title:CATALOG_TITLES[stop.id]??stop.title,noCandidate:true,noCandidateReason:found.sawAreaBlocked?'area':found.sawFar?'empty':found.sawAny?'filtered':'empty'})
     continue
    }
    // 打破確定性排序：不在固定取第一名，改在前 5 名裡隨機挑。seen-list 存在時，
