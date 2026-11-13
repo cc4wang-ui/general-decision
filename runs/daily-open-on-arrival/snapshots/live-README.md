@@ -12,3 +12,8 @@
 - `r3-area-2230.*`（commit `0f6b6a8`，地區偏好時半徑以地區中心為準）：`area 澀谷`、`areaOnly true`、出發點在澀谷南方約 4.4 km（`35.6195,139.7005`）。`routeVerified true`。派出的 2 站離澀谷 0.38／0.18 km，`open`。缺 4 站：creative、coffee `closed`；shopping、meal `area`。
 - `main-area-2230.*`：同一份請求打正式站（main，部署 `general-decision-oqjn9r7zk`）。缺站與原因完全相同 → 不是本 PR 造成。
 - ⚠️ 既有問題（本 PR 不改）：開地區偏好且出發點離地區很遠時，第一次搜尋以出發點為中心（`locationBias`），回來的店都在地區外，被標 `area`。
+
+## PR #64 合併後正式站驗收（2026-11-13 02:48 UTC，東京星期五 11:48）
+- 部署 `dpl_5rki61Mgzs427x4Xq2F9vWs9SSH3`（`general-decision-6woc2f537`，merge `1c58ba3`），別名 `general-decision.vercel.app`。
+- `prod-r3-2230.*`：請求 `r3-fixed-request.json`（出發點澀谷，`startTime` 22:30）。`routeVerified true`。派出 4 站都在澀谷 0.5 km 內，`openAtEta` 全 `open`。creative、coffee 標 `closed`。
+- 比對 `prod-prev-2230.json`：同一份請求打舊正式部署（`general-decision-oqjn9r7zk`，PR #63）。缺站與原因相同。18:00 出發兩版都派出咖啡、只缺 creative → 是當天 Google 營業資料，不是本 PR 造成。
