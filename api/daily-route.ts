@@ -93,7 +93,7 @@ function areaOk(p:Candidate,s:Stop,pref:{lat:number;lng:number}|null):boolean{
  * 注意：venueOk 不能直接拿來重驗——它對指定／固定站的候選也跑 DENY 檢查，
  * 會把 item 7 的車站候選清掉；這裡只對自動站跑 DENY／評論／地區。
  */
-function retentionOk(c:Candidate,s:Stop,opts:{excluded:string[];excludeKinds:string[];areaPref:{lat:number;lng:number}|null}):boolean{
+function retentionOk(c:Candidate,s:Stop,opts:{excluded:string[];excludeKinds:string[];areaPref:{lat:number;lng:number}|null;center:Coord}):boolean{
  if(opts.excluded.includes(c.id))return false
  const k=kindOfCandidate(c)
  if(k&&opts.excludeKinds.includes(k))return false
@@ -102,6 +102,9 @@ function retentionOk(c:Candidate,s:Stop,opts:{excluded:string[];excludeKinds:str
  if(isDeniedCandidate(c)||isDeniedName(c.name))return false
  if(s.id!=='gym'&&s.kind!=='gym'&&c.userRatingCount!==undefined&&c.userRatingCount<MIN_REVIEWS)return false
  if(opts.areaPref&&distanceKm(opts.areaPref,c)*1000>AREA_RADIUS_M)return false
+ // daily-retain-radius：保留的舊店跟新派的店同一個半徑（第一次挑店 nearOk、換店 usable 都是
+ // areaPref??center 的 SEARCH_BIAS_M）。否則單站換店時，換了出發點的其他站會留著很遠的舊店。
+ if(distanceKm(opts.areaPref??opts.center,c)*1000>SEARCH_BIAS_M)return false
  return true
 }
 function order(stops:Stop[],origin:Coord):{stops:Stop[];distanceKm:number;warning?:string}{
@@ -254,7 +257,9 @@ async function handler(req:Request):Promise<Response>{
     // 查的是使用者自己的地名，seen 不能把那間店擋掉）。
     // others 只在這裡用，絕對不進 retentionOk（round 8 K1：否則單站 shuffle
     // 會連帶清掉其他站的候選）；seen 也一樣不進 retentionOk（見上方 seen 的說明）。
-    const usableHere=(p:Candidate)=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&(!auto||!seen.includes(p.id))&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id)
+    // 要換的站不能挑回自己現在這間：用原始的 s.candidate（daily-retain-radius：現在這間太遠時
+    // 不通過重驗，stop.candidate 已被清掉，用 stop 會讓它又被挑回來）。
+    const usableHere=(p:Candidate)=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&(!auto||!seen.includes(p.id))&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==s.candidate?.id)
     eligible=found.places.filter(p=>usableHere(p)&&(!auto||nearOk(p)))
     // 只有遠店（B）：本來會被挑、只因太遠被擋的店。原因寫 empty（附近找不到），不寫 filtered（那是被不喜歡／評論數擋掉）。
     // 用跟 eligible 同一份條件判斷（把關第 1 輪：已被其他站挑走／換掉過的遠店不算，否則會少翻一頁、誤標找不到店）。
@@ -283,7 +288,7 @@ async function handler(req:Request):Promise<Response>{
    // 不是系統自動挑的）。rest 純文字站前面已經處理過，不走這裡。
    const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
    const fullRegen=!shuffle
-   const retained=!!s.candidate&&!picked.has(s.candidate.id)&&retentionOk(s.candidate,s,{excluded,excludeKinds,areaPref})&&(!fullRegen||!auto)
+   const retained=!!s.candidate&&!picked.has(s.candidate.id)&&retentionOk(s.candidate,s,{excluded,excludeKinds,areaPref,center})&&(!fullRegen||!auto)
    if(retained&&(!shuffle||s.id!==shuffle)){picked.add(s.candidate!.id);result.push(s);continue}
    // 候選沒通過重驗（或本來就沒有、或是要換的站）：清掉再重找。自動站的 place
    // 是候選帶來的地名，一起丟掉；指定／固定站的 place 是使用者輸入的，留著

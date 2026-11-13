@@ -1,0 +1,24 @@
+ RUN  v5.0.0 /home/user/general-decision
+ × tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 換 coffee；meal 舊店在 12 km 外 → 不保留，重新搜尋派半徑內的店 43ms
+   → expected 'meal-far' to be 'meal-near' // Object.is equality
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > meal 舊店在 3.3 km（半徑內）→ 照舊保留，不重新搜尋 3ms
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 固定站不套半徑：12 km 外的固定店照舊保留 3ms
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 指定站不套半徑：12 km 外的指定店照舊保留 2ms
+ ✓ tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 開地區偏好：中心是地區中心；地區內 1 km 的舊店照舊保留 4ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/unit/daily-retain-radius.test.ts > 單站換店：其他自動站的舊候選也要在半徑內 > 換 coffee；meal 舊店在 12 km 外 → 不保留，重新搜尋派半徑內的店
+AssertionError: expected 'meal-far' to be 'meal-near' // Object.is equality
+Expected: "meal-near"
+Received: "meal-far"
+ ❯ tests/unit/daily-retain-radius.test.ts:64:61
+     62|     const g = mockGoogle()
+     63|     const out = await run({ origin: SHIBUYA, shuffle: 'coffee', exclud…
+     64|     expect(out.find((s) => s.id === 'meal')!.candidate?.id).toBe('meal…
+       |                                                             ^
+     65|     expect(out.find((s) => s.id === 'coffee')!.candidate?.id).toBe('ca…
+     66|     expect(g.searches.filter((t) => t === 'restaurant')).toHaveLength(…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  07:54:09
+   Duration  357ms (transform 61%, tests 25%, import 11%, worker 3%)
