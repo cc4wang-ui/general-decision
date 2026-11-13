@@ -1,0 +1,6 @@
+travelMinutes 62 distanceKm 4.2 conflicts [] routeVerified True missing []
+p4 ChIJQ4KyM8mNGGARx7UDIN0vfeU 18:54 7 None None open
+p3 ChIJiXocb7WNGGAReVVBhRwWLoQ 19:19 10 None None open
+p5 ChIJJ-aF_6aMGGARfbFeJO3hQuU 19:43 9 None None closed
+p2 ChIJrWB6lbKMGGARp0QB0mMSNe4 20:19 21 None None open
+fixed ChIJ1Ya6fqiMGGAR8FTtP_6yeMg 21:30 15 None None open

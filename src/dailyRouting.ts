@@ -139,16 +139,19 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
  // If a fixed appointment cannot be met, surface the conflict, never silently discard stops.
  // leg 未知（矩陣缺列）時以 Infinity 計：排到最後，visit 會因非有限時間而 throw，不靜默丟站。
  while(flexible.length){const row=matrix[position];const ranked=flexible.map((s,i)=>({i,leg:row?.[idx.get(s.id)??-1]??Infinity})).sort((a,b)=>a.leg-b.leg);const first=ranked[0];if(!first)break;const removed=flexible.splice(first.i,1)[0];if(!removed)break;visit(removed)}
- // daily-fixed-ontime（P0）：貪婪排法報晚到時，再找一次晚到站數最少的排法（目標 0）；
- // 嚴格比貪婪少才改用，否則保留貪婪結果與晚到警告。貪婪沒有衝突時完全不進這裡（行為不變）。
+ // daily-fixed-ontime（P0）：貪婪排法報晚到時，再找一次晚到站數最少的排法（目標 0）；嚴格比貪婪少才改用。
  // 把關第 1 輪：不能「全有或全無」——一個怎樣都趕不上的固定行程（例：時間已過）不能害其他行程失去救援。
+ const replay=(seq:T[])=>{ordered.length=0;conflicts.length=0;position=originIndex;at=anchorMin;travelMinutes=0;distanceKm=0;for(const s of seq)visit(s)}
  if(conflicts.length){
   const seq=fewestLateOrder(stops,idx,matrix,anchorMin,deadlineAbs,conflicts.length)
-  if(seq){
-   ordered.length=0;conflicts.length=0;position=originIndex;at=anchorMin;travelMinutes=0;distanceKm=0
-   for(const s of seq)visit(s)
-  }
+  if(seq)replay(seq)
  }
+ // daily-walk-shortest（P0）：上面的結果當參考排法。固定站、已完成站的位置不動；每個可移動站留在原本那段
+ // （兩個固定站之間），只在段內改成步行最短。段內的站沒有開始時間、不會等待，所以步行變短＝到下一個固定站更早：
+ // 晚到不會變多、結束不會變晚。不跨段移動，因為預覽站與把關第 1 輪實測：跨段會先去晚上的固定行程空等，
+ // 把店排到半夜打烊後（runs/daily-walk-shortest/snapshots/preview-v1-pinned.json）。
+ const shorter=shortestWithinSegments(ordered.map(o=>stops.find(s=>s.id===o.id)!),idx,matrix)
+ if(shorter)replay(shorter)
  return {stops:ordered,distanceKm:Math.round(distanceKm*10)/10,travelMinutes,conflicts}
 }
 /** 搜尋節點上限：站多又趕不上時不卡住請求；用完就停，回目前找到的最好排法（沒有就 null，呼叫端保留貪婪結果與警告）。 */
@@ -200,4 +203,56 @@ function fewestLateOrder<T extends ScheduledStop>(stops:T[],idx:Map<string,numbe
  dfs(0,anchorMin,0)
  const found=bestSeq as number[]|null // dfs 閉包內會改寫；TS 的流程分析看不到，所以要標型別
  return found?found.map(i=>stops[i]!):null
+}
+/** 一段最多幾個可移動站做精確最短（Held-Karp：2^k×k² 次運算；API 上限 9 站＝約 4 萬次）。超過就保留原順序。 */
+export const WALK_SEGMENT_MAX=12
+/**
+ * daily-walk-shortest：參考排法依固定站（locked／custom／done）切段。每段＝前一個固定站（或出發點）→段內可移動站→
+ * 下一個固定站（最後一段沒有終點）。每段用 Held-Karp 求步行分鐘最小的順序，嚴格比原順序短才換。
+ * 都沒有變短就回 null（保留參考排法，不無故改順序）。
+ */
+function shortestWithinSegments<T extends ScheduledStop>(ref:T[],idx:Map<string,number>,matrix:number[][]):T[]|null{
+ const leg=(from:number,to:number)=>{const v=matrix[from]?.[to];return v!==undefined&&Number.isFinite(v)?v:Infinity}
+ // 段邊界：固定站、已完成站，以及帶了可解析開始時間的可移動站（手寫 POST 才會有）——帶 start 的站
+ // 若在段內被移動，可能晚到或結束變晚（把關第 2 輪反例），所以不重排、當邊界固定。
+ const isFixed=(s:T)=>!!(s.locked||s.custom||s.done)||minute(s.start??'')!==null
+ const out:T[]=[]
+ let changed=false,start=0,seg:T[]=[]
+ const flush=(end:number|null)=>{
+  const k=seg.length
+  if(k>=2&&k<=WALK_SEGMENT_MAX){
+   const nodes=seg.map(s=>idx.get(s.id)??-1)
+   if(nodes.every(p=>p>=0)){
+    const pathWalk=(order:number[])=>{let p=start,w=0;for(const i of order){w+=leg(p,nodes[i]!);p=nodes[i]!}return w+(end===null?0:leg(p,end))}
+    const full=(1<<k)-1
+    const dp=Array.from({length:1<<k},()=>new Array<number>(k).fill(Infinity))
+    const parent=Array.from({length:1<<k},()=>new Array<number>(k).fill(-1))
+    for(let i=0;i<k;i++)dp[1<<i]![i]=leg(start,nodes[i]!)
+    for(let mask=1;mask<=full;mask++)for(let i=0;i<k;i++){
+     const cur=dp[mask]![i]!
+     if(!(mask&(1<<i))||!Number.isFinite(cur))continue
+     for(let j=0;j<k;j++){
+      if(mask&(1<<j))continue
+      const nm=mask|(1<<j),v=cur+leg(nodes[i]!,nodes[j]!)
+      if(v<dp[nm]![j]!){dp[nm]![j]=v;parent[nm]![j]=i}
+     }
+    }
+    let bestI=-1,best=Infinity
+    for(let i=0;i<k;i++){const v=dp[full]![i]!+(end===null?0:leg(nodes[i]!,end));if(v<best){best=v;bestI=i}}
+    if(bestI>=0&&best<pathWalk(seg.map((_,i)=>i))){
+     const order:number[]=[]
+     for(let mask=full,i=bestI;i>=0;){order.push(i);const pi=parent[mask]![i]!;mask&=~(1<<i);i=pi}
+     order.reverse()
+     seg=order.map(i=>seg[i]!);changed=true
+    }
+   }
+  }
+  out.push(...seg);seg=[]
+ }
+ for(const s of ref){
+  if(isFixed(s)){const p=idx.get(s.id);if(p===undefined)return null;flush(p);out.push(s);start=p}
+  else seg.push(s)
+ }
+ flush(null)
+ return changed?out:null
 }
