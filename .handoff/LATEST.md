@@ -1,10 +1,18 @@
-# 交接｜daily-walk-shortest（已完成）
-狀態：已完成，沒有待辦
+# 交接｜pending-tests（下一棒：所有待定測試工作）
+狀態：待接手（daily-walk-shortest 已完成）
 建立：2026-11-13 10:00 UTC｜環境：Claude Code（雲端容器）
 
 ## 1. 下一個對話先做什麼
-1. 沒有待辦。先請 Cross 從第 2 段「其他候選」選下一件，不自動做。
-2. 交付時要告知 Cross：這次做的是「各段內步行最短」，不是全域最短。店和固定行程／已完成站的前後順序照舊版（理由見第 3 段）。
+Cross 原話（逐字，2026-11-13）：`合併完之後，handoff 換到下個對話去進行所有待定測試工作`。
+1. 載入 /board-intake，寫 `runs/pending-tests/contract.md`。範圍＝`STATE.md` 第 3 段「Open failures」裡所有「待驗證／待測」項目（逐字見下）。Cross 不在線上，不問他；成功指標預設：⚠️「每一項都有真實環境證據（截圖、錄影或 E2E 報告），或寫明為什麼做不到、要誰做什麼」。等級 M（對外交付品質；Cross 要親眼看）。
+2. 待測項目（逐字抄自 `STATE.md` 第 3 段）：
+   - `**P0 — full production E2E unverified:** ... Real production POST and browser device interactions still need independent confirmation.`
+   - `**P1 — Shuffle remaining coverage:** actual preview smoke PASS for alternate cafe + preserved meal/fixed stop; still missing browser E2E for manually overridden destinations, completed stops, multiple appointments and UI live feedback.`
+   - `**P1 — UI device testing:** ... **No verified real iPhone Safari/iPad/desktop screenshots or touch E2E** yet.`
+   - 本次新上線的「段內步行最短」：在瀏覽器上看今日行程的順序與 ETA（正式站）。
+3. 做法建議：Playwright 對正式站 `general-decision.vercel.app` 跑瀏覽器 E2E 與截圖（iPhone、iPad、桌機尺寸；用 Playwright 內建裝置名）。容器只有 Chromium（`/opt/pw-browsers/chromium`）。⚠️ `docs/FAILURE-MEMORY.md:9`：Chromium 結果不等於 Safari／WebKit PASS；試裝 WebKit，裝不了就照實標「WebKit 未驗」，真 iPhone 留給 Cross 一次性確認（附精確步驟）。
+4. 不要改產品程式，除非測出 bug；測出 bug 照 board-intake 開 PR 修（合併已授權：`merge不用再我批准` `一律核准`）。
+5. 做完：證據存 `runs/pending-tests/`，更新 `STATE.md` 第 3 段各項狀態，獨立 Opus 把關（checker）PASS，更新本檔。
 
 ## 2. 做到哪
 - 已完成（daily-walk-shortest，P0「總步行最短」，全部上線）：
@@ -14,9 +22,8 @@
   - 與舊版逐組比 4 萬組：晚到、步行、結束時間 0 組變差；可移動站換段 0 組；18728 組步行變短（`snapshots/probe-vs-main.json`）。
   - PR #75 已取消訂閱；沒有排程。
 - 進行中：無。
-- 未開始：無（P0 路線演算法：大眾運輸 Cross 決定不做）。
+- 未開始（Cross 已選，下一棒做）：所有待定測試工作（見第 1 段）。P0 路線演算法已完成；大眾運輸 Cross 決定不做。
 - 其他候選（請 Cross 選，不自動做）：
-  - 手機畫面驗收。
   - 試用資料匯出 N4。
   - 試用結束後路線 Q2（12-30 前裁定）。
   - 🔒 N5 Places 上限、L6 GCP 帳單上限。
