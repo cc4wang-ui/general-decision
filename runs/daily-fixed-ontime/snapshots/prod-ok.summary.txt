@@ -1,0 +1,8 @@
+routeVerified True anchorTime 22:30 conflicts [] missing ['creative:closed', 'coffee:closed'] travelMinutes 30
+creative | - |  | start= |  |  | (none)
+coffee | - |  | start= |  |  | (none)
+shopping | 22:34 | 0 | start= | 4 |  | スギ薬局 道玄坂店
+lunch-fixed | 23:30 | 0 | start=23:30 | 5 |  | 一蘭 渋谷スペイン坂店
+meal | 00:24 | 1 | start= | 9 |  | 権八
+gym | 01:21 | 1 | start= | 12 |  | フィットイージー 渋谷店
+rest | - |  | start= |  |  | (none)
