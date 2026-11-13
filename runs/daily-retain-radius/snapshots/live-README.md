@@ -13,3 +13,9 @@
 
 - 換的那一站（shopping）兩版都換了新店，都在 0.2 km 內；店名不同是前 5 名隨機挑。
 - 逐站摘要：`preview-*.summary.txt`、`main-*.summary.txt`；原始回應：同名 `.json`。
+
+## PR #72 合併後正式站驗收（2026-11-13 08:06 UTC）
+- 部署 `dpl_5A9gnF5LssJzB8j5QFcbZHuoVLqp`（`general-decision-6tzrc0y9q`，merge `cdac822`），別名 `general-decision.vercel.app`。
+- `prod-far.*`：晚餐舊店（24.65 km）被換成とりや幸NEO（0.21 km）。修正前同一份請求保留遠店（`main-far.*`）。
+- `prod-near.*`：権八（0.50 km）照舊保留。
+- 獨立把關第 1 輪 PASS（STOP 1–6、8 PASS；STOP 7 以本檔為證據）。
