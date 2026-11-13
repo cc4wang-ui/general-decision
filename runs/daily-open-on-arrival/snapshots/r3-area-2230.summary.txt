@@ -1,0 +1,8 @@
+routeVerified true anchorTime 22:30 partial true missing [{"id":"creative","reason":"closed"},{"id":"coffee","reason":"closed"},{"id":"shopping","reason":"area"},{"id":"meal","reason":"area"}] travelMinutes 82
+creative | - |  | - | (none) | closed |  | 
+coffee | - |  | - | (none) | closed |  | 
+shopping | - |  | - | (none) | area |  | 
+gym | 23:40 | 0 | open | フィットイージー 渋谷店 |  | 70 | km-from-shibuya 0.38
+lunch-fixed | 01:12 | 1 | open | 一蘭 渋谷店 |  | 12 | km-from-shibuya 0.18
+meal | - |  | - | (none) | area |  | 
+rest | - |  | - | (none) |  |  | 

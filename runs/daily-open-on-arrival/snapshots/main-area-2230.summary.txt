@@ -1,0 +1,8 @@
+routeVerified true partial true missing [{"id":"creative","reason":"closed"},{"id":"coffee","reason":"closed"},{"id":"shopping","reason":"area"},{"id":"meal","reason":"area"}]
+creative | - | - | (none) | closed | 
+coffee | - | - | (none) | closed | 
+shopping | - | - | (none) | area | 
+gym | 23:40 | open | フィットイージー 渋谷店 |  | km 0.38
+lunch-fixed | 01:13 | open | 一蘭 渋谷スペイン坂店 |  | km 0.23
+meal | - | - | (none) | area | 
+rest | - | - | (none) |  | 

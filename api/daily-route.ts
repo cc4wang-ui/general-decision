@@ -35,11 +35,13 @@ function randomIndex(n:number):number{
 /** 「散步回家」不是要拜訪的店家：不帶 candidate 的純文字站，不發 Places 查詢、不參與未解決檢查。固定安排／指定地點的不算。已完成也不算——rest 從來沒有可拜訪的店家，已完成與否都不帶候選；否則標記完成後整單 422（item 7：已完成 rest 無候選時，舊版 isTextOnlyRest 排除 done，會被未解決檢查擋下）。 */
 const isTextOnlyRest=(s:Stop)=>s.id==='rest'&&!s.locked&&!s.custom&&!s.specified
 type SearchPage={places:Candidate[];nextPageToken?:string}
+/** Places 搜尋的 locationBias 半徑（公尺）。只是偏好，Google 仍可能回很遠的店。 */
+const SEARCH_BIAS_M=3500
 async function search(key:string,q:string,center?:Coord,count=20,opts:{includedType?:string;pageToken?:string;biasRadiusM?:number}={}):Promise<SearchPage>{
  const body:Record<string,unknown>={textQuery:q,pageSize:count,languageCode:'ja'}
  if(opts.includedType)body.includedType=opts.includedType
  if(opts.pageToken)body.pageToken=opts.pageToken
- if(center)body.locationBias={circle:{center:{latitude:center.lat,longitude:center.lng},radius:opts.biasRadiusM??3500}}
+ if(center)body.locationBias={circle:{center:{latitude:center.lat,longitude:center.lng},radius:opts.biasRadiusM??SEARCH_BIAS_M}}
  const r=await fetch(BASE+'/v1/places:searchText',{method:'POST',headers:{'content-type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':MASK},body:JSON.stringify(body),signal:AbortSignal.timeout(9000)})
  if(!r.ok)throw new Error(r.status===429?'搜尋額度暫時用完':'店家搜尋暫時無法使用')
  const data=await r.json() as {places?:Array<{id?:string;displayName?:{text?:string};formattedAddress?:string;location?:{latitude?:number;longitude?:number};googleMapsUri?:string;currentOpeningHours?:{openNow?:boolean;periods?:HoursPeriod[]};rating?:number;userRatingCount?:number;types?:string[];primaryType?:string}>;nextPageToken?:string}
@@ -319,7 +321,8 @@ async function handler(req:Request):Promise<Response>{
     * 再檢查；最多 MAX_ROUTE_ROUNDS 次 Routes 呼叫。換哪一間：先估新店的到店時間（同一段
     * 路的實際步行速度 × 上一站到新店的直線距離），優先選估計時營業的；其次沒有營業時間
     * 資料的；最後才選舊 ETA 時營業的（把關第 1 輪：只看舊 ETA 會一間一間往遠處換、把輪數
-    * 用完）。估計只用來挑順序，派不派一律以重排後 Routes 的實際 ETA 判斷。池子用完就標無候選（closed）。最後一輪還不合格的站直接標 closed，
+    * 用完）。估計都不營業時，仍先派池裡第一個沒試過的候選（把關第 2 輪 R3：估計可能偏快）。
+    * 估計只用來挑順序，派不派一律以重排後 Routes 的實際 ETA 判斷。池子用完就標無候選（closed）。最後一輪還不合格的站直接標 closed，
     * 用同一份步行矩陣的子矩陣重排（不再打 API），重排後新的不合格站也一樣處理，直到沒有。
     * 指定／固定／已完成站不換店，只回 openAtEta 讓卡片警告。沒有營業時間資料＝unknown，不擋。
     */
@@ -348,7 +351,9 @@ async function handler(req:Request):Promise<Response>{
       pool=(await searchStop(s,{...s,candidate:undefined,place:undefined}))?.ranked??[]
       pools.set(s.id,pool)
      }
-     const usable=pool.filter(p=>!ban.has(p.id)&&!taken.has(p.id))
+     // 預覽站實測：池裡可能有很遠的店（locationBias 只是偏好；曾派到阿曼的咖啡廳）。換店只用搜尋半徑內的店。
+     // 開地區偏好時以地區中心為準（把關第 2 輪：出發點離地區很遠時，不能把地區內的店丟掉）。
+     const usable=pool.filter(p=>!ban.has(p.id)&&!taken.has(p.id)&&distanceKm(areaPref??center,p)*1000<=SEARCH_BIAS_M)
      const at=(p:Candidate)=>openAtEta(p.hours,anchorDate,b.eta,b.etaDayOffset??0)
      // 估新店的到店時間：上一站（或出發點）→舊店的實際步行分鐘數／直線距離＝步速，套到上一站→新店。
      const i=schedule.stops.findIndex(x=>x.id===b.id)
@@ -360,7 +365,9 @@ async function handler(req:Request):Promise<Response>{
       const abs=Math.max(0,Math.round(oldAbs-(b.travelMin??0)+(b.travelMin??0)*distanceKm(prev,p)/oldKm))
       return openAtEta(p.hours,anchorDate,String(Math.floor(abs/60)%24).padStart(2,'0')+':'+String(abs%60).padStart(2,'0'),Math.floor(abs/1440))
      }
-     const next=usable.find(p=>estAt(p)==='open')??usable.find(p=>estAt(p)==='unknown')??usable.find(p=>at(p)==='open')
+     // 把關第 2 輪 R3：估計只是排順序。估計挑不到（例如繞路使估計偏快，店還沒開）不直接標 closed，
+     // 改派池裡第一個還沒試過的候選，交給下一輪 Routes 實算 ETA 驗證；不合格會進 banned。輪數上限不變。
+     const next=usable.find(p=>estAt(p)==='open')??usable.find(p=>estAt(p)==='unknown')??usable.find(p=>at(p)==='open')??usable[0]
      current=current.map(x=>x.id!==s.id?x:next?{...x,title:next.name,place:next.address,candidate:next,noCandidate:undefined,noCandidateReason:undefined}:closedStop(x))
     }
     ordered=order(current,center)
