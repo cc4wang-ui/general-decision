@@ -11,3 +11,9 @@
 
 - meal `closed` 不是本 PR 造成：正式站同一份「沒開偏好」請求也是 `closed`（今天星期五的 Google 營業資料）。
 - 所有派出的店都在澀谷 1 km 內。逐站摘要見 `preview-*.summary.txt`、`main-*.summary.txt`，原始回應見同名 `.json`。
+
+## 最終 commit 複驗（`c41264c`，把關第 1 輪問題 1 修正後）
+- 2026-11-13 03:52 UTC。分支預覽別名 `general-decision-git-claude-sleepy-ded984`（當時最新部署 `dpl_8GjbmnpjTcvMRJL77mhgmXk5EbMx`＝`c41264c`）。
+- `final-area-2230.*`：沒有 `area`。shopping 派 スギ薬局 道玄坂店（0.07 km）。creative、coffee、meal `closed`（到店時打烊，跟正式站同時段一致）。
+- `final-noarea-2230.*`：跟正式站、上一版預覽站一致（creative、coffee、meal `closed`）。
+- ⚠️ 直接用部署網址 `general-decision-fdfml4xft` 的分享連結回 302 轉登入頁（HTTP 401）；改用分支別名的分享連結就成功。
