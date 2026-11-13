@@ -1,11 +1,12 @@
  RUN  v5.0.0 /home/user/general-decision
- ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 存在準時排法：選它，不報晚到 2ms
- ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 兩個固定行程：中間要繞路才趕得上第二個，也要選準時排法 0ms
+ ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 存在準時排法：選它，不報晚到 3ms
+ ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 兩個固定行程：中間要繞路才趕得上第二個，也要選準時排法 1ms
+ ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 把關第 1 輪：已過時間的行程趕不上，不能害其他行程失去救援 1ms
  ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 真的趕不上：照舊報晚到，不丟站 0ms
- ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 隨機比對窮舉：「找得到準時排法、程式卻報晚到」＝0（含違反三角不等式的矩陣） 652ms
- ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 原本沒有衝突的排法：輸出完全不變（指紋與修正前相同） 83ms
+ ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 隨機比對窮舉：晚到站數＝所有排法中的最小值（含違反三角不等式的矩陣、已過時間的行程） 955ms
+ ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 原本沒有衝突的排法：輸出完全不變（指紋與修正前相同） 99ms
  ✓ tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 站多又趕不上：搜尋有上限，不會卡住請求 1ms
  Test Files  1 passed (1)
-      Tests  6 passed (6)
-   Start at  06:38:56
-   Duration  1.11s (tests 72%, environment 22%, transform 5%, import 1%)
+      Tests  7 passed (7)
+   Start at  06:48:58
+   Duration  1.48s (tests 76%, environment 18%, transform 4%, import 1%)

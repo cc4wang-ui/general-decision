@@ -15,25 +15,27 @@ function perms(n:number):number[][]{
  go([],Array.from({length:n},(_,i)=>i))
  return out
 }
-/** 窮舉：所有排法中，是否有一種讓每個有時間的固定行程都準時（同一天，錨點 09:30）。 */
-function onTimeExists(stops:ScheduledStop[],m:number[][],anchor:number):boolean{
- return perms(stops.length).some(p=>{
-  let pos=0,at=anchor
+/** 窮舉：所有排法中，晚到站數的最小值（錨點 09:30，同一天；跟 visit 同規則：早到等、到達 > 期限算晚到）。 */
+function minLate(stops:ScheduledStop[],m:number[][],anchor:number):number{
+ let best=Infinity
+ for(const p of perms(stops.length)){
+  let pos=0,at=anchor,late=0
   for(const i of p){
    const s=stops[i]!,arr=at+m[pos]![i+1]!,dl=s.start?toMin(s.start):null
-   if(dl!==null&&arr>dl)return false
+   if(dl!==null&&arr>dl)late++
    at=(dl!==null&&arr<dl?dl:arr)+(s.minutes??45);pos=i+1
   }
-  return true
- })
+  best=Math.min(best,late)
+ }
+ return best
 }
-function randomCase(r:()=>number,metric:boolean){
+function randomCase(r:()=>number,metric:boolean,past=false){
  const n=3+Math.floor(r()*4)
  const pts=Array.from({length:n+1},()=>[r()*30,r()*30] as const)
  const m=pts.map((a,i)=>pts.map((b,j)=>i===j?0:metric?Math.ceil(Math.hypot(a[0]-b[0],a[1]-b[1])):(r()<0.5?1+Math.floor(r()*5):5+Math.floor(r()*60))))
  const tight=r()<0.7,nfix=1+Math.floor(r()*Math.min(4,n))
  const stops:ScheduledStop[]=Array.from({length:n},(_,i)=>{
-  const fixed=i<nfix,st=575+Math.floor(r()*(tight?90:240))
+  const fixed=i<nfix,st=past&&r()<0.15?480+Math.floor(r()*80):575+Math.floor(r()*(tight?90:240))
   return {id:'s'+i,title:'S'+i,minutes:5+Math.floor(r()*50),locked:fixed,start:fixed?hhmm(st):undefined,candidate:P}
  })
  return {stops,m}
@@ -68,24 +70,43 @@ describe('daily-fixed-ontime：能準時就要準時',()=>{
   expect(out.conflicts).toEqual([])
   expect(out.stops.map(s=>s.id)).toEqual(['A','F','G','B'])
  })
+ it('把關第 1 輪：已過時間的行程趕不上，不能害其他行程失去救援',()=>{
+  // 錨點 15:30。D＝已完成、09:00（怎樣都趕不上）。A＝16:00，直走 100 分鐘；繞 F→G 只要 5+5+5＋停留。
+  const m3=[[0,100,5,100,3],[100,0,100,5,100],[5,100,0,5,100],[100,5,5,0,100],[3,100,100,100,0]]
+  const s3:ScheduledStop[]=[
+   {id:'A',title:'A',locked:true,start:'16:00',minutes:30,candidate:P},
+   {id:'F',minutes:5,candidate:P},
+   {id:'G',minutes:5,candidate:P},
+   {id:'D',title:'D',done:true,start:'09:00',minutes:10,candidate:P},
+  ]
+  const out=scheduleRoute(s3,m3,zeros(m3),'15:30')
+  expect(out.conflicts).toHaveLength(1)
+  expect(out.conflicts[0]).toMatch(/^D：預計晚到/)
+  expect(out.stops.find(s=>s.id==='A')?.eta).toBe('16:00')
+  expect(out.stops.find(s=>s.id==='A')?.conflict).toBeUndefined()
+  expect(out.stops).toHaveLength(4)
+ })
  it('真的趕不上：照舊報晚到，不丟站',()=>{
   const out=scheduleRoute(stops,m,zeros(m),'09:58')
   expect(out.conflicts.some(c=>c.startsWith('會議：預計晚到'))).toBe(true)
   expect(out.stops.map(s=>s.id).sort()).toEqual(['A','F','G'])
  })
- it('隨機比對窮舉：「找得到準時排法、程式卻報晚到」＝0（含違反三角不等式的矩陣）',()=>{
-  let bad=0,lateCases=0
+ it('隨機比對窮舉：晚到站數＝所有排法中的最小值（含違反三角不等式的矩陣、已過時間的行程）',()=>{
+  let bad=0,lateCases=0,partial=0
   for(const metric of [true,false]){
    const r=rng(metric?2026:1113)
    for(let t=0;t<3000;t++){
-    const {stops:s,m:mm}=randomCase(r,metric)
+    const {stops:s,m:mm}=randomCase(r,metric,true)
     const out=scheduleRoute(s,mm,zeros(mm),'09:30')
     expect(out.stops).toHaveLength(s.length)
-    if(out.conflicts.length){lateCases++;if(onTimeExists(s,mm,570))bad++}
-    else expect(onTimeExists(s,mm,570)).toBe(true)
+    const best=minLate(s,mm,570)
+    if(best>0)lateCases++
+    if(best>0&&out.conflicts.length===best)partial++
+    if(out.conflicts.length!==best)bad++
    }
   }
   expect(lateCases).toBeGreaterThan(100) // 確認有測到「真的趕不上」的情況
+  expect(partial).toBeGreaterThan(50) // 確認有測到「部分趕不上、其他要救」的情況
   expect(bad).toBe(0)
  })
  it('原本沒有衝突的排法：輸出完全不變（指紋與修正前相同）',()=>{
