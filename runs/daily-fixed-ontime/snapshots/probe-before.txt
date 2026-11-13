@@ -1,0 +1,8 @@
+metric,true,fails,0,
+ ✓ tests/unit/zz-probe.test.ts > probe metric=true 4912ms
+metric,false,fails,0,
+ ✓ tests/unit/zz-probe.test.ts > probe metric=false 4780ms
+handmade {"order":["A","G","F"],"conf":["A：預計晚到 70 分鐘"],"exists":[1,2,0]}
+ ✓ tests/unit/zz-probe.test.ts > handmade non-metric shortcut 1ms
+ Test Files  1 passed (1)
+      Tests  3 passed (3)

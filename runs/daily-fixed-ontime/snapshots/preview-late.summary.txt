@@ -1,0 +1,8 @@
+routeVerified True anchorTime 22:30 conflicts ['一蘭 渋谷店：預計晚到 6 分鐘'] missing ['creative:closed', 'coffee:closed', 'meal:closed'] travelMinutes 21
+creative | - |  | start= |  |  | (none)
+coffee | - |  | start= |  |  | (none)
+lunch-fixed | 22:37 | 0 | start=22:31 | 7 | 預計晚到 6 分鐘 | 一蘭 渋谷スペイン坂店
+shopping | 23:27 | 0 | start= | 5 |  | スギ薬局 道玄坂店
+gym | 00:06 | 1 | start= | 9 |  | フィットイージー 渋谷店
+meal | - |  | start= |  |  | (none)
+rest | - |  | start= |  |  | (none)

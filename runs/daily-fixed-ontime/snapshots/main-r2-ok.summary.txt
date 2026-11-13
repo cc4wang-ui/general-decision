@@ -1,0 +1,8 @@
+routeVerified True anchorTime 22:30 conflicts [] missing ['creative:closed', 'coffee:closed', 'meal:closed'] travelMinutes 20
+creative | - |  | start= |  |  | (none)
+coffee | - |  | start= |  |  | (none)
+shopping | 22:34 | 0 | start= | 4 |  | 薬マツモトキヨシ SHIBUYA SCRAMBLE FLAG
+lunch-fixed | 23:30 | 0 | start=23:30 | 4 |  | 一蘭 渋谷店
+gym | 00:27 | 1 | start= | 12 |  | フィットイージー 渋谷店
+meal | - |  | start= |  |  | (none)
+rest | - |  | start= |  |  | (none)

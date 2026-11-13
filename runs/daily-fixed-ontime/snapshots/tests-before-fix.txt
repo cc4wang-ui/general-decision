@@ -1,0 +1,42 @@
+ RUN  v5.0.0 /home/user/general-decision
+ ❯ tests/unit/daily-fixed-ontime.test.ts (6 tests | 2 failed) 856ms
+   ❯ daily-fixed-ontime：能準時就要準時 (6)
+     × 存在準時排法：選它，不報晚到 7ms
+     × 兩個固定行程：中間要繞路才趕得上第二個，也要選準時排法 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 存在準時排法：選它，不報晚到
+AssertionError: expected [ '會議：預計晚到 70 分鐘' ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "會議：預計晚到 70 分鐘",
++ ]
+ ❯ tests/unit/daily-fixed-ontime.test.ts:53:25
+     51|  it('存在準時排法：選它，不報晚到',()=>{
+     52|   const out=scheduleRoute(stops,m,zeros(m),'09:30')
+     53|   expect(out.conflicts).toEqual([])
+       |                         ^
+     54|   expect(out.stops.map(s=>s.id)).toEqual(['F','G','A'])
+     55|   expect(out.stops.find(s=>s.id==='A')?.eta).toBe('10:00')
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+ FAIL  tests/unit/daily-fixed-ontime.test.ts > daily-fixed-ontime：能準時就要準時 > 兩個固定行程：中間要繞路才趕得上第二個，也要選準時排法
+AssertionError: expected [ 'B：預計晚到 150 分鐘' ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "B：預計晚到 150 分鐘",
++ ]
+ ❯ tests/unit/daily-fixed-ontime.test.ts:68:25
+     66|   ]
+     67|   const out=scheduleRoute(s2,m2,zeros(m2),'09:30')
+     68|   expect(out.conflicts).toEqual([])
+       |                         ^
+     69|   expect(out.stops.map(s=>s.id)).toEqual(['A','F','G','B'])
+     70|  })
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  06:37:23
+   Duration  1.28s (tests 72%, environment 22%, transform 4%, import 1%)
