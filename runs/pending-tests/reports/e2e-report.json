@@ -1,0 +1,515 @@
+{
+  "config": {
+    "argv": [
+      "/opt/node22/bin/node",
+      "/home/user/general-decision/node_modules/.bin/playwright",
+      "test",
+      "-c",
+      "playwright.prod.config.ts"
+    ],
+    "configFile": "/home/user/general-decision/playwright.prod.config.ts",
+    "rootDir": "/home/user/general-decision/tests/prod",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/general-decision/runs/pending-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "iphone",
+        "name": "iphone",
+        "testDir": "/home/user/general-decision/tests/prod",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 240000
+      },
+      {
+        "outputDir": "/home/user/general-decision/runs/pending-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "ipad",
+        "name": "ipad",
+        "testDir": "/home/user/general-decision/tests/prod",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 240000
+      },
+      {
+        "outputDir": "/home/user/general-decision/runs/pending-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop",
+        "name": "desktop",
+        "testDir": "/home/user/general-decision/tests/prod",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 240000
+      },
+      {
+        "outputDir": "/home/user/general-decision/runs/pending-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit-iphone",
+        "name": "webkit-iphone",
+        "testDir": "/home/user/general-decision/tests/prod",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 240000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "runs/pending-tests/reports/e2e-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "daily-prod.spec.ts",
+      "file": "daily-prod.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "P0／P1 裝置：正式站真 API 生成今日行程（2 個固定行程），畫面與回應一致",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "iphone",
+              "projectName": "iphone",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10017,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T10:13:24.770Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/user/general-decision/runs/pending-tests/test-results/daily-prod-P0／P1-裝置：正式站真-API-生成今日行程（2-個固定行程），畫面與回應一致-iphone/video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e079dbc77ad7d52fd8c-96da7a3562ddcd239de2",
+          "file": "daily-prod.spec.ts",
+          "line": 121,
+          "column": 1
+        },
+        {
+          "title": "P1 Shuffle：手動指定、已完成、換一站、重新搜尋（正式站真 API）",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [
+                {
+                  "type": "done-stop-eta",
+                  "description": "03:19"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "iphone",
+              "projectName": "iphone",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15766,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T10:13:34.896Z",
+                  "annotations": [
+                    {
+                      "type": "done-stop-eta",
+                      "description": "03:19"
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/user/general-decision/runs/pending-tests/test-results/daily-prod-P1-Shuffle：手動指定、已完成、換一站、重新搜尋（正式站真-API）-iphone/video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e079dbc77ad7d52fd8c-0a50099e6a3c082bba41",
+          "file": "daily-prod.spec.ts",
+          "line": 172,
+          "column": 1
+        },
+        {
+          "title": "P0／P1 裝置：正式站真 API 生成今日行程（2 個固定行程），畫面與回應一致",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "ipad",
+              "projectName": "ipad",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8016,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T10:13:51.303Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/user/general-decision/runs/pending-tests/test-results/daily-prod-P0／P1-裝置：正式站真-API-生成今日行程（2-個固定行程），畫面與回應一致-ipad/video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e079dbc77ad7d52fd8c-788b2bf2c6536f3727cf",
+          "file": "daily-prod.spec.ts",
+          "line": 121,
+          "column": 1
+        },
+        {
+          "title": "P1 Shuffle：手動指定、已完成、換一站、重新搜尋（正式站真 API）",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "只在 iPhone 跑一次，省 Places 呼叫",
+                  "location": {
+                    "file": "/home/user/general-decision/tests/prod/daily-prod.spec.ts",
+                    "line": 173,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "ipad",
+              "projectName": "ipad",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 306,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T10:13:59.429Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "只在 iPhone 跑一次，省 Places 呼叫",
+                      "location": {
+                        "file": "/home/user/general-decision/tests/prod/daily-prod.spec.ts",
+                        "line": 173,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/user/general-decision/runs/pending-tests/test-results/daily-prod-P1-Shuffle：手動指定、已完成、換一站、重新搜尋（正式站真-API）-ipad/video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "5e079dbc77ad7d52fd8c-d0cafa2a0914dddfd27f",
+          "file": "daily-prod.spec.ts",
+          "line": 172,
+          "column": 1
+        },
+        {
+          "title": "P0／P1 裝置：正式站真 API 生成今日行程（2 個固定行程），畫面與回應一致",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6099,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T10:14:00.392Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/user/general-decision/runs/pending-tests/test-results/daily-prod-P0／P1-裝置：正式站真-API-生成今日行程（2-個固定行程），畫面與回應一致-desktop/video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e079dbc77ad7d52fd8c-3903c1d3d8b74e0248f5",
+          "file": "daily-prod.spec.ts",
+          "line": 121,
+          "column": 1
+        },
+        {
+          "title": "P1 Shuffle：手動指定、已完成、換一站、重新搜尋（正式站真 API）",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "只在 iPhone 跑一次，省 Places 呼叫",
+                  "location": {
+                    "file": "/home/user/general-decision/tests/prod/daily-prod.spec.ts",
+                    "line": 173,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 228,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T10:14:06.609Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "只在 iPhone 跑一次，省 Places 呼叫",
+                      "location": {
+                        "file": "/home/user/general-decision/tests/prod/daily-prod.spec.ts",
+                        "line": 173,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/user/general-decision/runs/pending-tests/test-results/daily-prod-P1-Shuffle：手動指定、已完成、換一站、重新搜尋（正式站真-API）-desktop/video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "5e079dbc77ad7d52fd8c-a101c78f18f543abcf94",
+          "file": "daily-prod.spec.ts",
+          "line": 172,
+          "column": 1
+        },
+        {
+          "title": "P0／P1 裝置：正式站真 API 生成今日行程（2 個固定行程），畫面與回應一致",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit-iphone",
+              "projectName": "webkit-iphone",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9370,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T10:14:07.514Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/user/general-decision/runs/pending-tests/test-results/daily-prod-P0／P1-裝置：正式站真-API-生成今日行程（2-個固定行程），畫面與回應一致-webkit-iphone/video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e079dbc77ad7d52fd8c-4209e01be0951a333183",
+          "file": "daily-prod.spec.ts",
+          "line": 121,
+          "column": 1
+        },
+        {
+          "title": "P1 Shuffle：手動指定、已完成、換一站、重新搜尋（正式站真 API）",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [
+                {
+                  "type": "done-stop-eta",
+                  "description": "03:19"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "webkit-iphone",
+              "projectName": "webkit-iphone",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 17094,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T10:14:17.060Z",
+                  "annotations": [
+                    {
+                      "type": "done-stop-eta",
+                      "description": "03:19"
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/user/general-decision/runs/pending-tests/test-results/daily-prod-P1-Shuffle：手動指定、已完成、換一站、重新搜尋（正式站真-API）-webkit-iphone/video.webm"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e079dbc77ad7d52fd8c-9adfd1aa746c6b3946e3",
+          "file": "daily-prod.spec.ts",
+          "line": 172,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-13T10:13:24.039Z",
+    "duration": 70275.184,
+    "expected": 6,
+    "skipped": 2,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

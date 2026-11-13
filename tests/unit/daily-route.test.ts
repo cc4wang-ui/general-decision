@@ -1128,6 +1128,37 @@ describe('既有候選重驗與無候選（紅隊 round 6 L1／L2，round 7）',
     expect(data.stops.map((s) => s.id)).toEqual(['meal', 'rest'])
     expect(data.stops.find((s) => s.id === 'meal')?.candidate?.id).toBe('m1')
   })
+  it('已完成站不排進路線：留在原位、沒有 ETA、不算步行（pending-tests 正式站實測：完成的晚餐被排到最後 01:47 抵達）', async () => {
+    const seen: number[] = []
+    const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) {
+        const n = (JSON.parse(bodyText(init?.body, '{}')) as { origins: unknown[] }).origins.length
+        seen.push(n)
+        const elements = []
+        for (let o = 0; o < n; o++) for (let d = 0; d < n; d++) elements.push({ originIndex: o, destinationIndex: d, duration: o === d ? '0s' : '300s', distanceMeters: o === d ? 0 : 400 })
+        return new Response(JSON.stringify(elements), { status: 200 })
+      }
+      return new Response(JSON.stringify({ places: [validShop('m1', 0)] }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', f)
+    const doneCand = { id: 'done-1', name: '吃過的店', lat: 35.6605, lng: 139.7015, address: '吃過的店', mapUrl: 'https://maps.google.com/?cid=done-1', types: ['restaurant'], primaryType: 'restaurant', rating: 4.2, userRatingCount: 300 }
+    const res = await handler(post({ origin: SHIBUYA, stops: [
+      { id: 'creative', kind: 'creative', title: '吃過', minutes: 45, done: true, candidate: doneCand },
+      { id: 'meal', kind: 'meal', title: '定食', minutes: 45 },
+    ] }))
+    expect(res.status).toBe(200)
+    const data = await res.json() as { routeVerified: boolean; travelMinutes: number; stops: (StopOut & { done?: boolean; eta?: string; travelMin?: number })[] }
+    expect(data.routeVerified).toBe(true)
+    expect(data.stops.map((s) => s.id)).toEqual(['creative', 'meal'])
+    const done = data.stops[0]!
+    expect(done.done).toBe(true)
+    expect(done.candidate?.id).toBe('done-1')
+    expect(done.eta).toBeUndefined()
+    expect(done.travelMin).toBeUndefined()
+    expect(data.stops[1]!.eta).toBeTruthy()
+    expect(data.travelMinutes).toBe(5)
+    expect(seen.every((n) => n === 2)).toBe(true) // 矩陣只含出發點＋meal，不含已完成站
+  })
   it('Routes 成功時無候選站也要回來（不只回有候選的站）', async () => {
     const f = vi.fn((url: string | URL | Request, init?: RequestInit) => {
       if (urlText(url).includes('routes.googleapis.com')) {

@@ -1,0 +1,974 @@
+{
+  "origin": {
+    "id": "ChIJnxAAO1aLGGARJqvi8d4oczM",
+    "name": "渋谷駅",
+    "address": "日本、〒150-0002 東京都渋谷区渋谷２丁目２４",
+    "mapUrl": "https://maps.google.com/?cid=3707351856262064934&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+    "lat": 35.6580339,
+    "lng": 139.7016358,
+    "rating": 3.9,
+    "types": [
+      "transit_station",
+      "train_station",
+      "subway_station",
+      "transportation_service",
+      "point_of_interest",
+      "establishment"
+    ],
+    "primaryType": "transit_station",
+    "userRatingCount": 5464
+  },
+  "stops": [
+    {
+      "id": "coffee",
+      "kind": "creative",
+      "title": "OBSCURA COFFEE ROASTERS Front",
+      "place": "日本、〒150-0043 東京都渋谷区道玄坂１丁目１２−１ B1F",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 60,
+      "candidate": {
+        "id": "ChIJr838VoaLGGARoGFfmfEXojs",
+        "name": "OBSCURA COFFEE ROASTERS Front",
+        "address": "日本、〒150-0043 東京都渋谷区道玄坂１丁目１２−１ B1F",
+        "mapUrl": "https://maps.google.com/?cid=4297023320892596640&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6592112,
+        "lng": 139.7006372,
+        "rating": 4.4,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 0,
+              "hour": 10,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            },
+            "close": {
+              "day": 0,
+              "hour": 20,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 1,
+              "hour": 10,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            },
+            "close": {
+              "day": 1,
+              "hour": 20,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 2,
+              "hour": 10,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            },
+            "close": {
+              "day": 2,
+              "hour": 20,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 3,
+              "hour": 10,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            },
+            "close": {
+              "day": 3,
+              "hour": 20,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 4,
+              "hour": 10,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 20,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 10,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 5,
+              "hour": 20,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 6,
+              "hour": 10,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            },
+            "close": {
+              "day": 6,
+              "hour": 20,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            }
+          }
+        ],
+        "types": [
+          "coffee_shop",
+          "coffee_roastery",
+          "cafe",
+          "food_store",
+          "food",
+          "point_of_interest",
+          "store",
+          "establishment"
+        ],
+        "primaryType": "coffee_shop",
+        "userRatingCount": 110
+      },
+      "eta": "19:20",
+      "departure": "20:20",
+      "etaDayOffset": 0,
+      "departureDayOffset": 0,
+      "travelMin": 6,
+      "openAtEta": "open"
+    },
+    {
+      "id": "fixed-1794564851081-6",
+      "kind": "rest",
+      "title": "看唱片",
+      "place": "日本、〒150-0041 東京都渋谷区神南１丁目２２−１４",
+      "locked": true,
+      "done": false,
+      "custom": true,
+      "specified": false,
+      "start": "21:15",
+      "minutes": 30,
+      "candidate": {
+        "id": "ChIJ1Ya6fqiMGGAR8FTtP_6yeMg",
+        "name": "タワーレコード 渋谷店",
+        "address": "日本、〒150-0041 東京都渋谷区神南１丁目２２−１４",
+        "mapUrl": "https://maps.google.com/?cid=14445492609854821616&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.661904899999996,
+        "lng": 139.7010906,
+        "rating": 4.4,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 0,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            },
+            "close": {
+              "day": 0,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 1,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            },
+            "close": {
+              "day": 1,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 2,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            },
+            "close": {
+              "day": 2,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 3,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            },
+            "close": {
+              "day": 3,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 4,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 5,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 6,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            },
+            "close": {
+              "day": 6,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            }
+          }
+        ],
+        "types": [
+          "cafe",
+          "book_store",
+          "electronics_store",
+          "movie_rental",
+          "clothing_store",
+          "service",
+          "food",
+          "point_of_interest",
+          "store",
+          "establishment"
+        ],
+        "primaryType": "store",
+        "userRatingCount": 14994
+      },
+      "eta": "21:15",
+      "departure": "21:45",
+      "etaDayOffset": 0,
+      "departureDayOffset": 0,
+      "travelMin": 7,
+      "openAtEta": "open"
+    },
+    {
+      "id": "fixed-1794564851625-7",
+      "kind": "rest",
+      "title": "宵夜",
+      "place": "日本、〒150-0041 東京都渋谷区神南１丁目２２−７ 岩本ビル B1F",
+      "locked": true,
+      "done": false,
+      "custom": true,
+      "specified": false,
+      "start": "22:15",
+      "minutes": 40,
+      "candidate": {
+        "id": "ChIJOWucdKiMGGARbppa4b4CKA8",
+        "name": "一蘭 渋谷店",
+        "address": "日本、〒150-0041 東京都渋谷区神南１丁目２２−７ 岩本ビル B1F",
+        "mapUrl": "https://maps.google.com/?cid=1092125928485198446&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6611185,
+        "lng": 139.7009846,
+        "rating": 4.4,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 5,
+              "hour": 0,
+              "minute": 0,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 23,
+              "minute": 59,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          }
+        ],
+        "types": [
+          "ramen_restaurant",
+          "chinese_noodle_restaurant",
+          "noodle_shop",
+          "snack_bar",
+          "japanese_restaurant",
+          "meal_takeaway",
+          "restaurant",
+          "food",
+          "point_of_interest",
+          "establishment"
+        ],
+        "primaryType": "ramen_restaurant",
+        "userRatingCount": 5336
+      },
+      "eta": "22:15",
+      "departure": "22:55",
+      "etaDayOffset": 0,
+      "departureDayOffset": 0,
+      "travelMin": 2,
+      "openAtEta": "open"
+    },
+    {
+      "id": "shopping",
+      "kind": "shopping",
+      "title": "スギ薬局 道玄坂店",
+      "place": "日本、〒150-0043 東京都渋谷区道玄坂２丁目５−１ 日拓渋谷駅前ビル",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 55,
+      "candidate": {
+        "id": "ChIJB_pbv06NGGARq2q4Zs8X8zE",
+        "name": "スギ薬局 道玄坂店",
+        "address": "日本、〒150-0043 東京都渋谷区道玄坂２丁目５−１ 日拓渋谷駅前ビル",
+        "mapUrl": "https://maps.google.com/?cid=3599246706748189355&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.659360299999996,
+        "lng": 139.6996931,
+        "rating": 3.7,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 5,
+              "hour": 0,
+              "minute": 0,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 23,
+              "minute": 59,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          }
+        ],
+        "types": [
+          "drugstore",
+          "health",
+          "point_of_interest",
+          "store",
+          "establishment"
+        ],
+        "primaryType": "drugstore",
+        "userRatingCount": 98
+      },
+      "eta": "23:00",
+      "departure": "23:55",
+      "etaDayOffset": 0,
+      "departureDayOffset": 0,
+      "travelMin": 5,
+      "openAtEta": "open"
+    },
+    {
+      "id": "meal",
+      "kind": "meal",
+      "title": "権八",
+      "place": "日本、〒150-0044 東京都渋谷区円山町３−６ E・スペースタワー １４Ｆ フロアA",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 45,
+      "candidate": {
+        "id": "ChIJ3TUL91WLGGARNQVCAWLb0kw",
+        "name": "権八",
+        "address": "日本、〒150-0044 東京都渋谷区円山町３−６ E・スペースタワー １４Ｆ フロアA",
+        "mapUrl": "https://maps.google.com/?cid=5535728105966142773&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6574935,
+        "lng": 139.6955514,
+        "rating": 4.2,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 0,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            },
+            "close": {
+              "day": 1,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 1,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            },
+            "close": {
+              "day": 2,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 2,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            },
+            "close": {
+              "day": 3,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 3,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 4,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 23,
+              "minute": 59,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 0,
+              "minute": 0,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 5,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 6,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 6,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            },
+            "close": {
+              "day": 0,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            }
+          }
+        ],
+        "types": [
+          "japanese_restaurant",
+          "meal_delivery",
+          "sushi_restaurant",
+          "food_delivery",
+          "japanese_izakaya_restaurant",
+          "restaurant",
+          "food",
+          "point_of_interest",
+          "establishment"
+        ],
+        "primaryType": "japanese_restaurant",
+        "userRatingCount": 2330
+      },
+      "eta": "00:03",
+      "departure": "00:48",
+      "etaDayOffset": 1,
+      "departureDayOffset": 1,
+      "travelMin": 8,
+      "openAtEta": "open"
+    },
+    {
+      "id": "gym",
+      "kind": "gym",
+      "title": "フィットイージー 渋谷店",
+      "place": "日本、〒150-0031 東京都渋谷区桜丘町１−４ 渋谷サクラステージ ＳＨＩＢＵＹＡサイド ２Ｆ・３Ｆ",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 80,
+      "candidate": {
+        "id": "ChIJ6VgA7F-LGGARR2KB-KOCP3o",
+        "name": "フィットイージー 渋谷店",
+        "address": "日本、〒150-0031 東京都渋谷区桜丘町１−４ 渋谷サクラステージ ＳＨＩＢＵＹＡサイド ２Ｆ・３Ｆ",
+        "mapUrl": "https://maps.google.com/?cid=8808903036920488519&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6564735,
+        "lng": 139.70252929999998,
+        "rating": 4.1,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 5,
+              "hour": 0,
+              "minute": 0,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 23,
+              "minute": 59,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          }
+        ],
+        "types": [
+          "gym",
+          "lounge_bar",
+          "sauna",
+          "night_club",
+          "bar",
+          "spa",
+          "sports_activity_location",
+          "beauty_salon",
+          "health",
+          "public_bath",
+          "service",
+          "point_of_interest",
+          "establishment"
+        ],
+        "primaryType": "gym",
+        "userRatingCount": 151
+      },
+      "eta": "01:00",
+      "departure": "02:20",
+      "etaDayOffset": 1,
+      "departureDayOffset": 1,
+      "travelMin": 12,
+      "openAtEta": "open"
+    },
+    {
+      "id": "creative",
+      "kind": "creative",
+      "title": "バツアートギャラリー",
+      "place": "日本、〒150-0001 東京都渋谷区神宮前５丁目１１−５",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 65,
+      "candidate": {
+        "id": "ChIJuflD_qOMGGARqAaHfOo7pcE",
+        "name": "バツアートギャラリー",
+        "address": "日本、〒150-0001 東京都渋谷区神宮前５丁目１１−５",
+        "mapUrl": "https://maps.google.com/?cid=13953624898774959784&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6668538,
+        "lng": 139.70665,
+        "rating": 3.9,
+        "types": [
+          "art_gallery",
+          "point_of_interest",
+          "establishment"
+        ],
+        "primaryType": "art_gallery",
+        "userRatingCount": 96
+      },
+      "eta": "02:42",
+      "departure": "03:47",
+      "etaDayOffset": 1,
+      "departureDayOffset": 1,
+      "travelMin": 22,
+      "openAtEta": "unknown"
+    },
+    {
+      "id": "rest",
+      "kind": "rest",
+      "title": "散步回家、休息與晚餐",
+      "place": "",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 75
+    }
+  ],
+  "distanceKm": 4.1,
+  "travelMinutes": 62,
+  "conflicts": [],
+  "partial": false,
+  "missingStops": [],
+  "anchorTime": "19:14",
+  "routeVerified": true,
+  "travelMode": "WALK",
+  "verifiedSource": "Google Places + Google Routes",
+  "searchedAt": "2026-11-13T10:14:14.108Z",
+  "warning": "步行時間為 Google Routes 預估；到店營業判斷依 Google 營業時間，交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。",
+  "_request": {
+    "location": "渋谷駅",
+    "area": "澀谷",
+    "areaOnly": true,
+    "startTime": "",
+    "stops": [
+      {
+        "id": "fixed-1794564851081-6",
+        "title": "看唱片",
+        "place": "タワーレコード渋谷店",
+        "start": "21:15",
+        "minutes": 30,
+        "kind": "rest",
+        "done": false,
+        "locked": true,
+        "custom": true,
+        "detail": "既有固定安排：不會被重排或洗牌。"
+      },
+      {
+        "id": "fixed-1794564851625-7",
+        "title": "宵夜",
+        "place": "一蘭 渋谷店",
+        "start": "22:15",
+        "minutes": 40,
+        "kind": "rest",
+        "done": false,
+        "locked": true,
+        "custom": true,
+        "detail": "既有固定安排：不會被重排或洗牌。"
+      },
+      {
+        "id": "gym",
+        "title": "FIT-EASY｜80 分鐘力量訓練",
+        "minutes": 80,
+        "kind": "gym",
+        "done": false
+      },
+      {
+        "id": "meal",
+        "title": "澀谷｜一人友善的日式定食",
+        "minutes": 45,
+        "kind": "meal",
+        "done": false
+      },
+      {
+        "id": "creative",
+        "title": "澀谷｜藝術展／日本 IP 快閃探索（出發前查活動與營業）",
+        "minutes": 65,
+        "kind": "creative",
+        "done": false
+      },
+      {
+        "id": "coffee",
+        "title": "安靜咖啡廳｜閱讀、寫下 3 個新觀察",
+        "minutes": 60,
+        "kind": "creative",
+        "done": false
+      },
+      {
+        "id": "shopping",
+        "title": "澀谷｜運動長袖、純單水肌酸或生活用品（先查庫存）",
+        "minutes": 55,
+        "kind": "shopping",
+        "done": false
+      },
+      {
+        "id": "rest",
+        "title": "散步回家、休息與晚餐",
+        "minutes": 75,
+        "kind": "rest",
+        "done": false
+      }
+    ],
+    "exclude": [],
+    "excludeKinds": [],
+    "seen": []
+  }
+}
