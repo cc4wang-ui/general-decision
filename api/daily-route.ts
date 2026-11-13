@@ -352,7 +352,11 @@ async function handler(req:Request):Promise<Response>{
    const badOf=(list:Stop[])=>list.filter(s=>isAuto(s)&&!!s.candidate&&!dispatchableAt(stateOf(s)))
    const closedStop=(s:Stop):Stop=>({...s,candidate:undefined,place:undefined,title:CATALOG_TITLES[s.id]??s.title,noCandidate:true,noCandidateReason:'closed'})
    const banned=new Map<string,Set<string>>()
-   let located=ordered.stops.filter(s=>s.candidate)
+   // pending-tests（2026-11-13，正式站 E2E 實測）：已完成站是「已經去過」，不再排進路線。
+   // 舊版把它當沒有 start 的固定站，排到最後並給未來 ETA（實測：晚餐標完成後顯示 01:47 抵達），
+   // 也多算一段步行。現在只留在原位、不給 ETA；其他站照常排（固定站、指定站規則不變）。
+   const routable=(s:Stop)=>!!s.candidate&&!s.done
+   let located=ordered.stops.filter(routable)
    let {matrix,distances}=await travelMatrix(key,center,located)
    let schedule=scheduleRoute(located,matrix,distances,now)
    for(let round=1;round<MAX_ROUTE_ROUNDS;round++){
@@ -391,7 +395,7 @@ async function handler(req:Request):Promise<Response>{
      current=current.map(x=>x.id!==s.id?x:next?{...x,title:next.name,place:next.address,candidate:next,noCandidate:undefined,noCandidateReason:undefined}:closedStop(x))
     }
     ordered=order(current,center)
-    located=ordered.stops.filter(s=>s.candidate);
+    located=ordered.stops.filter(routable);
     ({matrix,distances}=await travelMatrix(key,center,located))
     schedule=scheduleRoute(located,matrix,distances,now)
    }
@@ -401,7 +405,7 @@ async function handler(req:Request):Promise<Response>{
     const ids=new Set(bad.map(s=>s.id))
     current=current.map(x=>ids.has(x.id)?closedStop(x):x)
     ordered=order(current,center)
-    const sub=ordered.stops.filter(s=>s.candidate)
+    const sub=ordered.stops.filter(routable)
     const ix=[0,...sub.map(s=>base.get(s.id)!)]
     schedule=scheduleRoute(sub,ix.map(i=>ix.map(j=>matrix[i]![j]!)),ix.map(i=>ix.map(j=>distances[i]![j]!)),now)
    }
