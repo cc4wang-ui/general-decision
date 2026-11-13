@@ -1,10 +1,13 @@
-# 交接｜daily-retain-radius（已完成）
-狀態：已完成，沒有待接手的工作。等 Cross 選下一件。
-建立：2026-11-13 08:07 UTC｜環境：Claude Code（雲端容器）
+# 交接｜daily-walk-shortest
+狀態：待接手
+建立：2026-11-13 08:20 UTC｜環境：Claude Code（雲端容器）｜上下文接近上限，Cross 已選下一件，依 §3.5 交接。
 
 ## 1. 下一個對話先做什麼
-1. 不要自動開工。下一件要 Cross 從第 2 段「未開始」選。
-2. Cross 選好後：載入 /board-intake，寫 `runs/<任務代號>/contract.md`，照同樣方法做（失敗測試 → 修 → CI → 獨立把關 → 合併 → 正式站真 POST）。
+1. 載入 /board-intake，寫 `runs/daily-walk-shortest/contract.md`。Cross 原話（逐字，AskUserQuestion 回答，2026-11-13）：`只做步行 距離我會自己判定`。意思：P0 剩下的部分只做「總步行最短」；大眾運輸不做（距離能不能走由 Cross 自己判斷）。
+2. Cross 不在線上，不問他。契約預設：⚠️「固定行程準時優先（沿用 daily-fixed-ontime 的最少晚到站數）；在晚到站數相同的排法裡，選總步行分鐘最短的」。不改站的內容、不改換店規則、不加 Google 呼叫。等級 M（錯了會多走路；排法改變會連動到店營業判斷）。
+3. 先讀 `src/dailyRouting.ts` 的 `scheduleRoute`（貪婪）與 `fewestLateOrder`（分支定界，`ONTIME_SEARCH_NODES`=20000）。寫失敗測試：貪婪的步行總分鐘比窮舉最短多、而且晚到站數相同。再修。API 上限 9 站（`api/daily-route.ts:153`）。
+4. 注意：現在貪婪沒有衝突時輸出不變（`tests/unit/daily-fixed-ontime.test.ts` 的指紋測試 `PRE_FIX`）。這件會刻意改變沒有衝突時的排法，指紋要依新規則重算，並在 PR 寫明理由。
+5. 修完：全套單元測試、lint、`npm run typecheck`、CI 綠；Vercel 預覽站真 POST；獨立 Opus 把關（checker skill）PASS；合併 main（Cross 已授權）；正式站真 POST 驗收；更新本檔。
 
 ## 2. 做到哪
 - 已完成（daily-retain-radius，單站換店時其他站保留的舊店也要在 3.5 km 半徑內，全部上線）：
@@ -13,14 +16,14 @@
   - PR #70 合併（merge `3a2a9a9265ec9dfca6b78c06bc27eeb7d33ccef2`），正式部署 `dpl_GhmRPgJMS4v6MQWMUgmj8Q1A5M9d` READY，真 POST 驗收通過（`runs/daily-fixed-ontime/snapshots/prod-*`）。
   - 獨立把關第 2 輪 PASS（第 1 輪 FAIL：全有或全無，已修）。
   - PR #70 已取消訂閱；沒有排程。
-- 進行中：無。本交接檔與合併後證據用另一個 PR 合併進 main（分支 `claude/friendly-shannon-r28vk3`）。PR #70、#71、#72 都已取消訂閱。
-- 未開始（請 Cross 選，不自動做）：
+- 進行中：無。沒有寫到一半的檔案。本交接檔用另一個 PR 合併進 main（分支 `claude/friendly-shannon-r28vk3`）。PR #70–#73 都已合併並取消訂閱。
+- 其他候選（做完上一項再請 Cross 選，不自動做）：
   - 手機畫面驗收。
   - 試用資料匯出 N4。
   - 試用結束後路線 Q2（12-30 前裁定）。
   - 🔒 N5 Places 上限、L6 GCP 帳單上限。
   - 舊分支清理。
-  - P0 剩下的部分（STATE.md 第 42 行）：總步行最短化、大眾運輸選擇。
+- 未開始（Cross 已選，下一棒做）：P0「總步行最短」（見第 1 段）。大眾運輸：Cross 決定不做。
 
 ## 3. 做了哪些決定和為什麼
 - 只在貪婪排法報晚到時才跑新搜尋，因為要保證正常情況輸出完全不變（指紋測試＋把關者對 main 逐字比對 6,500 組）。
@@ -29,6 +32,7 @@
 - 剪枝不用「直走時間」當下界，因為 Google 步行矩陣不保證三角不等式。
 - 開工前實測：12 萬組隨機案例，舊貪婪 0 次誤報。真實 Google 資料下兩版結果相同。這次修正是保證，不是修常見錯誤。
 - daily-retain-radius：保留的舊店用跟新派的店同一個半徑（`areaPref??center` 的 `SEARCH_BIAS_M`）。要換的站排除自己現在那間時改用原始 `s.candidate`，否則太遠的現任店會被挑回來（既有測試 `第 1 頁只有被換掉的遠店…` 抓到）。
+- P0 只做步行、不做大眾運輸，因為 Cross 2026-11-13 原話：`只做步行 距離我會自己判定`。
 - 合併不問 Cross，因為他 2026-11-13 原話：`merge不用再我批准` `一律核准`。
 
 ## 4. 試過但行不通的
