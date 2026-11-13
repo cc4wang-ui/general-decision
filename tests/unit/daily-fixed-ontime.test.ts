@@ -109,7 +109,7 @@ describe('daily-fixed-ontime：能準時就要準時',()=>{
   expect(partial).toBeGreaterThan(50) // 確認有測到「部分趕不上、其他要救」的情況
   expect(bad).toBe(0)
  })
- it('沒有衝突的排法：輸出指紋固定（daily-walk-shortest 起依「步行最短」新規則）',()=>{
+ it('沒有衝突的排法：輸出指紋固定（daily-walk-shortest 起依「步行最短、結束不更晚」新規則）',()=>{
   const h=createHash('sha256')
   let kept=0
   for(const metric of [true,false]){
@@ -138,6 +138,6 @@ describe('daily-fixed-ontime：能準時就要準時',()=>{
 })
 // 指紋：6000 組隨機案例中沒有衝突的 1950 組。
 // daily-fixed-ontime 時（main 99984a1）是 '0025f4d55d2ab4e0'，保證「沒有衝突時輸出不變」。
-// daily-walk-shortest（2026-11-13）刻意改變：沒有衝突時也改選總步行最短的排法，所以依新規則重算。
+// daily-walk-shortest（2026-11-13）刻意改變：沒有衝突時也改選總步行最短（結束不晚於舊版）的排法，所以依新規則重算。
 // 新規則的正確性由 tests/unit/daily-walk-shortest.test.ts 的窮舉比對保證。
-const PRE_FIX={kept:1950,digest:'803fa968a8744b1e'}
+const PRE_FIX={kept:1950,digest:'63096c64ee57e7a8'}

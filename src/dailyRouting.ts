@@ -139,53 +139,108 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
  // If a fixed appointment cannot be met, surface the conflict, never silently discard stops.
  // leg 未知（矩陣缺列）時以 Infinity 計：排到最後，visit 會因非有限時間而 throw，不靜默丟站。
  while(flexible.length){const row=matrix[position];const ranked=flexible.map((s,i)=>({i,leg:row?.[idx.get(s.id)??-1]??Infinity})).sort((a,b)=>a.leg-b.leg);const first=ranked[0];if(!first)break;const removed=flexible.splice(first.i,1)[0];if(!removed)break;visit(removed)}
- // daily-fixed-ontime＋daily-walk-shortest（P0）：貪婪排法只當起點。再找一次「晚到站數最少，其中總步行分鐘最短」的排法；
- // 依序比 (晚到站數, 步行分鐘)，嚴格比貪婪好才改用，並列就保留貪婪結果（不無故改順序）。
- // 把關（daily-fixed-ontime 第 1 輪）：不能「全有或全無」——一個怎樣都趕不上的固定行程不能害其他行程失去救援。
- const seq=bestOrder(stops,idx,matrix,anchorMin,deadlineAbs,conflicts.length,travelMinutes)
- if(seq){
-  ordered.length=0;conflicts.length=0;position=originIndex;at=anchorMin;travelMinutes=0;distanceKm=0
-  for(const s of seq)visit(s)
+ // daily-fixed-ontime（P0）：貪婪排法報晚到時，再找一次晚到站數最少的排法（目標 0）；嚴格比貪婪少才改用。
+ // 把關第 1 輪：不能「全有或全無」——一個怎樣都趕不上的固定行程（例：時間已過）不能害其他行程失去救援。
+ const replay=(seq:T[])=>{ordered.length=0;conflicts.length=0;position=originIndex;at=anchorMin;travelMinutes=0;distanceKm=0;for(const s of seq)visit(s)}
+ if(conflicts.length){
+  const seq=fewestLateOrder(stops,idx,matrix,anchorMin,deadlineAbs,conflicts.length)
+  if(seq)replay(seq)
  }
+ // daily-walk-shortest（P0）：上面的結果當參考排法。再找「晚到不多、結束不晚於參考、總步行嚴格更短」的排法；
+ // 找不到就保留參考排法（不無故改順序）。結束時間限制來自預覽站實測：只比步行時，會先去晚上的固定行程
+ // 空等 3.5 小時，其他店全排到半夜打烊後（runs/daily-walk-shortest/snapshots/preview-v1-pinned.json）。
+ const shorter=shortestWalkOrder(stops,idx,matrix,anchorMin,deadlineAbs,conflicts.length,travelMinutes,at)
+ if(shorter)replay(shorter)
  return {stops:ordered,distanceKm:Math.round(distanceKm*10)/10,travelMinutes,conflicts}
 }
-/** 搜尋節點上限：站多時不卡住請求；用完就停，回目前找到的最好排法（沒有比貪婪好的就 null，呼叫端保留貪婪結果）。
- * API 上限 9 站；實測最壞案例遠低於此上限（見 tests/unit/daily-walk-shortest.test.ts）。 */
-export const ROUTE_SEARCH_NODES=200000
+/** 搜尋節點上限：站多又趕不上時不卡住請求；用完就停，回目前找到的最好排法（沒有就 null，呼叫端保留貪婪結果與警告）。 */
+export const ONTIME_SEARCH_NODES=20000
 /**
- * 分支定界：找 (晚到站數, 總步行分鐘) 依序比較嚴格小於貪婪結果的排法。所有站都可以排在任何位置。
- * 每一步先試準時的站，再按步行由近到遠（先找到好解，剪枝才有力）。
- * 下界（Google 步行矩陣不保證三角不等式，所以只用「每個還沒去的站，至少要走一段進去」）：
- *  - 晚到：已晚到數＋「一定晚到」的站數。一定晚到＝現在時間＋走進該站的最短一段 > 期限。
- *  - 步行：已走分鐘＋每個還沒去的站「從現在位置或其他還沒去的站走進來」的最短一段。
+ * 分支定界：找晚到站數比 greedyLate 少的排法，越少越好；找到 0 就停。每一步先試準時的站，再按步行由近到遠。
+ * 剪枝：已晚到數＋「一定晚到」的站數 ≥ 目前最好 → 剪掉。「一定晚到」＝現在時間＋任何站走到該站的最短
+ * 步行分鐘數 > 期限。不用「直走」當下界，因為 Google 步行矩陣不保證三角不等式（繞經別站可能比直走快）。
  * 晚到與等待的算法跟 visit 一致（早到等到開始時間；到達 > 期限才算晚到）。
+ * 有時間的站都排完後，其餘站照貪婪的收尾規則：可移動站由近到遠，再接沒有時間的固定站。
  */
-function bestOrder<T extends ScheduledStop>(stops:T[],idx:Map<string,number>,matrix:number[][],anchorMin:number,deadlineAbs:(start?:string)=>number|null,greedyLate:number,greedyWalk:number):T[]|null{
+function fewestLateOrder<T extends ScheduledStop>(stops:T[],idx:Map<string,number>,matrix:number[][],anchorMin:number,deadlineAbs:(start?:string)=>number|null,greedyLate:number):T[]|null{
+ const n=stops.length
+ const node=stops.map(s=>idx.get(s.id)??-1)
+ if(node.some(p=>p<0||!matrix[p]))return null
+ const deadline=stops.map(s=>deadlineAbs(s.start))
+ const stay=stops.map(s=>s.minutes??45)
+ const fixed=stops.map(s=>!!(s.locked||s.custom||s.done))
+ const leg=(from:number,to:number)=>{const v=matrix[from]?.[to];return v!==undefined&&Number.isFinite(v)?v:Infinity}
+ const minIn=node.map(p=>Math.min(...matrix.map((row,i)=>i===p?Infinity:(Number.isFinite(row[p]??NaN)?row[p]!:Infinity))))
+ const used=new Array<boolean>(n).fill(false)
+ const seq:number[]=[]
+ let budget=ONTIME_SEARCH_NODES,best=greedyLate,bestSeq:number[]|null=null
+ const tail=(pos:number):number[]=>{
+  const rest=stops.map((_,i)=>i).filter(i=>!used[i])
+  const flex=rest.filter(i=>!fixed[i]),late=rest.filter(i=>fixed[i])
+  const out:number[]=[]
+  let p=pos
+  while(flex.length){let k=0;flex.forEach((i,j)=>{if(leg(p,node[i]!)<leg(p,node[flex[k]!]!))k=j});const i=flex.splice(k,1)[0]!;out.push(i);p=node[i]!}
+  return [...out,...late]
+ }
+ const dfs=(pos:number,at:number,late:number):void=>{
+  if(--budget<0)return
+  const open=stops.map((_,i)=>i).filter(i=>!used[i]&&deadline[i]!==null)
+  if(!open.length){if(late<best){best=late;bestSeq=[...seq,...tail(pos)]}return}
+  if(late+open.filter(i=>at+minIn[i]!>deadline[i]!).length>=best)return
+  const next=stops.map((_,i)=>i).filter(i=>!used[i]).map(i=>{const l=leg(pos,node[i]!),dl=deadline[i]??null;return {i,l,dl,isLate:dl!==null&&at+l>dl}})
+   .filter(x=>Number.isFinite(x.l)).sort((a,b)=>Number(a.isLate)-Number(b.isLate)||a.l-b.l)
+  for(const {i,l,dl,isLate} of next){
+   const nl=late+(isLate?1:0)
+   if(nl>=best)continue
+   const arrival=at+l
+   used[i]=true;seq.push(i)
+   dfs(node[i]!,(dl!==null&&arrival<dl?dl:arrival)+stay[i]!,nl)
+   used[i]=false;seq.pop()
+   if(best===0||budget<0)return
+  }
+ }
+ dfs(0,anchorMin,0)
+ const found=bestSeq as number[]|null // dfs 閉包內會改寫；TS 的流程分析看不到，所以要標型別
+ return found?found.map(i=>stops[i]!):null
+}
+/** 步行最短搜尋的節點上限：用完就停，回目前找到的最好排法（沒有比參考好的就 null）。API 上限 9 站。 */
+export const WALK_SEARCH_NODES=200000
+/**
+ * daily-walk-shortest：分支定界。找「晚到站數 ≤ 參考、結束時間 ≤ 參考、(晚到, 步行) 依序嚴格更小」的排法。
+ * 結束時間＝最後一站離開的絕對分鐘數（跟 visit 的 at 一致：早到等到開始時間，再加停留）。
+ * 每一步先試準時的站，再按步行由近到遠。下界（Google 步行矩陣不保證三角不等式，只用「每個還沒去的站，
+ * 至少要從現在位置或其他還沒去的站走一段進去」）：
+ *  - 晚到：已晚到數＋「一定晚到」的站數（現在時間＋走進該站的最短一段 > 期限）。
+ *  - 步行：已走分鐘＋每個還沒去的站的最短進站一段。
+ *  - 結束：max(現在時間＋剩下停留＋步行下界, 每個還沒去的有時間站的開始時間＋停留)。
+ */
+function shortestWalkOrder<T extends ScheduledStop>(stops:T[],idx:Map<string,number>,matrix:number[][],anchorMin:number,deadlineAbs:(start?:string)=>number|null,refLate:number,refWalk:number,refEnd:number):T[]|null{
  const n=stops.length
  const node=stops.map(s=>idx.get(s.id)??-1)
  if(node.some(p=>p<0||!matrix[p]))return null
  const deadline=stops.map(s=>deadlineAbs(s.start))
  const stay=stops.map(s=>s.minutes??45)
  const leg=(from:number,to:number)=>{const v=matrix[from]?.[to];return v!==undefined&&Number.isFinite(v)?v:Infinity}
- // legIn[k][i]：從 k（0＝出發點，1..n＝站）走進站 i 的分鐘數
+ // legIn[k][i]：從 k（0＝出發點，i+1＝第 i 站）走進第 i 站的分鐘數
  const legIn=[0,...node].map(from=>node.map(to=>leg(from,to)))
  const used=new Array<boolean>(n).fill(false)
  const seq:number[]=[]
- let budget=ROUTE_SEARCH_NODES,bestLate=greedyLate,bestWalk=greedyWalk,bestSeq:number[]|null=null
+ let budget=WALK_SEARCH_NODES,bestLate=refLate,bestWalk=refWalk,bestSeq:number[]|null=null
  const dfs=(posK:number,at:number,late:number,walk:number):void=>{
   if(--budget<0)return
-  let lateLB=late,walkLB=walk,left=0
+  let lateLB=late,walkLB=walk,stays=0,endLB=at,left=0
   for(let i=0;i<n;i++){
    if(used[i])continue
-   left++
+   left++;stays+=stay[i]!
    let m=legIn[posK]![i]!
    for(let j=0;j<n;j++)if(j!==i&&!used[j])m=Math.min(m,legIn[j+1]![i]!)
    walkLB+=m
    const dl=deadline[i]
-   if(dl!==null&&dl!==undefined&&at+m>dl)lateLB++
+   if(dl!==null&&dl!==undefined){if(at+m>dl)lateLB++;endLB=Math.max(endLB,dl+stay[i]!)}
   }
-  if(!left){if(late<bestLate||(late===bestLate&&walk<bestWalk)){bestLate=late;bestWalk=walk;bestSeq=[...seq]}return}
-  if(lateLB>bestLate||(lateLB===bestLate&&walkLB>=bestWalk))return
+  if(!left){if(at<=refEnd&&(late<bestLate||(late===bestLate&&walk<bestWalk))){bestLate=late;bestWalk=walk;bestSeq=[...seq]}return}
+  endLB=Math.max(endLB,at+stays+(walkLB-walk))
+  if(endLB>refEnd||lateLB>bestLate||(lateLB===bestLate&&walkLB>=bestWalk))return
   const next:{i:number;l:number;dl:number|null;isLate:boolean}[]=[]
   for(let i=0;i<n;i++){
    if(used[i])continue
