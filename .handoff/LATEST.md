@@ -1,42 +1,47 @@
-# 交接｜daily-fixed-ontime
-狀態：待接手
-建立：2026-11-13 04:50 UTC｜環境：Claude Code（雲端容器）｜上下文：`331,393`／400k（過軟上限，Cross 說 `交接做 P0`）
+# 交接｜daily-fixed-ontime（已完成）
+狀態：已完成，沒有待接手的工作。等 Cross 選下一件。
+建立：2026-11-13 07:05 UTC｜環境：Claude Code（雲端容器）
 
 ## 1. 下一個對話先做什麼
-1. 載入 /board-intake，替 P0 寫目標契約 `runs/daily-fixed-ontime/contract.md`。P0 原文（`STATE.md:42`，逐字）：`**P0 — route algorithm correctness:** src/dailyRouting.ts uses a greedy nearest-feasible heuristic, not global route optimization. Fixed appointments may be late; alerts exist, but rigorous multi-appointment optimization, opening-hour constraints, overnight boundaries and transit choices remain unverified.`
-2. Cross 不在線上，不問他。契約範圍用預設：⚠️「有固定行程時，只要存在一種排法能準時趕上所有固定行程，就要選那種排法；真的趕不上才顯示晚到警告」。opening-hour（已由 PR #64 做完）、transit 選擇不在範圍。等級 M（錯了會讓 Cross 遲到）。
-3. 先讀 `src/dailyRouting.ts` 的 `scheduleRoute`（第 78 行起，共 143 行）和 `order`（`api/daily-route.ts`）。寫一條「貪婪排法會遲到、但有準時排法」的失敗測試，再修。
-4. 修完：全套單元測試、lint、`npm run typecheck`、CI 綠；Vercel 預覽站真 POST；獨立 Opus 把關（checker skill）PASS；合併 main（Cross 已授權，不用再問）；正式站真 POST 驗收。
+1. 不要自動開工。下一件要 Cross 從第 2 段「未開始」選。
+2. Cross 選好後：載入 /board-intake，寫 `runs/<任務代號>/contract.md`，照同樣方法做（失敗測試 → 修 → CI → 獨立把關 → 合併 → 正式站真 POST）。
 
 ## 2. 做到哪
-- 已完成（上一件 daily-area-radius，全部上線）：
-  - PR #67 合併（merge `1b2fca13fdb5db59034c3c1d093ba56fc955a49e`），正式部署 `dpl_5aq7SQLex3oNk4Pr26BnQGKKngJ8` READY，真 POST 驗收通過。
-  - PR #68（證據與交接檔，只有文件）合併（merge `e80d2bb7d3ee267dd39a52ed2caa59c8691205d2`）。
-  - 兩個 PR 都已取消訂閱；安全網排程都已刪除。
-- 進行中：無。沒有寫到一半的檔案。本交接檔用 PR #69 合併進 main（分支 `claude/sleepy-ritchie-etttn8`）。
-- 未開始：
-  - P0 本身（Cross 已選，見第 1 段）。
-  - 其他候選（做完 P0 再請 Cross 選，不自動做）：已知未修——單站換店時其他自動站保留的舊候選不檢查半徑（`retentionOk` 沒有距離檢查）；手機畫面驗收；試用資料匯出 N4；試用結束後路線 Q2（12-30 前裁定）；🔒 N5 Places 上限、L6 GCP 帳單上限；舊分支清理。
+- 已完成（daily-fixed-ontime，P0「固定行程能準時就要準時」，全部上線）：
+  - PR #70 合併（merge `3a2a9a9265ec9dfca6b78c06bc27eeb7d33ccef2`），正式部署 `dpl_GhmRPgJMS4v6MQWMUgmj8Q1A5M9d` READY，真 POST 驗收通過（`runs/daily-fixed-ontime/snapshots/prod-*`）。
+  - 獨立把關第 2 輪 PASS（第 1 輪 FAIL：全有或全無，已修）。
+  - PR #70 已取消訂閱；沒有排程。
+- 進行中：無。本交接檔與合併後證據用另一個 PR 合併進 main（分支 `claude/friendly-shannon-r28vk3`）。
+- 未開始（請 Cross 選，不自動做）：
+  - 單站換店時其他自動站保留的舊候選不檢查半徑（`retentionOk` 沒有距離檢查）。
+  - 手機畫面驗收。
+  - 試用資料匯出 N4。
+  - 試用結束後路線 Q2（12-30 前裁定）。
+  - 🔒 N5 Places 上限、L6 GCP 帳單上限。
+  - 舊分支清理。
+  - P0 剩下的部分（STATE.md 第 42 行）：總步行最短化、大眾運輸選擇。
 
 ## 3. 做了哪些決定和為什麼
-- 合併到 main 不用再問 Cross，因為他 2026-11-13 原話：`merge不用再我批准` `一律核准`。CI 全綠、把關 PASS 就直接合併。
-- 下一件做 P0，因為 Cross 原話：`交接做 P0`。
-- 這一棒不開工 P0，因為上下文已 `331,393`，過了軟上限 320k。
-- P0 範圍預設只做「固定行程能準時就要準時」，因為 STATE.md 列的到店營業時間已由 PR #64 處理，transit 不在今日行程範圍（`travelMode:'WALK'`）。
-- 驗證沿用上一件的方法，因為已證實可行：測試先失敗後通過、預覽站真 POST、正式站真 POST 前後比對。
+- 只在貪婪排法報晚到時才跑新搜尋，因為要保證正常情況輸出完全不變（指紋測試＋把關者對 main 逐字比對 6,500 組）。
+- 搜尋目標是「晚到站數最少」，不是「全部準時才救」。原因：把關第 1 輪指出，一個時間已過的行程會害其他行程失去救援。
+- 晚到以站數計，不比晚到分鐘數（寫在契約 ⚠️ 假設）。
+- 剪枝不用「直走時間」當下界，因為 Google 步行矩陣不保證三角不等式。
+- 開工前實測：12 萬組隨機案例，舊貪婪 0 次誤報。真實 Google 資料下兩版結果相同。這次修正是保證，不是修常見錯誤。
+- 合併不問 Cross，因為他 2026-11-13 原話：`merge不用再我批准` `一律核准`。
 
 ## 4. 試過但行不通的
-- 試了合併時分支落後 main：失敗，錯誤 `405 3 of 3 required status checks are expected`。原因：規則要求分支跟 main 同步（`mergeable_state: behind`）。先把 main 合進分支、等 CI 全綠再合併。
-- 試了部署網址的 Vercel 分享連結（`general-decision-fdfml4xft`）：失敗，302 轉登入頁，API 回 `HTTP 401`。改用分支別名（`general-decision-git-claude-<分支縮寫>-cc4wang-uis-projects.vercel.app`）或正式別名 `general-decision.vercel.app` 的分享連結。
-- 試了 `git push -f`：被擋，錯誤 `[Git Destructive]`。分支合併後從 main 重開不需要 force，一般 push 即可。
-- 每次 push 都會取消上一個 commit 的 e2e，`required` 顯示 failure。不是程式錯，只看最新 commit。
-- 前景 `sleep`：被擋。用 `run_in_background: true`。
-- 試了用 `create_trigger` 自動開下一棒（`create_new_session_on_fire: true`）：失敗，回傳 `warning: this trigger stores no MCP connectors, so the sessions it fires will run without connector (mcp__<server>__*) tools.`，而且 `sources` 是空的（沒有 repo）。原因：新 session 沒有 Vercel、GitHub 工具，做不了真 POST 和合併。排程已刪（`trig_01LawnG3HvadJmPH9stEZdtk`），改由 Cross 手動開新對話。
+- 第一版搜尋「全有或全無」：把關 FAIL。例：錨點 15:30、已完成 09:00 行程＋要繞路的 16:00 行程，輸出 `["D：預計晚到 391 分鐘","A：預計晚到 101 分鐘"]`。改成分支定界取最少晚到站數。
+- 指紋測試共用隨機產生器：改產生器後指紋從 `kept:1950` 變 `kept:1800`。改成「過去時間」只在比對測試開啟（`randomCase(r,metric,true)`）。
+- `bestSeq` 在閉包內改寫：tsc 報 `Property 'map' does not exist on type 'never'`。改成 `bestSeq as number[]|null`。
+- 預覽站分享連結綁部署：新部署後舊連結回 `share 302`、POST `401`。新部署要重拿分享連結。
+- 每次 push 取消上一個 commit 的 e2e，`required` 顯示 failure。看 job：check 是 success、e2e 是 `cancelled`，不是程式錯。
+- 店家每次不同（例：正式站 06:41 派スギ薬局、06:52 派マツモトキヨシ）：自動站前 5 名隨機。不能逐店比對，改比 ETA 與晚到是否逐站一致（`live-consistency.txt`）。
+- 把關子代理在 `tests/unit/zz-checker-*` 放暫存檔，stop hook 會要求 commit。不要 commit，等它刪。
 
 ## 5. 要讀哪些檔
-1. 原文：`/root/.claude/projects/-home-user-general-decision/0c4bb33a-395c-534c-ac6f-daadb0e4a0cd.jsonl`。⚠️ 雲端容器回收後就沒了；讀不到時以本檔為準。不要整份讀。
-2. `src/dailyRouting.ts` — `scheduleRoute`：排程與晚到警告（第 111 行 `預計晚到`）。
-3. `api/daily-route.ts` — `order()`：固定行程與可移動站的排序；`MAX_ROUTE_ROUNDS` 換店迴圈會重排。
-4. `tests/unit/daily-open-on-arrival.test.ts` — Routes mock 寫法（`mockGoogle`）。
-5. `runs/daily-area-radius/contract.md`、`runs/daily-area-radius/snapshots/live-README.md` — 契約與真 POST 證據的範例。
-6. `STATE.md` 第 40–42 行 — P0 原文。
+1. 原文：`/root/.claude/projects/-home-user-general-decision/861b28da-98d1-5cf9-883d-654682ab89fd.jsonl`。⚠️ 雲端容器回收後就沒了；讀不到時以本檔為準。不要整份讀。
+2. `runs/daily-fixed-ontime/contract.md` — 凍結契約（含 STOP 3b）。
+3. `runs/daily-fixed-ontime/snapshots/live-README.md` — 預覽站、正式站真 POST 證據。
+4. `src/dailyRouting.ts` — `scheduleRoute`、`fewestLateOrder`、`ONTIME_SEARCH_NODES`。
+5. `tests/unit/daily-fixed-ontime.test.ts` — 7 個測試（含窮舉比對與指紋）。
+6. `STATE.md` 第 42 行 — P0 現況。

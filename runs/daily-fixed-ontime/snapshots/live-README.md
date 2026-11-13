@@ -19,3 +19,9 @@
 - 結果：`preview-r2-*`、`main-r2-*`。`routeVerified true`；ok 請求兩版都 `conflicts []`、一蘭 ETA 23:30；late 請求兩版都報晚到。
 - 兩版派的店不同（例：正式站 06:41 派スギ薬局、06:52 派マツモトキヨシ）：自動站從前 5 名隨機挑，固定站名稱比對 Places 也會變。同一版前後兩次就不同，不是本 PR 造成。
 - 排程一致性（`live-consistency.txt`，8 份回應逐站重算）：每站 ETA＝上一站離開時間＋步行分鐘（早到等到開始時間）。晚到警告只在「步行分鐘 > 剩餘時間」時出現，分鐘數吻合。
+
+## PR #70 合併後正式站驗收（2026-11-13 07:01 UTC）
+- 部署 `dpl_GhmRPgJMS4v6MQWMUgmj8Q1A5M9d`（`general-decision-fzw6vtnrh`，merge `3a2a9a9`），別名 `general-decision.vercel.app`。
+- `prod-ok.*`：`routeVerified true`、`conflicts []`、一蘭 ETA 23:30（準時）。
+- `prod-late.*`：只報 `一蘭 渋谷店：預計晚到 4 分鐘`（開始時間只比出發晚 1 分鐘、步行 5 分鐘，真的趕不上）。
+- 逐站重算一致（`live-consistency.txt` 最後兩行）。
