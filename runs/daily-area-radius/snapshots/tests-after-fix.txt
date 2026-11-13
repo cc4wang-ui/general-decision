@@ -1,2 +1,2 @@
  Test Files  56 passed (56)
-      Tests  1227 passed (1227)
+      Tests  1228 passed (1228)

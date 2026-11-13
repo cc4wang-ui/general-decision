@@ -142,3 +142,26 @@ describe('STOP 8：Places 次數不增加', () => {
     expect(calls).toHaveLength(1)
   })
 })
+
+describe('把關第 1 輪：已排除的遠店不能讓翻頁提早停', () => {
+  it('第 1 頁只有被換掉的遠店（目前候選）＋已排除的近店 → 照樣翻第 2 頁，派出第 2 頁的近店', async () => {
+    const farCurrent = shop('far-current', SHIBUYA, 110)
+    const nearDisliked = shop('near-disliked', SHIBUYA, 1)
+    const nearPage2 = shop('near-page2', SHIBUYA, 2)
+    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      if (urlText(url).includes('routes.googleapis.com')) {
+        const b = JSON.parse(bodyText(init?.body, '{}')) as { origins: unknown[] }
+        const n = b.origins.length
+        const el = []
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) el.push({ originIndex: i, destinationIndex: j, duration: (i === j ? 0 : 600) + 's', distanceMeters: i === j ? 0 : 800 })
+        return Promise.resolve(new Response(JSON.stringify(el), { status: 200 }))
+      }
+      const body = JSON.parse(bodyText(init?.body, '{}')) as { pageToken?: string }
+      const places = body.pageToken ? [nearPage2] : [farCurrent, nearDisliked]
+      return Promise.resolve(new Response(JSON.stringify({ places, nextPageToken: body.pageToken ? undefined : 'page-2' }), { status: 200 }))
+    }))
+    const current = { id: 'far-current', name: 'far-current', address: 'x', mapUrl: 'https://maps.google.com/?cid=far-current', lat: SHIBUYA.lat + 0.11, lng: SHIBUYA.lng }
+    const data = await run({ origin: SHIBUYA, shuffle: 'meal', exclude: ['near-disliked'], stops: meal({ candidate: current }) })
+    expect(data.stops.find((s) => s.id === 'meal')!.candidate?.id).toBe('near-page2')
+  })
+})

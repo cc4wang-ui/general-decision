@@ -247,8 +247,6 @@ async function handler(req:Request):Promise<Response>{
     sawAny=sawAny||found.places.length>0
     // 翻頁時也要記錄「有店回來但被地區擋掉」：那是無候選的原因（area），不是「什麼都沒有」（empty）。
     if(areaPref&&found.places.some(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&!areaOk(p,s,areaPref)))sawAreaBlocked=true
-    // 只有遠店（B）：記下來，無候選原因寫 empty（附近找不到），不寫 filtered（那是被不喜歡／評論數擋掉）。
-    if(auto&&found.places.some(p=>!excluded.includes(p.id)&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&!nearOk(p)))sawFar=true
     // eligible 過濾：exclude（使用者不要的店）＋others（其他站現任候選，防重複）
     // ＋picked（本請求前面站已經挑走／保留的店，round 10 R9-K1：同一請求內
     // 後處理的站不能再挑同一間）＋seen（各站換掉過的店，round 11：完整重新生成
@@ -256,7 +254,11 @@ async function handler(req:Request):Promise<Response>{
     // 查的是使用者自己的地名，seen 不能把那間店擋掉）。
     // others 只在這裡用，絕對不進 retentionOk（round 8 K1：否則單站 shuffle
     // 會連帶清掉其他站的候選）；seen 也一樣不進 retentionOk（見上方 seen 的說明）。
-    eligible=found.places.filter(p=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&(!auto||!seen.includes(p.id))&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(!auto||nearOk(p))&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id))
+    const usableHere=(p:Candidate)=>!excluded.includes(p.id)&&!others.includes(p.id)&&!picked.has(p.id)&&(!auto||!seen.includes(p.id))&&venueOk(p,s,excludeKinds)&&areaOk(p,s,areaPref)&&(preserve||shuffle!==s.id||p.id!==stop.candidate?.id)
+    eligible=found.places.filter(p=>usableHere(p)&&(!auto||nearOk(p)))
+    // 只有遠店（B）：本來會被挑、只因太遠被擋的店。原因寫 empty（附近找不到），不寫 filtered（那是被不喜歡／評論數擋掉）。
+    // 用跟 eligible 同一份條件判斷（把關第 1 輪：已被其他站挑走／換掉過的遠店不算，否則會少翻一頁、誤標找不到店）。
+    if(auto&&found.places.some(p=>usableHere(p)&&!nearOk(p)))sawFar=true
     // 只剩遠店就不往下翻：下一頁只會更遠，而且修正前這種情況也只查 1 頁（Places 次數不增加，契約 STOP 8）。
     if(eligible.length||!found.nextPageToken||sawFar)break
     pageToken=found.nextPageToken
