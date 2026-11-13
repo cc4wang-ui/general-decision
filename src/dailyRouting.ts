@@ -213,7 +213,9 @@ export const WALK_SEGMENT_MAX=12
  */
 function shortestWithinSegments<T extends ScheduledStop>(ref:T[],idx:Map<string,number>,matrix:number[][]):T[]|null{
  const leg=(from:number,to:number)=>{const v=matrix[from]?.[to];return v!==undefined&&Number.isFinite(v)?v:Infinity}
- const isFixed=(s:T)=>!!(s.locked||s.custom||s.done)
+ // 段邊界：固定站、已完成站，以及帶了可解析開始時間的可移動站（手寫 POST 才會有）——帶 start 的站
+ // 若在段內被移動，可能晚到或結束變晚（把關第 2 輪反例），所以不重排、當邊界固定。
+ const isFixed=(s:T)=>!!(s.locked||s.custom||s.done)||minute(s.start??'')!==null
  const out:T[]=[]
  let changed=false,start=0,seg:T[]=[]
  const flush=(end:number|null)=>{

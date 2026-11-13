@@ -98,6 +98,14 @@ describe('daily-walk-shortest：總步行最短',()=>{
    expect(out.stops.find(s=>s.id==='A')!.eta).toBe('18:40')
   }
  })
+ it('把關第 2 輪反例：可移動站帶開始時間時，不被段內重排拉到晚到',()=>{
+  //      0  S0 S1
+  const m=[[0,60,23],[1,0,3],[42,57,0]]
+  const stops:ScheduledStop[]=[{id:'S0',minutes:41,candidate:P},{id:'S1',minutes:43,start:'13:38',candidate:P}]
+  const out=scheduleRoute(stops,m,zeros(m),'12:00')
+  expect(out.conflicts).toEqual([])
+  expect(out.stops.map(s=>s.id)).toEqual(['S1','S0'])
+ })
  it('隨機比對窮舉：晚到站數最少；固定站位置不動，每段內步行最短（含違反三角不等式的矩陣、已過時間的行程）',()=>{
   let bad=0,late=0
   for(const metric of [true,false]){
