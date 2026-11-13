@@ -1,0 +1,8 @@
+routeVerified true anchorTime 22:30 partial true missing [{"id":"creative","reason":"closed"},{"id":"coffee","reason":"closed"}] travelMinutes 34
+creative | - |  | - | (none) | closed |  | 
+coffee | - |  | - | (none) | closed |  | 
+shopping | 22:34 | 0 | open | スギ薬局 道玄坂店 |  | 4 | km 0.08
+lunch-fixed | 23:09 | 0 | open | 一蘭 渋谷店 |  | 5 | km 0.18
+gym | 00:06 | 1 | open | フィットイージー 渋谷店 |  | 12 | km 0.38
+meal | 01:39 | 1 | open | 権八 |  | 13 | km 0.50
+rest | - |  | - | (none) |  |  | 
