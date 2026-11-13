@@ -4,7 +4,7 @@
 
 ## 1. 下一個對話先做什麼
 1. **時間閘**：Vercel 免費方案每日部署上限（滾動 24 小時）。2026-11-13 10:26 UTC 再次被擋，錯誤逐字：`Resource is limited - try again in 24 hours (more than 100, code: "api-deployments-free-per-day")`。**2026-11-14 10:30 UTC 之後**才做第 2 步。改方案＝動錢 🔒，不要做。
-2. 確認正式站別名 `general-decision.vercel.app` 指向哪個部署（`mcp__Vercel__get_deployment` 看 `githubCommitSha`）。若不是 main 的 `e391097`（或之後），用 Vercel MCP 對 main 重新部署 production（git 來源，不要直接上傳），等 READY。
+2. 確認正式站別名 `general-decision.vercel.app` 指向哪個部署（有 Vercel 工具：`get_deployment` 看 `githubCommitSha`）。若不是 main 的 `e391097`（或之後），讓 main 重新部署 production（git 來源，不要直接上傳）：有 Vercel 工具就對 main 重新部署；沒有 Vercel 工具（排程開的 session 可能沒有 connector），就合併一個 main 的小 PR（例如本檔更新），由 Vercel git 整合自動部署。判斷新版已上線：`curl -s -X POST https://general-decision.vercel.app/api/daily-route` 帶一個 `done:true` 有候選的站＋一個自動站，回應的已完成站沒有 `eta`；或直接跑第 3 步。
 3. 正式站重驗（不攔截 API，真 Google）：
    `WEBKIT=1 EXPECT_DONE_FIX=1 E2E_OUT=runs/pending-tests/prod-after PLAYWRIGHT_BROWSERS_PATH=<pw> npx playwright test -c playwright.prod.config.ts --project=iphone --project=webkit-iphone`
    WebKit：`PLAYWRIGHT_BROWSERS_PATH=<scratchpad>/pw npx playwright install webkit`＋`npx playwright install-deps webkit`，再把 `/opt/pw-browsers/*` 符號連結進同一個 `<pw>` 目錄（否則 Chromium 找不到）。
