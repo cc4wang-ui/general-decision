@@ -1,0 +1,3 @@
+routeVerified True missing []
+shopping | ChIJ96xsBliLGGARbRP7edDwwog | ビックカメラ 渋谷東口店 | 0.15 km | 
+meal | retain-radius-far-test | 遠店テスト（横浜） | 24.65 km | 

@@ -1,0 +1,3 @@
+routeVerified True missing []
+shopping | ChIJ-dwB31eLGGARg7htBZXzyp8 | サンドラッグ 渋谷店 | 0.06 km | 
+meal | ChIJ3TUL91WLGGARNQVCAWLb0kw | 権八 | 0.50 km | 
