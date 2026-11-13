@@ -146,10 +146,11 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
   const seq=fewestLateOrder(stops,idx,matrix,anchorMin,deadlineAbs,conflicts.length)
   if(seq)replay(seq)
  }
- // daily-walk-shortest（P0）：上面的結果當參考排法。再找「晚到不多、結束不晚於參考、總步行嚴格更短」的排法；
- // 找不到就保留參考排法（不無故改順序）。結束時間限制來自預覽站實測：只比步行時，會先去晚上的固定行程
- // 空等 3.5 小時，其他店全排到半夜打烊後（runs/daily-walk-shortest/snapshots/preview-v1-pinned.json）。
- const shorter=shortestWalkOrder(stops,idx,matrix,anchorMin,deadlineAbs,conflicts.length,travelMinutes,at)
+ // daily-walk-shortest（P0）：上面的結果當參考排法。固定站、已完成站的位置不動；每個可移動站留在原本那段
+ // （兩個固定站之間），只在段內改成步行最短。段內的站沒有開始時間、不會等待，所以步行變短＝到下一個固定站更早：
+ // 晚到不會變多、結束不會變晚。不跨段移動，因為預覽站與把關第 1 輪實測：跨段會先去晚上的固定行程空等，
+ // 把店排到半夜打烊後（runs/daily-walk-shortest/snapshots/preview-v1-pinned.json）。
+ const shorter=shortestWithinSegments(ordered.map(o=>stops.find(s=>s.id===o.id)!),idx,matrix)
  if(shorter)replay(shorter)
  return {stops:ordered,distanceKm:Math.round(distanceKm*10)/10,travelMinutes,conflicts}
 }
@@ -203,64 +204,53 @@ function fewestLateOrder<T extends ScheduledStop>(stops:T[],idx:Map<string,numbe
  const found=bestSeq as number[]|null // dfs 閉包內會改寫；TS 的流程分析看不到，所以要標型別
  return found?found.map(i=>stops[i]!):null
 }
-/** 步行最短搜尋的節點上限：用完就停，回目前找到的最好排法（沒有比參考好的就 null）。API 上限 9 站。 */
-export const WALK_SEARCH_NODES=200000
+/** 一段最多幾個可移動站做精確最短（Held-Karp：2^k×k² 次運算；API 上限 9 站＝約 4 萬次）。超過就保留原順序。 */
+export const WALK_SEGMENT_MAX=12
 /**
- * daily-walk-shortest：分支定界。找「晚到站數 ≤ 參考、結束時間 ≤ 參考、(晚到, 步行) 依序嚴格更小」的排法。
- * 結束時間＝最後一站離開的絕對分鐘數（跟 visit 的 at 一致：早到等到開始時間，再加停留）。
- * 每一步先試準時的站，再按步行由近到遠。下界（Google 步行矩陣不保證三角不等式，只用「每個還沒去的站，
- * 至少要從現在位置或其他還沒去的站走一段進去」）：
- *  - 晚到：已晚到數＋「一定晚到」的站數（現在時間＋走進該站的最短一段 > 期限）。
- *  - 步行：已走分鐘＋每個還沒去的站的最短進站一段。
- *  - 結束：max(現在時間＋剩下停留＋步行下界, 每個還沒去的有時間站的開始時間＋停留)。
+ * daily-walk-shortest：參考排法依固定站（locked／custom／done）切段。每段＝前一個固定站（或出發點）→段內可移動站→
+ * 下一個固定站（最後一段沒有終點）。每段用 Held-Karp 求步行分鐘最小的順序，嚴格比原順序短才換。
+ * 都沒有變短就回 null（保留參考排法，不無故改順序）。
  */
-function shortestWalkOrder<T extends ScheduledStop>(stops:T[],idx:Map<string,number>,matrix:number[][],anchorMin:number,deadlineAbs:(start?:string)=>number|null,refLate:number,refWalk:number,refEnd:number):T[]|null{
- const n=stops.length
- const node=stops.map(s=>idx.get(s.id)??-1)
- if(node.some(p=>p<0||!matrix[p]))return null
- const deadline=stops.map(s=>deadlineAbs(s.start))
- const stay=stops.map(s=>s.minutes??45)
+function shortestWithinSegments<T extends ScheduledStop>(ref:T[],idx:Map<string,number>,matrix:number[][]):T[]|null{
  const leg=(from:number,to:number)=>{const v=matrix[from]?.[to];return v!==undefined&&Number.isFinite(v)?v:Infinity}
- // legIn[k][i]：從 k（0＝出發點，i+1＝第 i 站）走進第 i 站的分鐘數
- const legIn=[0,...node].map(from=>node.map(to=>leg(from,to)))
- const used=new Array<boolean>(n).fill(false)
- const seq:number[]=[]
- let budget=WALK_SEARCH_NODES,bestLate=refLate,bestWalk=refWalk,bestSeq:number[]|null=null
- const dfs=(posK:number,at:number,late:number,walk:number):void=>{
-  if(--budget<0)return
-  let lateLB=late,walkLB=walk,stays=0,endLB=at,left=0
-  for(let i=0;i<n;i++){
-   if(used[i])continue
-   left++;stays+=stay[i]!
-   let m=legIn[posK]![i]!
-   for(let j=0;j<n;j++)if(j!==i&&!used[j])m=Math.min(m,legIn[j+1]![i]!)
-   walkLB+=m
-   const dl=deadline[i]
-   if(dl!==null&&dl!==undefined){if(at+m>dl)lateLB++;endLB=Math.max(endLB,dl+stay[i]!)}
+ const isFixed=(s:T)=>!!(s.locked||s.custom||s.done)
+ const out:T[]=[]
+ let changed=false,start=0,seg:T[]=[]
+ const flush=(end:number|null)=>{
+  const k=seg.length
+  if(k>=2&&k<=WALK_SEGMENT_MAX){
+   const nodes=seg.map(s=>idx.get(s.id)??-1)
+   if(nodes.every(p=>p>=0)){
+    const pathWalk=(order:number[])=>{let p=start,w=0;for(const i of order){w+=leg(p,nodes[i]!);p=nodes[i]!}return w+(end===null?0:leg(p,end))}
+    const full=(1<<k)-1
+    const dp=Array.from({length:1<<k},()=>new Array<number>(k).fill(Infinity))
+    const parent=Array.from({length:1<<k},()=>new Array<number>(k).fill(-1))
+    for(let i=0;i<k;i++)dp[1<<i]![i]=leg(start,nodes[i]!)
+    for(let mask=1;mask<=full;mask++)for(let i=0;i<k;i++){
+     const cur=dp[mask]![i]!
+     if(!(mask&(1<<i))||!Number.isFinite(cur))continue
+     for(let j=0;j<k;j++){
+      if(mask&(1<<j))continue
+      const nm=mask|(1<<j),v=cur+leg(nodes[i]!,nodes[j]!)
+      if(v<dp[nm]![j]!){dp[nm]![j]=v;parent[nm]![j]=i}
+     }
+    }
+    let bestI=-1,best=Infinity
+    for(let i=0;i<k;i++){const v=dp[full]![i]!+(end===null?0:leg(nodes[i]!,end));if(v<best){best=v;bestI=i}}
+    if(bestI>=0&&best<pathWalk(seg.map((_,i)=>i))){
+     const order:number[]=[]
+     for(let mask=full,i=bestI;i>=0;){order.push(i);const pi=parent[mask]![i]!;mask&=~(1<<i);i=pi}
+     order.reverse()
+     seg=order.map(i=>seg[i]!);changed=true
+    }
+   }
   }
-  if(!left){if(at<=refEnd&&(late<bestLate||(late===bestLate&&walk<bestWalk))){bestLate=late;bestWalk=walk;bestSeq=[...seq]}return}
-  endLB=Math.max(endLB,at+stays+(walkLB-walk))
-  if(endLB>refEnd||lateLB>bestLate||(lateLB===bestLate&&walkLB>=bestWalk))return
-  const next:{i:number;l:number;dl:number|null;isLate:boolean}[]=[]
-  for(let i=0;i<n;i++){
-   if(used[i])continue
-   const l=legIn[posK]![i]!
-   if(!Number.isFinite(l))continue
-   const dl=deadline[i]??null
-   next.push({i,l,dl,isLate:dl!==null&&at+l>dl})
-  }
-  next.sort((a,b)=>Number(a.isLate)-Number(b.isLate)||a.l-b.l)
-  for(const {i,l,dl,isLate} of next){
-   const nl=late+(isLate?1:0)
-   if(nl>bestLate)continue
-   const arrival=at+l
-   used[i]=true;seq.push(i)
-   dfs(i+1,(dl!==null&&arrival<dl?dl:arrival)+stay[i]!,nl,walk+l)
-   used[i]=false;seq.pop()
-   if(budget<0)return
-  }
+  out.push(...seg);seg=[]
  }
- dfs(0,anchorMin,0,0)
- const found=bestSeq as number[]|null // dfs 閉包內會改寫；TS 的流程分析看不到，所以要標型別
- return found?found.map(i=>stops[i]!):null
+ for(const s of ref){
+  if(isFixed(s)){const p=idx.get(s.id);if(p===undefined)return null;flush(p);out.push(s);start=p}
+  else seg.push(s)
+ }
+ flush(null)
+ return changed?out:null
 }

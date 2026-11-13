@@ -24,15 +24,25 @@ function evalOrder(stops:ScheduledStop[],m:number[][],anchor:number,p:number[]){
  }
  return {late,walk,end:at}
 }
-/** 窮舉：所有排法的最少晚到站數，以及「晚到相同、步行更短、結束不晚於 end」的排法是否存在。 */
-function exhaust(stops:ScheduledStop[],m:number[][],anchor:number,out:{late:number;walk:number;end:number}){
- let minLate=Infinity,dominated=false
- for(const p of perms(stops.length)){
-  const e=evalOrder(stops,m,anchor,p)
-  minLate=Math.min(minLate,e.late)
-  if(e.late===out.late&&e.walk<out.walk&&e.end<=out.end)dominated=true
+/** 窮舉：所有排法的最少晚到站數。 */
+function minLate(stops:ScheduledStop[],m:number[][],anchor:number){
+ let best=Infinity
+ for(const p of perms(stops.length))best=Math.min(best,evalOrder(stops,m,anchor,p).late)
+ return best
+}
+const isFixed=(s:ScheduledStop)=>!!(s.locked||s.custom||s.done)
+/** 段內窮舉：固定站位置不動、每個可移動站留在同一段，所有段內重排中最小的總步行。 */
+function segmentBestWalk(stops:ScheduledStop[],m:number[][],ids:string[]){
+ const ix=(id:string)=>stops.findIndex(s=>s.id===id)+1
+ let total=0,start=0,seg:number[]=[]
+ const flush=(end:number|null)=>{
+  let best=Infinity
+  for(const p of perms(seg.length)){let q=start,w=0;for(const k of p){w+=m[q]![seg[k]!]!;q=seg[k]!}if(end!==null)w+=m[q]![end]!;best=Math.min(best,w)}
+  total+=seg.length?best:(end!==null?m[start]![end]!:0);seg=[]
  }
- return {minLate,dominated}
+ for(const id of ids){const s=stops[ix(id)-1]!;if(isFixed(s)){flush(ix(id));start=ix(id)}else seg.push(ix(id))}
+ flush(null)
+ return total
 }
 const outEval=(stops:ScheduledStop[],m:number[][],anchor:number,ids:string[])=>evalOrder(stops,m,anchor,ids.map(id=>stops.findIndex(s=>s.id===id)))
 function randomCase(r:()=>number,metric:boolean,n=3+Math.floor(r()*4)){
@@ -66,9 +76,7 @@ describe('daily-walk-shortest：總步行最短',()=>{
   const stops:ScheduledStop[]=[{id:'A',minutes:10,candidate:P},{id:'B',minutes:10,candidate:P},{id:'C',minutes:10,candidate:P},{id:'F',locked:true,start:'09:40',minutes:30,candidate:P}]
   const out=scheduleRoute(stops,m,zeros(m),'09:30')
   expect(out.conflicts).toEqual([])
-  const e=outEval(stops,m,570,out.stops.map(s=>s.id))
-  expect(e.walk).toBe(out.travelMinutes)
-  expect(exhaust(stops,m,570,e)).toEqual({minLate:0,dominated:false})
+  expect(out.travelMinutes).toBe(segmentBestWalk(stops,m,out.stops.map(s=>s.id)))
  })
  it('預覽站實測：不能為了少走路，先去晚上的固定行程空等，再把其他站排到半夜',()=>{
   // 0 出發 18:30。F＝22:00 固定行程，離出發點 5 分鐘。A、B 在出發點附近；只比步行時會選 0→F(5)→A(2)→B(2)，
@@ -80,7 +88,17 @@ describe('daily-walk-shortest：總步行最短',()=>{
   expect(out.stops.map(s=>s.id)).toEqual(['A','B','F'])
   expect(out.stops.find(s=>s.id==='B')!.eta).toBe('18:56')
  })
- it('隨機比對窮舉：晚到站數最少；沒有「晚到相同、步行更短、結束不更晚」的排法（含違反三角不等式的矩陣、已過時間的行程）',()=>{
+ it('把關第 1 輪反例：已完成站／沒時間的固定站不能被拉到前面，把店推到晚上的固定行程之後',()=>{
+  //      0  F  A  D
+  const m=[[0,5,10,1],[5,0,1,10],[10,10,0,10],[1,1,10,0]]
+  for(const d of [{done:true},{locked:true}]){
+   const stops:ScheduledStop[]=[{id:'F',locked:true,start:'22:00',minutes:45,candidate:P},{id:'A',minutes:45,candidate:P},{id:'D',...d,candidate:P}]
+   const out=scheduleRoute(stops,m,zeros(m),'18:30')
+   expect(out.stops.map(s=>s.id)).toEqual(['A','F','D'])
+   expect(out.stops.find(s=>s.id==='A')!.eta).toBe('18:40')
+  }
+ })
+ it('隨機比對窮舉：晚到站數最少；固定站位置不動，每段內步行最短（含違反三角不等式的矩陣、已過時間的行程）',()=>{
   let bad=0,late=0
   for(const metric of [true,false]){
    const r=rng(metric?4242:1311)
@@ -89,12 +107,13 @@ describe('daily-walk-shortest：總步行最短',()=>{
     const out=scheduleRoute(s,mm,zeros(mm),'09:30')
     expect(out.stops).toHaveLength(s.length)
     expect(new Set(out.stops.map(x=>x.id)).size).toBe(s.length)
-    const e=outEval(s,mm,570,out.stops.map(x=>x.id))
+    const ids=out.stops.map(x=>x.id)
+    const e=outEval(s,mm,570,ids)
     expect(e.walk).toBe(out.travelMinutes)
     expect(e.late).toBe(out.conflicts.length)
-    const x=exhaust(s,mm,570,e)
-    if(x.minLate>0)late++
-    if(x.minLate!==e.late||x.dominated)bad++
+    const ml=minLate(s,mm,570)
+    if(ml>0)late++
+    if(ml!==e.late||segmentBestWalk(s,mm,ids)!==e.walk)bad++
    }
   }
   expect(late).toBeGreaterThan(100)
