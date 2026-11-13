@@ -13,7 +13,7 @@
   - PR #67 合併（merge `1b2fca13fdb5db59034c3c1d093ba56fc955a49e`），正式部署 `dpl_5aq7SQLex3oNk4Pr26BnQGKKngJ8` READY，真 POST 驗收通過。
   - PR #68（證據與交接檔，只有文件）合併（merge `e80d2bb7d3ee267dd39a52ed2caa59c8691205d2`）。
   - 兩個 PR 都已取消訂閱；安全網排程都已刪除。
-- 進行中：無。沒有寫到一半的檔案。本交接檔用 PR 合併進 main（分支 `claude/sleepy-ritchie-etttn8`）。
+- 進行中：無。沒有寫到一半的檔案。本交接檔用 PR #69 合併進 main（分支 `claude/sleepy-ritchie-etttn8`）。
 - 未開始：
   - P0 本身（Cross 已選，見第 1 段）。
   - 其他候選（做完 P0 再請 Cross 選，不自動做）：已知未修——單站換店時其他自動站保留的舊候選不檢查半徑（`retentionOk` 沒有距離檢查）；手機畫面驗收；試用資料匯出 N4；試用結束後路線 Q2（12-30 前裁定）；🔒 N5 Places 上限、L6 GCP 帳單上限；舊分支清理。
@@ -31,6 +31,7 @@
 - 試了 `git push -f`：被擋，錯誤 `[Git Destructive]`。分支合併後從 main 重開不需要 force，一般 push 即可。
 - 每次 push 都會取消上一個 commit 的 e2e，`required` 顯示 failure。不是程式錯，只看最新 commit。
 - 前景 `sleep`：被擋。用 `run_in_background: true`。
+- 試了用 `create_trigger` 自動開下一棒（`create_new_session_on_fire: true`）：失敗，回傳 `warning: this trigger stores no MCP connectors, so the sessions it fires will run without connector (mcp__<server>__*) tools.`，而且 `sources` 是空的（沒有 repo）。原因：新 session 沒有 Vercel、GitHub 工具，做不了真 POST 和合併。排程已刪（`trig_01LawnG3HvadJmPH9stEZdtk`），改由 Cross 手動開新對話。
 
 ## 5. 要讀哪些檔
 1. 原文：`/root/.claude/projects/-home-user-general-decision/0c4bb33a-395c-534c-ac6f-daadb0e4a0cd.jsonl`。⚠️ 雲端容器回收後就沒了；讀不到時以本檔為準。不要整份讀。
