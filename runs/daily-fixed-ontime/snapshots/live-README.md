@@ -13,3 +13,9 @@
 - creative、coffee（兩版）、meal（late 請求兩版）`closed`：當晚 Google 營業資料，跟本 PR 無關（兩版相同）。
 - late 請求的一蘭派到「一蘭 渋谷スペイン坂店」：固定站名稱比對 Places 的結果，兩版相同，不是本 PR 造成。
 - 逐站摘要：`preview-*.summary.txt`、`main-*.summary.txt`；原始回應：同名 `.json`。
+
+## 把關第 1 輪修正後複驗（commit `5ae7e70`）
+- 2026-11-13 06:52 UTC。預覽站部署 `dpl_3GyiSSLzX348z7TDDNA4EUsbCYBN`（同一分支別名）。正式站同時再打一次（`main-r2-*`）。
+- 結果：`preview-r2-*`、`main-r2-*`。`routeVerified true`；ok 請求兩版都 `conflicts []`、一蘭 ETA 23:30；late 請求兩版都報晚到。
+- 兩版派的店不同（例：正式站 06:41 派スギ薬局、06:52 派マツモトキヨシ）：自動站從前 5 名隨機挑，固定站名稱比對 Places 也會變。同一版前後兩次就不同，不是本 PR 造成。
+- 排程一致性（`live-consistency.txt`，8 份回應逐站重算）：每站 ETA＝上一站離開時間＋步行分鐘（早到等到開始時間）。晚到警告只在「步行分鐘 > 剩餘時間」時出現，分鐘數吻合。

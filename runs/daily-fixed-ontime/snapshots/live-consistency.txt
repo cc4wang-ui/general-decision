@@ -1,0 +1,8 @@
+main-late.json ETA一致 | lunch-fixed: 出發可走=1分 需走=7分 → 晚到 6
+main-ok.json ETA一致 | lunch-fixed: 出發可走=26分 需走=5分 → 準時
+main-r2-late.json ETA一致 | lunch-fixed: 出發可走=1分 需走=7分 → 晚到 6
+main-r2-ok.json ETA一致 | lunch-fixed: 出發可走=26分 需走=4分 → 準時
+preview-late.json ETA一致 | lunch-fixed: 出發可走=1分 需走=7分 → 晚到 6
+preview-ok.json ETA一致 | lunch-fixed: 出發可走=26分 需走=5分 → 準時
+preview-r2-late.json ETA一致 | lunch-fixed: 出發可走=1分 需走=5分 → 晚到 4
+preview-r2-ok.json ETA一致 | lunch-fixed: 出發可走=26分 需走=5分 → 準時

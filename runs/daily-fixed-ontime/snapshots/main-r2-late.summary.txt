@@ -1,0 +1,8 @@
+routeVerified True anchorTime 22:30 conflicts ['一蘭 渋谷店：預計晚到 6 分鐘'] missing ['creative:closed', 'coffee:closed', 'meal:closed'] travelMinutes 21
+creative | - |  | start= |  |  | (none)
+coffee | - |  | start= |  |  | (none)
+lunch-fixed | 22:37 | 0 | start=22:31 | 7 | 預計晚到 6 分鐘 | 一蘭 渋谷スペイン坂店
+shopping | 23:26 | 0 | start= | 4 |  | 薬マツモトキヨシ SHIBUYA SCRAMBLE FLAG
+gym | 00:06 | 1 | start= | 10 |  | フィットイージー 渋谷店
+meal | - |  | start= |  |  | (none)
+rest | - |  | start= |  |  | (none)
