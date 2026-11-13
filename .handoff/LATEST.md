@@ -1,49 +1,48 @@
-# 交接｜next-dev
+# 交接｜daily-open-on-arrival
 狀態：待接手
-建立：2026-11-12 03:40 UTC（03:48 更新）｜環境：Claude Code（雲端容器）｜上下文：約 255k／400k
+建立：2026-11-13 03:27 UTC｜環境：Claude Code（雲端容器）｜上下文：`310,794`／400k（Cross 說 `/anthropic-skills:session-handoff`，所以交接）
 
 ## 1. 下一個對話先做什麼
-1. 用 `mcp__github__pull_request_read`（method `get`，owner `cc4wang-ui`，repo `general-decision`，pullNumber `61`）看 `merged`。沒合併就看第 2 段「進行中」，照那裡做；已合併就用 `mcp__Vercel__list_deployments`（projectId `prj_bKA0WAdn6Nm03CaN5bDARIVAkLmi`，teamId `team_6HL0acbpoaKW1HCfcLy7fA0h`，target `production`）確認最新一筆 `READY`。
-2. 問 Cross 一題（AskUserQuestion，第一個選項標「（建議）」）：「下一步開發哪一項？」選項照第 2 段「未開始」的 B、C、D。Cross 已選就跳過這條。
-3. Cross 選 B、C、D：照第 2 段該項寫的「要 Cross 給什麼」，用一句話請他給，給了再開工。
+1. 確認 PR #65 的正式部署上線：Vercel MCP `list_deployments`（projectId `prj_bKA0WAdn6Nm03CaN5bDARIVAkLmi`、teamId `team_6HL0acbpoaKW1HCfcLy7fA0h`、sha `a7e571bae9bf443f758fc93ce0124a3bb2317b91`），`state` 要是 `READY`。PR #65 只有文件，不用再驗收行為。
+2. 請 Cross 從第 2 段「未開始」選一項。沒選之前不動手，不開下一棒（全部候選都要他選）。
+3. 他選了之後，依 /board-intake 開目標契約（`runs/<代號>/contract.md`），再開工。
 
 ## 2. 做到哪
-- 已完成：候選 A 三個小錯修好，PR #59（分支 `claude/busy-hamilton-4fsj04`）。
-  - O2：`loadDaily` 過濾器加 `t.specified`，重開頁面後指定站不再掉落。Chromium 實測：main 重開後 `stopCards` 是 `1`，修正後是 `2`。
-  - RT2-F1：只剩 rest 時狀態列改說 `今天的行程不用找店家。`。
-  - RT2-F2：缺站點名改成 `missingStops` 與逐站 `noCandidate` 的聯集，依 id 去重。
-  - 測試：`Tests  1195 passed (1195)`；修正前新測試 `Tests  4 failed | 69 passed (73)`；lint 0；`npm run typecheck` exit 0。
-  - CI：`check (tsc + lint + vitest)` success；Vercel 預覽 Ready。
-- 外部動作（做了，不要重做）：push 分支、開草稿 PR #59、訂閱 PR #59、設備援檢查排程 `trig_0172q2gd8EqvRppoyFdSuGwF`（04:25 UTC 觸發）。本交接檔也 commit 到 PR #59 同一分支。
-- 已完成（03:45 起）：PR #59 合併（merge `73725ec8c09afcd8f9407324de05c99ddb367c57`），正式部署 `dpl_81csT3HrcZ763eqtoLJPLBkFfeZN` 寫檔時 `BUILDING`；#59 訂閱已取消、排程 `trig_0172q2gd8EqvRppoyFdSuGwF` 已刪。Cross 選 E（AskUserQuestion 回答 `E 修自動站消失（建議）`）；E 已修、開草稿 PR #61（同分支，從 main 重開），已訂閱，備援排程 `trig_014oixDQTGY2jL5dGRzVWRwB`（04:37 UTC）。E 實測：重開前 `6`、重開後 `6`、第一次進來 `0`；`Tests  1196 passed (1196)`。
-- 進行中：PR #61 等 CI。合併 main 會觸發正式部署（保留事項），要 Cross 說 `核准`；寫檔時還沒核准。本 session 還訂閱著。
-- 未開始：下一步開發，等 Cross 選。候選（依建議順序）：
-  - B 2.4 行為回饋迴圈（新功能）。要 Cross 給：核准 Q1–Q11。⚠️ 設計稿在 `~/workspace/general-decision-core-loop-2.0/design-2.4/DESIGN-feedback-loop.md`，不在 repo、容器裡也沒有；Cross 手上沒有就要重寫設計稿。
-  - C 用試用資料調派店規則（ROADMAP N4、N6）。要 Cross 給：在 App 除錯畫面按一次「匯出」，把檔案給我們。
-  - D Cross 的待決清單，只要裁定：hygiene 報告 #10 試用結束日（12-30 或 12-29）、#14 產品主次（核心班長 vs 今日行程）、#19 直傳時代部署工具要不要拿掉、#20 `npm run taste` 要不要留；ROADMAP N5 Places 上限 🔒、L3 聯絡信箱、L6 GCP 帳單上限 🔒、L7 遙測 🔒。另 2.3 AKOMEYA 按鈕文案待裁。
-  - 舊分支清理（被擋）：已合併的 9 個遠端分支要刪：`claude/fable-repo-hygiene-ui-redesign-6h7sxl`、`claude/handoff-daily-layout-hha4hi`、`docs/adr-001`、`docs/adr-002`、`docs/roadmap-2.0`、`feature/daily-intent-first`、`feature/start-time-input`、`server/pr2-partial-seen`、`step3/stryker-threshold`。未合併的不刪：`claude/vigilant-clarke-dsrqfi`（9 commits）、`progress/memory-sync`（1 commit）。
-  - 上一份交接檔的草稿 PR（分支 `claude/handoff-daily-layout-j63hzm`）被本檔取代，要不要關由 Cross 決定。
+- 已完成（本棒）：
+  - R3 修好：`api/daily-route.ts` 換店挑選鏈尾加 `??usable[0]`（估計挑不到就交給下一輪 Routes 實算）。
+  - 預覽站實測抓到壞資料：fallback 派了阿曼馬斯喀特的咖啡廳（`travelMin 161849`、`etaDayOffset 113`）。修法：換店只用 `SEARCH_BIAS_M`（3500 m）內的候選。
+  - 把關第 2 輪 FAIL：半徑以出發點為中心時，開地區偏好且出發點離地區 4.4 km，地區內營業的店被誤標 `closed`。修法：中心改 `areaPref??center`。
+  - 新增 3 條回歸測試，全套 `Tests 1219 passed (1219)`。ROADMAP §6「今日行程到店要開著」已改 `✅ 2026-11-12`。
+  - PR #64 合併（merge `1c58ba30362aed8065270869eaf7c63a48ab2e67`），Cross 原話 `核准`。正式部署 `dpl_5rki61Mgzs427x4Xq2F9vWs9SSH3` READY，真 POST 驗收通過。
+  - PR #65（正式站證據，只有文件）合併（merge `a7e571bae9bf443f758fc93ce0124a3bb2317b91`），Cross 原話 `核准`。
+- 外部動作（做了，不要重做）：PR #64、#65 已合併，兩個都已取消訂閱。安全網排程都已刪除。Vercel 分享連結已建：預覽站 1 個、正式部署 `general-decision-6woc2f537` 1 個、舊正式部署 `general-decision-oqjn9r7zk` 2 個（都 23 小時後失效）。本交接檔 push 到分支 `claude/handoff-daily-open-arrival-prquy1`。
+- 進行中：無。沒有寫到一半的檔案。
+- 未開始（都要 Cross 選，不自動做）：
+  - A 新發現：開地區偏好且出發點離地區很遠時，第一次搜尋以出發點為中心（`locationBias`），店都在地區外，被標 `area`。main 原本就有。證據 `runs/daily-open-on-arrival/snapshots/main-area-2230.summary.txt`。
+  - B 第一次挑店（前 5 名隨機）沒有半徑限制，池子不到 5 家時可能抽到遠店。main 原本就有。
+  - 舊候選：有固定行程時排程可能遲到（`STATE.md` P0）；手機畫面驗收；試用資料匯出 N4；試用結束後路線 Q2（12-30 前裁定）；🔒 N5 Places 上限、L6 GCP 帳單上限。
+  - 舊分支清理：自動模式擋刪遠端分支，要 Cross 加權限或在 GitHub 網頁刪。
 
 ## 3. 做了哪些決定和為什麼
-- 把 Cross 的 `核准` 當成選 A，因為上一棒建議 A，而且 A 不用拍板方向；Claude.md「能假設就不問」。
-- O2 用「過濾器保留指定站」，不用上一份交接檔預設的「掛載重跑 `replanDaily`」，因為重跑會替 `tasks: []` 的空行程自動長出整條目錄行程，改掉「今天還沒有行程」空狀態（PR #57 才剛修過這個畫面）。
-- 過濾器保留範圍是 `t.specified`（不只 `intentSpecified`），因為逐站指定的地點是使用者輸入的，濾掉等於丟資料。
-- 前端 `isTextOnlyRest` 照抄伺服器 `api/daily-route.ts:34` 的規則，因為兩邊判斷「不用找店」必須一致。
-- 分級 S（同一 context 自查，沒開獨立把關者），因為只是可復原的修錯，不對外、不動錢。
-- 交接檔加進 PR #59 同一分支，因為合併 main 會觸發正式部署（保留事項）；併在一起只部署一次。
-- E 的修法是過濾器保留目錄 id（`catalogTitle(t.id) !== undefined`），因為目錄站都能重建、來路不明的 id 照舊濾掉才安全；空行程不受影響。
-- 這一棒不自動開下一棒，因為「下一步做什麼」是定目標，屬 Cross（Claude.md §4）；Cross 原話：`寫交接檔 看下一步要開發甚麼`。
+- fallback 用 `usable[0]`（池裡第一個沒試過的），因為估計只是排順序；派不派由下一輪 Routes 實際 ETA 決定，最後一輪仍標 `closed`，不會派到關門的店。
+- 換店半徑用 3500 m，因為跟 Places 搜尋 `locationBias` 半徑同一個數（抽成常數 `SEARCH_BIAS_M`），不新增魔術數字。
+- 開地區偏好時半徑中心用地區中心，因為池子已被 `areaOk` 限在地區 1 km 內，用出發點會把地區內的店丟掉（把關第 2 輪實測）。
+- 地區偏好的修正沒送第 3 輪把關，因為 Claude.md 規則 3「審查最多兩輪」。改用回歸測試加預覽站／正式站真 POST 比對。
+- A、B 兩個既有問題不在本 PR 修，因為不在 R3 範圍，而且 main 原本就有；新正式站與舊正式站結果相同。
+- ROADMAP 提早標 ✅（把關說太早），保留，因為那列記的是已上線的 PR #63，交接檔原本就指定這樣改。
+- 正式站 22:30 藝廊、咖啡標 `closed`，判定不是退步，因為同一份請求打舊正式部署結果相同；18:00 出發兩版都派得出咖啡。
 
 ## 4. 試過但行不通的
-- 試了用 `git push origin --delete <9 個分支>` 刪已合併舊分支：失敗，錯誤 `Permission for this action was denied by the Claude Code auto mode classifier. Reason: [Git Destructive].`。原因：自動模式把刪遠端分支當破壞性動作。不要再試同一指令；要 Cross 加權限規則，或他在 GitHub 網頁刪。
-- 試了用讀 localStorage 驗 O2：失敗，修正前後都印 `"after":["meal:一蘭"]`。原因：`loadDaily` 只過濾記憶體裡的狀態，不改存檔。要數畫面上的 `article.dd-stop` 卡片才驗得到。
-- 上一棒的坑仍有效：CI 安裝瀏覽器 DNS 失敗已用重試解決，不要手動重跑等它好；今日行程不要加位移進場動畫（會捲走 `151` px）。
+- 試了只加 `??usable[0]`、不限距離（commit `139ba43`）：預覽站派到阿曼的店。原因：Places `locationBias` 只是偏好，池裡有遠店。已在 `584a574` 修。不要退回。
+- 試了換店半徑以出發點為中心（commit `584a574`）：把關第 2 輪 FAIL，`missingStops:[{"id":"meal","reason":"closed"}]`。原因：地區偏好模式下出發點可能離地區很遠。已在 `0f6b6a8` 修。不要退回。
+- 前景 `sleep 100`：被擋，錯誤 `Blocked: sleep 100 followed by: echo done. To wait for a condition, use Monitor with an until-loop`。改用 `run_in_background: true` 的 `sleep 90`。
+- 舊 Vercel 分享連結重用：回 `HTTP 401`。原因：要重新呼叫 `get_access_to_vercel_url` 取新連結，再用新 cookie。
+- 舊 commit 的 CI `required` 顯示 failure：不是程式錯，是新 push 取消舊 run 的 e2e（`e2e (Playwright) cancelled`）。只看最新 commit。
 
 ## 5. 要讀哪些檔
-1. 原文：`/root/.claude/projects/-home-user-general-decision/f9810b10-d9f8-5b15-8cdf-d4b248337a25.jsonl`。⚠️ 雲端容器回收後就沒了；讀不到時以本檔為準。對話網址：`https://claude.ai/code/session_01NsUyzm3MPvrwvRa4Q3HvYQ`。檢索方法見 §7。不要整份讀。
-2. `docs/ROADMAP.md` — §0 試用期規則、§6 待 Cross 清單、§7.5 2.4 狀態、§7.6 O2 修法紀錄。
-3. `runs/hygiene-ui-1111/reports/hygiene.md` — 24 條衝突清單，#10、#14、#19、#20 待 Cross。
-4. `src/dailyDecision.tsx` — `loadDaily` 過濾器（O2、E 都改在這）；`buildDaily`、`replanDaily` 決定站怎麼長出來。
-5. `STATE.md` — 產品規則與踩過的坑；開工前先讀。
-6. `.handoff/20261111-0627-daily-layout.md` — 今日行程的 testid、色盤守門、版面坑。
-7. `/tmp/claude-0/e2e/o2.cjs` — Chromium 驗 O2 的腳本（容器回收就沒了；寫法：vite dev 開 5179 port，`page.route('**/api/**')` 回 503，數 `article.dd-stop`）。
+1. 原文：`/root/.claude/projects/-home-user-general-decision/be0104e5-6c31-5eac-9965-5878be7777a4.jsonl`。⚠️ 雲端容器回收後就沒了；讀不到時以本檔為準。檢索方法見 session-handoff §7。不要整份讀。
+2. `runs/daily-open-on-arrival/contract.md` — 凍結的目標契約（7 條 STOP），本件已全部達成。
+3. `runs/daily-open-on-arrival/snapshots/live-README.md` — 所有真 API 證據的說明（預覽站、地區偏好、正式站）。
+4. `api/daily-route.ts` — 搜 `SEARCH_BIAS_M`、`MAX_ROUTE_ROUNDS`：換店邏輯。做候選 A、B 都從這裡開始。
+5. `tests/unit/daily-open-on-arrival.test.ts` — 23 條測試與 Routes mock 寫法。
+6. `docs/ROADMAP.md`、`STATE.md` — 候選項目的來源。
