@@ -35,4 +35,5 @@
 - 現象（正式站現場重現，iPhone＋WebKit 兩次）：把晚餐標記完成後重新排路線，已完成站被排到行程最後、給未來 ETA **03:19 抵達**，還多算一段步行（報告 annotation `done-stop-eta: 03:19`；`snapshots/iphone-shuffle-2-swap.json` meal 站 `done:true` 卻 `eta 03:19`）。
 - 根因：`api/daily-route.ts` 排路線時把 `done` 站當成沒有 `start` 的固定站，排進 `scheduleRoute` 的矩陣。
 - 修正（本分支）：排路線只收 `!s.done` 的站（`routable`）；已完成站留在原位、不給 ETA、不算步行。新增單元測試 `tests/unit/daily-route.test.ts`「已完成站不排進路線」，拔掉修正會 FAIL。
-- ⚠️ 未部署：Vercel 每日部署上限（約 2026-11-14 10:00 UTC 前）。本頁正式站證據是**舊版**；修正以單元測試驗，正式站重驗待上限恢復＋合併後。設 `EXPECT_DONE_FIX=1` 可讓 prod 測試對已完成站 ETA 做嚴格檢查（部署後用）。
+- **預覽站實測 PASS（2026-11-13 10:3x UTC）**：部署上限已恢復，PR #77 預覽 `dpl_ArQZpgwumkAVJuvdjncSobKrcxWr`（commit `532ec8e`）READY。用 `EXPECT_DONE_FIX=1` 對預覽站跑 iPhone＋WebKit 共 4 個測試全過；已完成站（権八）換站後、重新搜尋後都**沒有 ETA**（`preview/snapshots/*-shuffle-2-swap.json`、`*-3-regenerate.json`；截圖 `preview/shots/`；報告 `preview/reports/e2e-report.json`）。
+- 正式站：合併後再用 `EXPECT_DONE_FIX=1` 跑一次。

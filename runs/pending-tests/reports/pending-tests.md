@@ -1,6 +1,6 @@
 # 小組報告｜pending-tests
 
-結論：STATE.md 第 3 段四項待測全部在正式站 `general-decision.vercel.app` 用真 API、四種裝置（iPhone／iPad／桌機／WebKit）跑過瀏覽器 E2E，附截圖、錄影、API 快照。過程測出一個正式站 bug：已完成站被排進未來路線（顯示 03:19 抵達、多算步行），已在本分支修正並加單元測試（拔掉會 FAIL），因 Vercel 每日部署上限未部署。單元全綠 1248→1249。
+結論：STATE.md 第 3 段四項待測全部在正式站 `general-decision.vercel.app` 用真 API、四種裝置（iPhone／iPad／桌機／WebKit）跑過瀏覽器 E2E，附截圖、錄影、API 快照。過程測出一個正式站 bug：已完成站被排進未來路線（顯示 03:19 抵達、多算步行），已在本分支修正並加單元測試（拔掉會 FAIL）。單元全綠 1247→1248。預覽站已用嚴格模式驗過修正（已完成站無 ETA）。
 
 ## STOP 自查（逐條，附證據）
 1. **P0 正式站 E2E** — PASS。四裝置 `routeVerified:true`、無未驗證警告、含 2 個固定行程、真店名＋地址＋ETA、console error 0。證據 `snapshots/*-generate.json`、`snapshots/live-README.md` §1、`shots/*-3-itinerary.jpg`。
@@ -11,10 +11,11 @@
 ## 產出檔案
 - `tests/prod/daily-prod.spec.ts`、`playwright.prod.config.ts`（正式站 E2E，不攔截 API）
 - `api/daily-route.ts`（修正：已完成站不排進路線）
-- `tests/unit/daily-route.test.ts`（+1 回歸測試）
+- `tests/unit/daily-route.test.ts`（+1 回歸測試，116→117）
 - `runs/pending-tests/snapshots/live-README.md`、`reports/e2e-report.json`、`shots/`（24 張 JPG）、`videos/`（6 支）
 
 ## 未完成／⚠️ 假設
-- ⚠️ 正式站證據是**舊版** main：修正未部署（Vercel 每日部署上限，約 2026-11-14 10:00 UTC 前）。修正以單元測試驗；正式站重驗待上限恢復＋合併後（`EXPECT_DONE_FIX=1`）。
+- 修正已在預覽站實測 PASS（`preview/`）；正式站待合併部署後用 `EXPECT_DONE_FIX=1` 重驗。
+- 把關第 1 輪：PASS，已知未修 3 項（正式站重驗、真 iPhone、報告數字差 1 已更正）。
 - ⚠️ 真 iPhone Safari 實機由 Cross 一次性確認（步驟已附）；WebKit 引擎已在容器驗過。
 - ⚠️ Places 真資料每次店名可能不同；只驗結構與保留行為，不驗特定店名（契約假設）。

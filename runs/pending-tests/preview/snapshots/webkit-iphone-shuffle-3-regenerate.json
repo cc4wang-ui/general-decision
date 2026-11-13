@@ -1,0 +1,2013 @@
+{
+  "origin": {
+    "id": "ChIJnxAAO1aLGGARJqvi8d4oczM",
+    "name": "渋谷駅",
+    "address": "日本、〒150-0002 東京都渋谷区渋谷２丁目２４",
+    "mapUrl": "https://maps.google.com/?cid=3707351856262064934&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+    "lat": 35.6580339,
+    "lng": 139.7016358,
+    "rating": 3.9,
+    "types": [
+      "transit_station",
+      "subway_station",
+      "train_station",
+      "point_of_interest",
+      "transportation_service",
+      "establishment"
+    ],
+    "primaryType": "transit_station",
+    "userRatingCount": 5465
+  },
+  "stops": [
+    {
+      "id": "meal",
+      "kind": "meal",
+      "title": "権八",
+      "place": "日本、〒150-0044 東京都渋谷区円山町３−６ E・スペースタワー １４Ｆ フロアA",
+      "locked": false,
+      "done": true,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 45,
+      "candidate": {
+        "id": "ChIJ3TUL91WLGGARNQVCAWLb0kw",
+        "name": "権八",
+        "address": "日本、〒150-0044 東京都渋谷区円山町３−６ E・スペースタワー １４Ｆ フロアA",
+        "mapUrl": "https://maps.google.com/?cid=5535728105966142773&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6574935,
+        "lng": 139.6955514,
+        "rating": 4.2,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 0,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            },
+            "close": {
+              "day": 1,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 1,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            },
+            "close": {
+              "day": 2,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 2,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            },
+            "close": {
+              "day": 3,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 3,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 4,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 23,
+              "minute": 59,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 0,
+              "minute": 0,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 5,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 6,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 6,
+              "hour": 11,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            },
+            "close": {
+              "day": 0,
+              "hour": 3,
+              "minute": 30,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            }
+          }
+        ],
+        "types": [
+          "japanese_restaurant",
+          "sushi_restaurant",
+          "japanese_izakaya_restaurant",
+          "meal_delivery",
+          "food_delivery",
+          "restaurant",
+          "food",
+          "point_of_interest",
+          "establishment"
+        ],
+        "primaryType": "japanese_restaurant",
+        "userRatingCount": 2330
+      }
+    },
+    {
+      "id": "gym",
+      "kind": "gym",
+      "title": "FIT-EASY｜80 分鐘力量訓練",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 80,
+      "noCandidate": true,
+      "noCandidateReason": "filtered"
+    },
+    {
+      "id": "creative",
+      "kind": "creative",
+      "title": "Gallery Conceal Shibuya",
+      "place": "日本、〒150-0043 東京都渋谷区道玄坂１丁目１１−４ 第１富士商事ビル 4F",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 65,
+      "candidate": {
+        "id": "ChIJSZTctFeLGGARjJZlYwb88Ic",
+        "name": "Gallery Conceal Shibuya",
+        "address": "日本、〒150-0043 東京都渋谷区道玄坂１丁目１１−４ 第１富士商事ビル 4F",
+        "mapUrl": "https://maps.google.com/?cid=9795606293898434188&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6576082,
+        "lng": 139.6987605,
+        "rating": 4.1,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 0,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            },
+            "close": {
+              "day": 0,
+              "hour": 20,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 1,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            },
+            "close": {
+              "day": 1,
+              "hour": 20,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 2,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            },
+            "close": {
+              "day": 2,
+              "hour": 20,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 3,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            },
+            "close": {
+              "day": 3,
+              "hour": 20,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 4,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 20,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 5,
+              "hour": 20,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 6,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            },
+            "close": {
+              "day": 6,
+              "hour": 20,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            }
+          }
+        ],
+        "types": [
+          "art_gallery",
+          "cafe",
+          "event_venue",
+          "food",
+          "point_of_interest",
+          "establishment"
+        ],
+        "primaryType": "art_gallery",
+        "userRatingCount": 106
+      },
+      "eta": "19:31",
+      "departure": "20:36",
+      "etaDayOffset": 0,
+      "departureDayOffset": 0,
+      "travelMin": 6,
+      "openAtEta": "open"
+    },
+    {
+      "id": "fixed-1794565533586-6",
+      "kind": "rest",
+      "title": "看唱片",
+      "place": "日本、〒150-0041 東京都渋谷区神南１丁目２２−１４",
+      "locked": true,
+      "done": false,
+      "custom": true,
+      "specified": false,
+      "start": "21:25",
+      "minutes": 30,
+      "candidate": {
+        "id": "ChIJ1Ya6fqiMGGAR8FTtP_6yeMg",
+        "name": "タワーレコード 渋谷店",
+        "address": "日本、〒150-0041 東京都渋谷区神南１丁目２２−１４",
+        "mapUrl": "https://maps.google.com/?cid=14445492609854821616&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.661904899999996,
+        "lng": 139.7010906,
+        "rating": 4.4,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 0,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            },
+            "close": {
+              "day": 0,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 1,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            },
+            "close": {
+              "day": 1,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 2,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            },
+            "close": {
+              "day": 2,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 3,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            },
+            "close": {
+              "day": 3,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 4,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 5,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 6,
+              "hour": 11,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            },
+            "close": {
+              "day": 6,
+              "hour": 22,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            }
+          }
+        ],
+        "types": [
+          "cafe",
+          "book_store",
+          "electronics_store",
+          "movie_rental",
+          "clothing_store",
+          "service",
+          "food",
+          "point_of_interest",
+          "store",
+          "establishment"
+        ],
+        "primaryType": "store",
+        "userRatingCount": 14994
+      },
+      "eta": "21:25",
+      "departure": "21:55",
+      "etaDayOffset": 0,
+      "departureDayOffset": 0,
+      "travelMin": 10,
+      "openAtEta": "open"
+    },
+    {
+      "id": "fixed-1794565534115-7",
+      "kind": "rest",
+      "title": "宵夜",
+      "place": "日本、〒150-0041 東京都渋谷区神南１丁目２２−７ 岩本ビル B1F",
+      "locked": true,
+      "done": false,
+      "custom": true,
+      "specified": false,
+      "start": "22:25",
+      "minutes": 40,
+      "candidate": {
+        "id": "ChIJOWucdKiMGGARbppa4b4CKA8",
+        "name": "一蘭 渋谷店",
+        "address": "日本、〒150-0041 東京都渋谷区神南１丁目２２−７ 岩本ビル B1F",
+        "mapUrl": "https://maps.google.com/?cid=1092125928485198446&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6611185,
+        "lng": 139.7009846,
+        "rating": 4.4,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 5,
+              "hour": 0,
+              "minute": 0,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 23,
+              "minute": 59,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          }
+        ],
+        "types": [
+          "ramen_restaurant",
+          "chinese_noodle_restaurant",
+          "noodle_shop",
+          "snack_bar",
+          "japanese_restaurant",
+          "meal_takeaway",
+          "restaurant",
+          "food",
+          "point_of_interest",
+          "establishment"
+        ],
+        "primaryType": "ramen_restaurant",
+        "userRatingCount": 5336
+      },
+      "eta": "22:25",
+      "departure": "23:05",
+      "etaDayOffset": 0,
+      "departureDayOffset": 0,
+      "travelMin": 2,
+      "openAtEta": "open"
+    },
+    {
+      "id": "coffee",
+      "kind": "creative",
+      "title": "安靜咖啡廳｜閱讀、寫下 3 個新觀察",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 60,
+      "noCandidate": true,
+      "noCandidateReason": "closed"
+    },
+    {
+      "id": "shopping",
+      "kind": "shopping",
+      "title": "FUGLEN TOKYO",
+      "place": "日本、〒151-0063 東京都渋谷区富ケ谷１丁目１６−１１",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": true,
+      "start": "",
+      "minutes": 55,
+      "candidate": {
+        "id": "ChIJrWB6lbKMGGARp0QB0mMSNe4",
+        "name": "FUGLEN TOKYO",
+        "address": "日本、〒151-0063 東京都渋谷区富ケ谷１丁目１６−１１",
+        "mapUrl": "https://maps.google.com/?cid=17164645774726874279&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+        "lat": 35.6666181,
+        "lng": 139.6923999,
+        "rating": 4.3,
+        "openNow": true,
+        "hours": [
+          {
+            "open": {
+              "day": 0,
+              "hour": 7,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            },
+            "close": {
+              "day": 1,
+              "hour": 1,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 1,
+              "hour": 7,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            },
+            "close": {
+              "day": 1,
+              "hour": 23,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 16
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 2,
+              "hour": 7,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            },
+            "close": {
+              "day": 2,
+              "hour": 23,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 17
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 3,
+              "hour": 7,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 18
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 1,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 4,
+              "hour": 7,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            },
+            "close": {
+              "day": 4,
+              "hour": 23,
+              "minute": 59,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 19
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 0,
+              "minute": 0,
+              "truncated": true,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 5,
+              "hour": 1,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 5,
+              "hour": 7,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 13
+              }
+            },
+            "close": {
+              "day": 6,
+              "hour": 1,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            }
+          },
+          {
+            "open": {
+              "day": 6,
+              "hour": 7,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 14
+              }
+            },
+            "close": {
+              "day": 0,
+              "hour": 1,
+              "minute": 0,
+              "date": {
+                "year": 2026,
+                "month": 11,
+                "day": 15
+              }
+            }
+          }
+        ],
+        "types": [
+          "coffee_shop",
+          "coffee_stand",
+          "cocktail_bar",
+          "cafe",
+          "food_store",
+          "bar",
+          "food",
+          "store",
+          "point_of_interest",
+          "establishment"
+        ],
+        "primaryType": "coffee_shop",
+        "userRatingCount": 3867
+      },
+      "eta": "23:21",
+      "departure": "00:16",
+      "etaDayOffset": 0,
+      "departureDayOffset": 1,
+      "travelMin": 16,
+      "openAtEta": "open"
+    },
+    {
+      "id": "rest",
+      "kind": "rest",
+      "title": "散步回家、休息與晚餐",
+      "place": "",
+      "locked": false,
+      "done": false,
+      "custom": false,
+      "specified": false,
+      "start": "",
+      "minutes": 75
+    }
+  ],
+  "distanceKm": 2.2,
+  "travelMinutes": 34,
+  "conflicts": [],
+  "partial": true,
+  "missingStops": [
+    {
+      "id": "gym",
+      "reason": "filtered"
+    },
+    {
+      "id": "coffee",
+      "reason": "closed"
+    }
+  ],
+  "anchorTime": "19:25",
+  "routeVerified": true,
+  "travelMode": "WALK",
+  "verifiedSource": "Google Places + Google Routes",
+  "searchedAt": "2026-11-13T10:25:45.306Z",
+  "warning": "步行時間為 Google Routes 預估；到店營業判斷依 Google 營業時間，交通狀況與營業資訊可能變動。固定行程衝突會顯示警告。",
+  "_request": {
+    "location": "渋谷駅",
+    "area": "澀谷",
+    "areaOnly": true,
+    "startTime": "",
+    "stops": [
+      {
+        "id": "fixed-1794565533586-6",
+        "kind": "rest",
+        "title": "看唱片",
+        "place": "日本、〒150-0041 東京都渋谷区神南１丁目２２−１４",
+        "locked": true,
+        "done": false,
+        "custom": true,
+        "specified": false,
+        "start": "21:25",
+        "minutes": 30,
+        "candidate": {
+          "id": "ChIJ1Ya6fqiMGGAR8FTtP_6yeMg",
+          "name": "タワーレコード 渋谷店",
+          "address": "日本、〒150-0041 東京都渋谷区神南１丁目２２−１４",
+          "mapUrl": "https://maps.google.com/?cid=14445492609854821616&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+          "lat": 35.661904899999996,
+          "lng": 139.7010906,
+          "rating": 4.4,
+          "openNow": true,
+          "hours": [
+            {
+              "open": {
+                "day": 0,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 15
+                }
+              },
+              "close": {
+                "day": 0,
+                "hour": 22,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 15
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 1,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              },
+              "close": {
+                "day": 1,
+                "hour": 22,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 2,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 17
+                }
+              },
+              "close": {
+                "day": 2,
+                "hour": 22,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 17
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 3,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 18
+                }
+              },
+              "close": {
+                "day": 3,
+                "hour": 22,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 18
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 4,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 22,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 5,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              },
+              "close": {
+                "day": 5,
+                "hour": 22,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 6,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 14
+                }
+              },
+              "close": {
+                "day": 6,
+                "hour": 22,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 14
+                }
+              }
+            }
+          ],
+          "types": [
+            "cafe",
+            "book_store",
+            "electronics_store",
+            "movie_rental",
+            "clothing_store",
+            "service",
+            "food",
+            "point_of_interest",
+            "store",
+            "establishment"
+          ],
+          "primaryType": "store",
+          "userRatingCount": 14994
+        },
+        "eta": "21:25",
+        "departure": "21:55",
+        "etaDayOffset": 0,
+        "departureDayOffset": 0,
+        "travelMin": 14,
+        "openAtEta": "open"
+      },
+      {
+        "id": "fixed-1794565534115-7",
+        "kind": "rest",
+        "title": "宵夜",
+        "place": "日本、〒150-0041 東京都渋谷区神南１丁目２２−７ 岩本ビル B1F",
+        "locked": true,
+        "done": false,
+        "custom": true,
+        "specified": false,
+        "start": "22:25",
+        "minutes": 40,
+        "candidate": {
+          "id": "ChIJOWucdKiMGGARbppa4b4CKA8",
+          "name": "一蘭 渋谷店",
+          "address": "日本、〒150-0041 東京都渋谷区神南１丁目２２−７ 岩本ビル B1F",
+          "mapUrl": "https://maps.google.com/?cid=1092125928485198446&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+          "lat": 35.6611185,
+          "lng": 139.7009846,
+          "rating": 4.4,
+          "openNow": true,
+          "hours": [
+            {
+              "open": {
+                "day": 5,
+                "hour": 0,
+                "minute": 0,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 23,
+                "minute": 59,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            }
+          ],
+          "types": [
+            "ramen_restaurant",
+            "chinese_noodle_restaurant",
+            "noodle_shop",
+            "snack_bar",
+            "japanese_restaurant",
+            "meal_takeaway",
+            "restaurant",
+            "food",
+            "point_of_interest",
+            "establishment"
+          ],
+          "primaryType": "ramen_restaurant",
+          "userRatingCount": 5336
+        },
+        "eta": "22:25",
+        "departure": "23:05",
+        "etaDayOffset": 0,
+        "departureDayOffset": 0,
+        "travelMin": 2,
+        "openAtEta": "open"
+      },
+      {
+        "id": "meal",
+        "kind": "meal",
+        "title": "権八",
+        "place": "日本、〒150-0044 東京都渋谷区円山町３−６ E・スペースタワー １４Ｆ フロアA",
+        "locked": false,
+        "done": true,
+        "custom": false,
+        "specified": false,
+        "start": "",
+        "minutes": 45,
+        "candidate": {
+          "id": "ChIJ3TUL91WLGGARNQVCAWLb0kw",
+          "name": "権八",
+          "address": "日本、〒150-0044 東京都渋谷区円山町３−６ E・スペースタワー １４Ｆ フロアA",
+          "mapUrl": "https://maps.google.com/?cid=5535728105966142773&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+          "lat": 35.6574935,
+          "lng": 139.6955514,
+          "rating": 4.2,
+          "openNow": true,
+          "hours": [
+            {
+              "open": {
+                "day": 0,
+                "hour": 11,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 15
+                }
+              },
+              "close": {
+                "day": 1,
+                "hour": 3,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 1,
+                "hour": 11,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              },
+              "close": {
+                "day": 2,
+                "hour": 3,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 17
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 2,
+                "hour": 11,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 17
+                }
+              },
+              "close": {
+                "day": 3,
+                "hour": 3,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 18
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 3,
+                "hour": 11,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 18
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 3,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 4,
+                "hour": 11,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 23,
+                "minute": 59,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 5,
+                "hour": 0,
+                "minute": 0,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              },
+              "close": {
+                "day": 5,
+                "hour": 3,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 5,
+                "hour": 11,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              },
+              "close": {
+                "day": 6,
+                "hour": 3,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 14
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 6,
+                "hour": 11,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 14
+                }
+              },
+              "close": {
+                "day": 0,
+                "hour": 3,
+                "minute": 30,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 15
+                }
+              }
+            }
+          ],
+          "types": [
+            "japanese_restaurant",
+            "sushi_restaurant",
+            "japanese_izakaya_restaurant",
+            "meal_delivery",
+            "food_delivery",
+            "restaurant",
+            "food",
+            "point_of_interest",
+            "establishment"
+          ],
+          "primaryType": "japanese_restaurant",
+          "userRatingCount": 2330
+        }
+      },
+      {
+        "id": "gym",
+        "title": "フィットイージー 渋谷店",
+        "minutes": 80,
+        "kind": "gym",
+        "place": "日本、〒150-0031 東京都渋谷区桜丘町１−４ 渋谷サクラステージ ＳＨＩＢＵＹＡサイド ２Ｆ・３Ｆ",
+        "locked": false,
+        "done": false,
+        "custom": false,
+        "specified": false,
+        "start": "",
+        "candidate": {
+          "id": "ChIJ6VgA7F-LGGARR2KB-KOCP3o",
+          "name": "フィットイージー 渋谷店",
+          "address": "日本、〒150-0031 東京都渋谷区桜丘町１−４ 渋谷サクラステージ ＳＨＩＢＵＹＡサイド ２Ｆ・３Ｆ",
+          "mapUrl": "https://maps.google.com/?cid=8808903036920488519&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+          "lat": 35.6564735,
+          "lng": 139.70252929999998,
+          "rating": 4.1,
+          "openNow": true,
+          "hours": [
+            {
+              "open": {
+                "day": 5,
+                "hour": 0,
+                "minute": 0,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 23,
+                "minute": 59,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            }
+          ],
+          "types": [
+            "gym",
+            "lounge_bar",
+            "sauna",
+            "night_club",
+            "bar",
+            "spa",
+            "sports_activity_location",
+            "beauty_salon",
+            "health",
+            "public_bath",
+            "service",
+            "point_of_interest",
+            "establishment"
+          ],
+          "primaryType": "gym",
+          "userRatingCount": 151
+        },
+        "eta": "19:33",
+        "departure": "20:53",
+        "etaDayOffset": 0,
+        "departureDayOffset": 0,
+        "travelMin": 8,
+        "openAtEta": "open"
+      },
+      {
+        "id": "creative",
+        "title": "バツアートギャラリー",
+        "minutes": 65,
+        "kind": "creative",
+        "place": "日本、〒150-0001 東京都渋谷区神宮前５丁目１１−５",
+        "locked": false,
+        "done": false,
+        "custom": false,
+        "specified": false,
+        "start": "",
+        "candidate": {
+          "id": "ChIJuflD_qOMGGARqAaHfOo7pcE",
+          "name": "バツアートギャラリー",
+          "address": "日本、〒150-0001 東京都渋谷区神宮前５丁目１１−５",
+          "mapUrl": "https://maps.google.com/?cid=13953624898774959784&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+          "lat": 35.6668538,
+          "lng": 139.70665,
+          "rating": 3.9,
+          "types": [
+            "art_gallery",
+            "point_of_interest",
+            "establishment"
+          ],
+          "primaryType": "art_gallery",
+          "userRatingCount": 96
+        },
+        "eta": "00:32",
+        "departure": "01:37",
+        "etaDayOffset": 1,
+        "departureDayOffset": 1,
+        "travelMin": 14,
+        "openAtEta": "unknown"
+      },
+      {
+        "id": "coffee",
+        "title": "note",
+        "minutes": 60,
+        "kind": "creative",
+        "place": "東京都渋谷区渋谷2-10-15 NV B1, ２丁目-１０ 渋谷 渋谷区 東京都 150-0002 日本",
+        "locked": false,
+        "done": false,
+        "custom": false,
+        "specified": false,
+        "start": "",
+        "candidate": {
+          "id": "ChIJ23hNB3OLGGARcdSaCwLXTvw",
+          "name": "note",
+          "address": "東京都渋谷区渋谷2-10-15 NV B1, ２丁目-１０ 渋谷 渋谷区 東京都 150-0002 日本",
+          "mapUrl": "https://maps.google.com/?cid=18180705149525873777&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+          "lat": 35.66034,
+          "lng": 139.7068664,
+          "rating": 4.6,
+          "openNow": true,
+          "hours": [
+            {
+              "open": {
+                "day": 0,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 15
+                }
+              },
+              "close": {
+                "day": 1,
+                "hour": 0,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 1,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              },
+              "close": {
+                "day": 2,
+                "hour": 0,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 17
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 2,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 17
+                }
+              },
+              "close": {
+                "day": 3,
+                "hour": 0,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 18
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 3,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 18
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 0,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 4,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 23,
+                "minute": 59,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 5,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              },
+              "close": {
+                "day": 6,
+                "hour": 0,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 14
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 6,
+                "hour": 11,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 14
+                }
+              },
+              "close": {
+                "day": 0,
+                "hour": 0,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 15
+                }
+              }
+            }
+          ],
+          "types": [
+            "cafe",
+            "cocktail_bar",
+            "bar",
+            "food",
+            "point_of_interest",
+            "establishment"
+          ],
+          "primaryType": "cafe",
+          "userRatingCount": 247
+        },
+        "eta": "23:18",
+        "departure": "00:18",
+        "etaDayOffset": 0,
+        "departureDayOffset": 1,
+        "travelMin": 13,
+        "openAtEta": "open"
+      },
+      {
+        "id": "shopping",
+        "title": "FUGLEN TOKYO",
+        "minutes": 55,
+        "kind": "shopping",
+        "place": "日本、〒151-0063 東京都渋谷区富ケ谷１丁目１６−１１",
+        "locked": false,
+        "done": false,
+        "custom": false,
+        "specified": true,
+        "start": "",
+        "candidate": {
+          "id": "ChIJrWB6lbKMGGARp0QB0mMSNe4",
+          "name": "FUGLEN TOKYO",
+          "address": "日本、〒151-0063 東京都渋谷区富ケ谷１丁目１６−１１",
+          "mapUrl": "https://maps.google.com/?cid=17164645774726874279&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQQAhgEIAA",
+          "lat": 35.6666181,
+          "lng": 139.6923999,
+          "rating": 4.3,
+          "openNow": true,
+          "hours": [
+            {
+              "open": {
+                "day": 0,
+                "hour": 7,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 15
+                }
+              },
+              "close": {
+                "day": 1,
+                "hour": 1,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 1,
+                "hour": 7,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              },
+              "close": {
+                "day": 1,
+                "hour": 23,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 16
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 2,
+                "hour": 7,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 17
+                }
+              },
+              "close": {
+                "day": 2,
+                "hour": 23,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 17
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 3,
+                "hour": 7,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 18
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 1,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 4,
+                "hour": 7,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              },
+              "close": {
+                "day": 4,
+                "hour": 23,
+                "minute": 59,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 19
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 5,
+                "hour": 0,
+                "minute": 0,
+                "truncated": true,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              },
+              "close": {
+                "day": 5,
+                "hour": 1,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 5,
+                "hour": 7,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 13
+                }
+              },
+              "close": {
+                "day": 6,
+                "hour": 1,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 14
+                }
+              }
+            },
+            {
+              "open": {
+                "day": 6,
+                "hour": 7,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 14
+                }
+              },
+              "close": {
+                "day": 0,
+                "hour": 1,
+                "minute": 0,
+                "date": {
+                  "year": 2026,
+                  "month": 11,
+                  "day": 15
+                }
+              }
+            }
+          ],
+          "types": [
+            "coffee_shop",
+            "coffee_stand",
+            "cocktail_bar",
+            "cafe",
+            "food_store",
+            "bar",
+            "food",
+            "store",
+            "point_of_interest",
+            "establishment"
+          ],
+          "primaryType": "coffee_shop",
+          "userRatingCount": 3867
+        },
+        "eta": "02:02",
+        "departure": "02:57",
+        "etaDayOffset": 1,
+        "departureDayOffset": 1,
+        "travelMin": 25,
+        "openAtEta": "closed"
+      },
+      {
+        "id": "rest",
+        "title": "散步回家、休息與晚餐",
+        "minutes": 75,
+        "kind": "rest",
+        "place": "",
+        "locked": false,
+        "done": false,
+        "custom": false,
+        "specified": false,
+        "start": ""
+      }
+    ],
+    "exclude": [],
+    "excludeKinds": [],
+    "seen": [
+      "ChIJr838VoaLGGARoGFfmfEXojs",
+      "ChIJ23hNB3OLGGARcdSaCwLXTvw",
+      "ChIJ6VgA7F-LGGARR2KB-KOCP3o",
+      "ChIJuflD_qOMGGARqAaHfOo7pcE",
+      "ChIJ1Ya6fqiMGGAR8FTtP_6yeMg",
+      "ChIJOWucdKiMGGARbppa4b4CKA8",
+      "ChIJ3TUL91WLGGARNQVCAWLb0kw",
+      "ChIJrWB6lbKMGGARp0QB0mMSNe4"
+    ]
+  }
+}

@@ -3,7 +3,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 
-const OUT = 'runs/pending-tests'
+const OUT = process.env.E2E_OUT || 'runs/pending-tests'
 mkdirSync(`${OUT}/shots`, { recursive: true })
 mkdirSync(`${OUT}/snapshots`, { recursive: true })
 
@@ -23,6 +23,8 @@ function tokyoPlus(min: number): string {
 
 async function prime(page: Page) {
   await page.addInitScript(() => { try { localStorage.setItem('decide.consent', 'v1') } catch { /* */ } })
+  // 受保護的 Vercel 預覽站：先開分享連結（帶 _vercel_share）取得 cookie
+  if (process.env.SHARE_URL) await page.goto(process.env.SHARE_URL)
 }
 
 /** 點一下：有觸控的裝置用 tap（真的觸控事件），桌機用 click。 */

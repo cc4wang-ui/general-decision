@@ -3,7 +3,7 @@
 // WEBKIT=1 時加跑 WebKit（需要另外裝好 WebKit 瀏覽器）。
 import { defineConfig, devices } from '@playwright/test'
 
-const OUT = 'runs/pending-tests'
+const OUT = process.env.E2E_OUT || 'runs/pending-tests'
 const chromium = { browserName: 'chromium' as const }
 
 export default defineConfig({
