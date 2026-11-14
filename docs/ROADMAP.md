@@ -147,7 +147,7 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 | 開始時間・PR-4 | ✅ 2026-11-10 | PR #52（`43a82820`）：開始時間輸入；rebase 後 head `09e8cd7`；production 已驗（bundle index-ScDXdLMo.js）；見 §7 |
 | 2.3 AKOMEYA 觀察 | ✅ 結案 2026-11-14 | 文案維持 `不要「{kindLabel}」這類`（Fable 代核）。真資料證據：預覽站 2026-11-14 回應裡「AKOMEYA食堂 東急プラザ渋谷」的種類判定是 `cafe`（`runs/finish-1114/snapshots/preview-prefer.out.json`），標籤來源就是當下 Google types |
 | 2.4 回饋迴圈 | ✅ 2026-11-14 | PR #79：最簡版已實作（種類偏好軟排序）。Q1–Q11 由 Fable 代核（Cross 原話 `其他fable代替我核准`），裁定在 `runs/finish-1114/decisions.md`；見 §7.5 |
-| 步驟 4 | ⏸ 不再追（2026-11-14 Fable 代核） | ADR-001／ADR-002 已合併（PR #48／#49）；錯誤分類統計在 workspace（`~/workspace/improvement-research/ERROR-TAXONOMY-STATS.md`），defect escape rate 追蹤未確認（repo 內無對應檔案） | 2026-11-14：defect escape rate 追蹤不做——統計檔在 repo 外、沒有入庫，單人試用期每輪已有獨立把關紀錄（`runs/*/reports/`）可回溯 |
+| 步驟 4 | ⏸ 不再追（2026-11-14 Fable 代核） | ADR-001／ADR-002 已合併（PR #48／#49）；錯誤分類統計在 workspace（`~/workspace/improvement-research/ERROR-TAXONOMY-STATS.md`），defect escape rate 追蹤未確認（repo 內無對應檔案）；2026-11-14：defect escape rate 追蹤不做——統計檔在 repo 外、沒有入庫，單人試用期每輪已有獨立把關紀錄（`runs/*/reports/`）可回溯 |
 | 分支清理 | ⏳ 待 Cross | 2026-11-14：遠端除 main 外 23 個分支，16 個已完整併入 main。代理刪除兩次都被平台擋（11-12 `[Git Destructive]`、11-14 `[Destructive or Unwanted Actions]`）。清單在 `runs/finish-1114/reports/main.md`。過期 PR #25、#37、#58、#62 已關閉 |
 | 今日行程到店要開著 | ✅ 2026-11-12 | 自動站依預估到店時間（含跨日）檢查營業時間，剩不到 10 分鐘也不派，換同池下一間；全不符標 `closed`。指定／固定站不換，只在卡片警告。沒有營業時間資料不擋。PR #63（c7579984）。估計到店偏快時（繞路），估計時還沒開的店仍會交給實際路線驗證，不再被跳過（把關 R3 已修）。契約：`runs/daily-open-on-arrival/contract.md` |
 
@@ -244,8 +244,8 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 |---|---|---|
 | 2.1 O1：池子太薄時回傳部分行程並標示缺站 | ✅ PR-2 已合併（PR #51） | 已裁定（2026-11-10，使用者授權按目的決定）；見 §7.4 PR-2 (c) |
 | 2.2 O2：`seen` 跨請求保存（當天、弱於 `disliked`、可清除） | ✅ PR-2 已合併（PR #51） | 已裁定（同上）；見 §7.4 PR-2 (d)。注意：此處的 O2 是「seen 跨請求保存」；PR-1 紅隊第 5 輪的 O2 觀察是另一件事，見 §7.6 |
-| 2.3 AKOMEYA 食堂排除按鈕標籤 | ✅ 結案（2026-11-14：文案維持，見 §6） | Production 觀察 2026-11-10 19:03–19:07 JST：production bundle 與 main @ `5bf71a87` SHA-256 一致（`a2667822762537875babe8381fc2658a1a84134337e24109abbe7e2cc979e366`，`assets/index-VHua357e.js`）；按鈕模板唯一：`不要「{kindLabel}」這類`；kind 唯一來源是當下候選的 Google Places types／primaryType（type＋brand 判定，店名零貢獻）；stale 標籤假設在 UI 渲染層不成立。**AKOMEYA 今日的 types 未確認**（需瀏覽器實測 production 渲染）；文案決定待使用者看證據後做 |
-| 2.4 行為回饋迴圈＋權重圖 | ✅ 最簡版已實作（2026-11-14，PR #79） | 設計稿 `~/workspace/general-decision-core-loop-2.0/design-2.4/DESIGN-feedback-loop.md`；訊號三層（手動輸入最強／明確表態／隱性訊號）、圖譜軟分數、半衰期 30 天、`prefer` 加權皆為提案；待核准問題 Q1–Q11（權重數字、衰減、儲存位置、清除粒度、跨日目的地、標記完成是否寫入核心記憶、`prefer` 加權與放寬、種類親和閾值、說明文字、活動跨日效果、是否讀取愛店）。核准後才實作 | **2026-11-14 實作範圍**：只做「種類親和」軟排序（`src/dailyAffinity.ts`）；原設計稿不在 repo，權重圖、跨日目的地、讀取愛店都沒做（Q5、Q6、Q10、Q11 裁定為不做）。 |
+| 2.3 AKOMEYA 食堂排除按鈕標籤 | ✅ 結案（2026-11-14：文案維持，見 §6） | Production 觀察 2026-11-10 19:03–19:07 JST：production bundle 與 main @ `5bf71a87` SHA-256 一致（`a2667822762537875babe8381fc2658a1a84134337e24109abbe7e2cc979e366`，`assets/index-VHua357e.js`）；按鈕模板唯一：`不要「{kindLabel}」這類`；kind 唯一來源是當下候選的 Google Places types／primaryType（type＋brand 判定，店名零貢獻）；stale 標籤假設在 UI 渲染層不成立。**2026-11-14 補證據並結案**：預覽站真資料裡 AKOMEYA食堂 的種類判定是 `cafe`（`runs/finish-1114/snapshots/preview-prefer.out.json`）；文案維持（Fable 代核） |
+| 2.4 行為回饋迴圈＋權重圖 | ✅ 最簡版已實作（2026-11-14，PR #79） | 設計稿 `~/workspace/general-decision-core-loop-2.0/design-2.4/DESIGN-feedback-loop.md`；訊號三層（手動輸入最強／明確表態／隱性訊號）、圖譜軟分數、半衰期 30 天、`prefer` 加權皆為提案；待核准問題 Q1–Q11（權重數字、衰減、儲存位置、清除粒度、跨日目的地、標記完成是否寫入核心記憶、`prefer` 加權與放寬、種類親和閾值、說明文字、活動跨日效果、是否讀取愛店）。核准後才實作；**2026-11-14 實作範圍**：只做「種類親和」軟排序（`src/dailyAffinity.ts`）；原設計稿不在 repo，權重圖、跨日目的地、讀取愛店都沒做（Q5、Q6、Q10、Q11 裁定為不做）。 |
 
 ### 7.6 不在本批次：O2（PR-1 紅隊第 5 輪觀察）
 
