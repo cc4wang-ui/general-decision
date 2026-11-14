@@ -1,0 +1,82 @@
+{
+ "base": "https://general-decision.vercel.app",
+ "at": "2026-11-14T05:16:36.225Z",
+ "none": [
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "牛かつもと村 渋谷本店",
+   "primaryType": "tonkatsu_restaurant"
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "とりや幸NEO",
+   "primaryType": "yakitori_restaurant"
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "とりや幸NEO",
+   "primaryType": "yakitori_restaurant"
+  }
+ ],
+ "prefer": [
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "AKOMEYA食堂 東急プラザ渋谷",
+   "primaryType": "japanese_restaurant",
+   "preferHit": true
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "極上黒毛和牛 本格焼肉 ビーフキッチン渋谷店",
+   "primaryType": "yakiniku_restaurant"
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "鉄板ステーキ＆ハンバーグ BANANA STEAK 渋谷サクラステージ店",
+   "primaryType": "restaurant"
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "牛かつもと村 渋谷本店",
+   "primaryType": "tonkatsu_restaurant"
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "とりや幸NEO",
+   "primaryType": "yakitori_restaurant",
+   "preferHit": true
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "AKOMEYA食堂 東急プラザ渋谷",
+   "primaryType": "japanese_restaurant",
+   "preferHit": true
+  }
+ ],
+ "bad": [
+  {
+   "status": 200,
+   "routeVerified": true,
+   "name": "極上黒毛和牛 本格焼肉 ビーフキッチン渋谷店",
+   "primaryType": "yakiniku_restaurant"
+  }
+ ],
+ "summary": {
+  "all200": true,
+  "nonePreferHit": 0,
+  "preferHit": 3,
+  "badPreferHit": 0,
+  "bundle": "assets/index-D7zkJDcg.js",
+  "bundleHasAffinityKey": true,
+  "bundleHasReason": true
+ }
+}
