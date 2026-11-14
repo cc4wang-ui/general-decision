@@ -1,4 +1,6 @@
-# general-decision — GitHub Actions CI（草稿，step 2 準備用，未推送）
+# general-decision — GitHub Actions CI（已上線：2026-11-09 PR #40 起 check／e2e／required 是 required check）
+# 註（2026-11-14）：下面提到的 IMPROVEMENT-PLAN.md、ci-gates/REPORT.md、AGENTS.md、
+# staging/branch-protection-checklist.md 都是外部工作區的檔案，不在本 repo；repo 內的依據是 docs/adr/adr-002-ci-gate.md。
 #
 # 來源：IMPROVEMENT-PLAN.md §1 第 4 層（CI 門檻）＋ ci-gates/REPORT.md §5。
 # 本檔所有指令都取自本 repo 真實的 package.json（2026-11-09 於

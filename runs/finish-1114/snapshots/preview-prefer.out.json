@@ -1,0 +1,308 @@
+{
+ "base": "https://general-decision-7k5i3et1e-cc4wang-uis-projects.vercel.app",
+ "at": "2026-11-14T04:54:16.893Z",
+ "A": [
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "とりや幸NEO",
+     "pid": "ChIJO0W7Ms2LGGARL_DsQra1O1Q",
+     "kind": "yakitori"
+    },
+    {
+     "id": "coffee",
+     "name": "ABOUT LIFE COFFEE BREWERS",
+     "pid": "ChIJXVNv51WLGGARAFLANNXRSoo",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "とりや幸NEO",
+     "pid": "ChIJO0W7Ms2LGGARL_DsQra1O1Q",
+     "kind": "yakitori"
+    },
+    {
+     "id": "coffee",
+     "name": "CHIMNEY COFFEE 渋谷本店",
+     "pid": "ChIJScjylXiLGGARHvz6qXgAw6g",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "AKOMEYA食堂 東急プラザ渋谷",
+     "pid": "ChIJoXcmljuLGGARs_pK_bXsNx4",
+     "kind": "cafe"
+    },
+    {
+     "id": "coffee",
+     "name": "ABOUT LIFE COFFEE BREWERS",
+     "pid": "ChIJXVNv51WLGGARAFLANNXRSoo",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "圓 弁柄",
+     "pid": "ChIJJxSq0tCLGGARK8XjL9vkgfo",
+     "kind": "izakaya"
+    },
+    {
+     "id": "coffee",
+     "name": "CHIMNEY COFFEE 渋谷本店",
+     "pid": "ChIJScjylXiLGGARHvz6qXgAw6g",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "梅丘 寿司の美登利 渋谷店",
+     "pid": "ChIJu9W4zVeLGGARXn0xCjGINF8",
+     "kind": "sushi"
+    },
+    {
+     "id": "coffee",
+     "name": "mum coffee",
+     "pid": "ChIJ_2vBXgCLGGARF7sEIxbALXg",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "とりや幸NEO",
+     "pid": "ChIJO0W7Ms2LGGARL_DsQra1O1Q",
+     "kind": "yakitori"
+    },
+    {
+     "id": "coffee",
+     "name": "OBSCURA COFFEE ROASTERS Front",
+     "pid": "ChIJr838VoaLGGARoGFfmfEXojs",
+     "kind": "cafe"
+    }
+   ]
+  }
+ ],
+ "B": [
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "極上黒毛和牛 本格焼肉 ビーフキッチン渋谷店",
+     "pid": "ChIJOcJXb1WLGGARwVR7XP06yFo",
+     "kind": "yakiniku"
+    },
+    {
+     "id": "coffee",
+     "name": "虎へび珈琲",
+     "pid": "ChIJHxKBj3yNGGARDGCN7Qn6gK0",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "coffee",
+     "name": "OBSCURA COFFEE ROASTERS Front",
+     "pid": "ChIJr838VoaLGGARoGFfmfEXojs",
+     "kind": "cafe"
+    },
+    {
+     "id": "meal",
+     "name": "AKOMEYA食堂 東急プラザ渋谷",
+     "pid": "ChIJoXcmljuLGGARs_pK_bXsNx4",
+     "kind": "cafe",
+     "preferHit": true
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "とりや幸NEO",
+     "pid": "ChIJO0W7Ms2LGGARL_DsQra1O1Q",
+     "kind": "yakitori"
+    },
+    {
+     "id": "coffee",
+     "name": "mum coffee",
+     "pid": "ChIJ_2vBXgCLGGARF7sEIxbALXg",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "coffee",
+     "name": "OBSCURA COFFEE ROASTERS Front",
+     "pid": "ChIJr838VoaLGGARoGFfmfEXojs",
+     "kind": "cafe"
+    },
+    {
+     "id": "meal",
+     "name": "牛かつもと村 渋谷本店",
+     "pid": "ChIJn2FoeFmLGGARnIog2ijRZXw",
+     "kind": "tonkatsu"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "AKOMEYA食堂 東急プラザ渋谷",
+     "pid": "ChIJoXcmljuLGGARs_pK_bXsNx4",
+     "kind": "cafe",
+     "preferHit": true
+    },
+    {
+     "id": "coffee",
+     "name": "ABOUT LIFE COFFEE BREWERS",
+     "pid": "ChIJXVNv51WLGGARAFLANNXRSoo",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "coffee",
+     "name": "OBSCURA COFFEE ROASTERS Front",
+     "pid": "ChIJr838VoaLGGARoGFfmfEXojs",
+     "kind": "cafe"
+    },
+    {
+     "id": "meal",
+     "name": "AKOMEYA食堂 東急プラザ渋谷",
+     "pid": "ChIJoXcmljuLGGARs_pK_bXsNx4",
+     "kind": "cafe",
+     "preferHit": true
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "とりや幸NEO",
+     "pid": "ChIJO0W7Ms2LGGARL_DsQra1O1Q",
+     "kind": "yakitori"
+    },
+    {
+     "id": "coffee",
+     "name": "虎へび珈琲",
+     "pid": "ChIJHxKBj3yNGGARDGCN7Qn6gK0",
+     "kind": "cafe"
+    }
+   ]
+  },
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "牛かつもと村 渋谷本店",
+     "pid": "ChIJn2FoeFmLGGARnIog2ijRZXw",
+     "kind": "tonkatsu"
+    },
+    {
+     "id": "coffee",
+     "name": "CHIMNEY COFFEE 渋谷本店",
+     "pid": "ChIJScjylXiLGGARHvz6qXgAw6g",
+     "kind": "cafe"
+    }
+   ]
+  }
+ ],
+ "C": [
+  {
+   "status": 200,
+   "routeVerified": true,
+   "stops": [
+    {
+     "id": "meal",
+     "name": "牛かつもと村 渋谷本店",
+     "pid": "ChIJn2FoeFmLGGARnIog2ijRZXw",
+     "kind": "tonkatsu"
+    },
+    {
+     "id": "coffee",
+     "name": "ABOUT LIFE COFFEE BREWERS",
+     "pid": "ChIJXVNv51WLGGARAFLANNXRSoo",
+     "kind": "cafe"
+    }
+   ]
+  }
+ ],
+ "K": "cafe",
+ "kindCountA": {
+  "yakitori": 3,
+  "cafe": 1,
+  "izakaya": 1,
+  "sushi": 1
+ },
+ "summary": {
+  "allStatus200": true,
+  "A_mealKshare": "1/6",
+  "B_mealKshare": "3/8",
+  "A_preferHitCount": 0,
+  "B_preferHitCount": 3,
+  "B_preferHitOnlyOnK": true,
+  "B_distinctMeal": 4,
+  "B_mealNotInK": [
+   "極上黒毛和牛 本格焼肉 ビーフキッチン渋谷店",
+   "とりや幸NEO",
+   "牛かつもと村 渋谷本店",
+   "とりや幸NEO",
+   "牛かつもと村 渋谷本店"
+  ],
+  "C_badInputStatus": 200,
+  "C_preferHit": 0
+ }
+}

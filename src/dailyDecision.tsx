@@ -6,8 +6,9 @@ import { blockedPlaceIds, clearDislike, markDailyDislike, migrateDailyDislike } 
 import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from './venueCheck.ts'
 import { AREA_NAMES, withinArea } from './areas.ts'
+import { AFFINITY_WEIGHT, affinityHints, clearAffinity, dropAffinity, loadAffinity, recordAffinity } from './dailyAffinity.ts'
 
-export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是結構化日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。結構化日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number;hours?:unknown[]}; eta?:string;departure?:string;travelMin?:number;conflict?:string; /** 跨日偏移（PR-4 修正輪）：錨點當日 0，跨過午夜 1，依此類推；與 eta／departure 同一束，清掉 ETA 時一起清。舊存檔／舊回應沒有此欄位時視為 0（當天）。 */ etaDayOffset?:number;departureDayOffset?:number; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied'|'closed'; /** 伺服器依 ETA 判斷的到店營業狀態（daily-open-on-arrival）。只在有 eta 時顯示。 */ openAtEta?: 'open'|'closing'|'closed'|'unknown' }
+export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是結構化日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。結構化日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number;hours?:unknown[]}; eta?:string;departure?:string;travelMin?:number;conflict?:string; /** 跨日偏移（PR-4 修正輪）：錨點當日 0，跨過午夜 1，依此類推；與 eta／departure 同一束，清掉 ETA 時一起清。舊存檔／舊回應沒有此欄位時視為 0（當天）。 */ etaDayOffset?:number;departureDayOffset?:number; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied'|'closed'; /** 伺服器依 ETA 判斷的到店營業狀態（daily-open-on-arrival）。只在有 eta 時顯示。 */ openAtEta?: 'open'|'closing'|'closed'|'unknown'; /** 2.4：伺服器標示這間店是種類偏好提高機率後挑中的；卡片顯示一行原因。 */ preferHit?: boolean }
 /** 可被意圖指定的站：5 個可搜尋站。rest 不在內——rest 是純文字站，永遠不是搜尋目標。 */
 export type IntentStationId = 'gym' | 'meal' | 'creative' | 'coffee' | 'shopping'
 /** 5 個可搜尋站的 catalog 順序（活動顯示與存放順序）。 */
@@ -353,6 +354,32 @@ const restoreIntentSpecified = (stops: DailyTask[], old: DailyTask[]): DailyTask
     const prev = old.find(x => x.id === t.id)
     return prev?.intentSpecified && t.specified ? { ...t, intentSpecified: true } : t
   })
+/** 2.4：伺服器只在「這次新挑」的站回 preferHit；原樣保留的站（單站換店時的其他站、已完成站）
+ * 回應裡沒有這個旗標。同一站、同一間店沒換，原因也沒變，從舊 state 補回來；店換了就不補。 */
+const restorePreferHit = (stops: DailyTask[], old: DailyTask[], shuffle?: string): DailyTask[] =>
+  stops.map(t => {
+    const prev = old.find(x => x.id === t.id)
+    // 只補「伺服器這次原樣保留」的站：已完成站，或單站換店時的其他站。完整重新生成時自動站是重挑的，
+    // 剛好挑回同一間也不補（那次挑選沒有受偏好影響，補了就是謊稱；把關 R1 F1）。
+    const kept = t.done === true || (shuffle !== undefined && t.id !== shuffle)
+    return kept && prev?.preferHit && !!t.candidate && prev.candidate?.id === t.candidate.id ? { ...t, preferHit: true } : t
+  })
+/** 2.4 行為訊號的來源鍵：同一天、同一站、同一間店只算一次。 */
+const affinitySrc = (what: 'spec' | 'done' | 'swap', day: string, stopId: string, placeId: string): string => `${what}:${day}:${stopId}:${placeId}`
+/** 2.4：搜尋成功後記行為訊號（只寫本機）。手動指定的站這次解析到真店 +3；
+ * 單站換店換掉的是自動挑的店 −1（同一天同一站只算一次：連換幾間只是想換店，不是討厭這個種類；把關 R1 F2）。種類判不出就不記（recordAffinity 內處理）。 */
+export function recordRouteSignals(proposed: DailyState, stops: DailyTask[], shuffle: string | undefined, replaced: DailyTask | undefined, now: number): void {
+  for (const t of stops) {
+    const sent = proposed.tasks.find(x => x.id === t.id)
+    if (t.candidate && t.specified && sent?.specified && !sent.candidate) recordAffinity(kindOfCandidate(t.candidate), AFFINITY_WEIGHT.specified, now, affinitySrc('spec', proposed.day, t.id, t.candidate.id))
+  }
+  if (shuffle && replaced?.candidate && !replaced.done && !replaced.locked && !replaced.custom && !replaced.specified) recordAffinity(kindOfCandidate(replaced.candidate), AFFINITY_WEIGHT.swapped, now, affinitySrc('swap', proposed.day, replaced.id, '*'))
+}
+/** 2.4：請求多帶的種類偏好。沒有過閾值的種類就不帶欄位（請求與沒有這個功能時相同）。 */
+export function affinityRequestFields(now: number): { prefer?: string[]; demote?: string[] } {
+  const { prefer, demote } = affinityHints(loadAffinity(), now)
+  return { ...(prefer.length ? { prefer } : {}), ...(demote.length ? { demote } : {}) }
+}
 /** rest 純文字站（「散步回家」）：不需要找店家。與伺服器 api/daily-route.ts 的
  * isTextOnlyRest 同一規則——固定安排／自訂／指定了地點的 rest 不算。 */
 export const isTextOnlyRest = (t: DailyTask): boolean => t.id === 'rest' && !t.locked && !t.custom && !t.specified
@@ -528,7 +555,8 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     }
     let proposed=shuffle ? s : routeProposal(s)
     // shuffle 先把被換掉的那間記進 seen：這次請求就要排除它，否則下一輪它又回來。
-    const replacedId=shuffle?proposed.tasks.find(t=>t.id===shuffle)?.candidate?.id:undefined
+    const replaced=shuffle?proposed.tasks.find(t=>t.id===shuffle):undefined
+    const replacedId=replaced?.candidate?.id
     if(shuffle&&replacedId)proposed=withSeen(proposed,shuffle,replacedId)
     // 2.2 O2：完整重新生成也要把被換掉的店寫進 seen（不只送、不存）。withCurrentAsSeen
     // 只記自動站現任候選；下面合併處的 seen:{...old.seen,...proposed.seen} 隨後把它存進 state，
@@ -549,10 +577,11 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       // 不進伺服器的 retention 重驗。完整重新生成不送 others（沒有要換的站，也沒有「其他站」），
       // 改送 seen（round 11：各站換掉過的店全部合併，剛被換掉的店在完整重新生成時也不回來；
       // seen 同樣只擋自動站的新搜尋、不進 retention，見 seenFor）。
-      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,startTime:s.startTime??'',stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)})})})
+      const response=await fetch('/api/daily-route',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...(here?{origin:here}:{location:s.currentPlace}),area:s.area,areaOnly:s.areaOnly!==false,startTime:s.startTime??'',stops:proposed.tasks,shuffle,exclude:excludeInfo.list,excludeKinds:(proposed.dislikedKinds??[]).map(normalizeKind),...(shuffle?{others:othersFor(proposed,shuffle)}:{seen:seenFor(proposed)}),...affinityRequestFields(Date.now())})})
       const data=(await response.json()) as DailyRouteResponse
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
-      change(old=>({...old,tasks:restoreIntentSpecified(data.stops??old.tasks, old.tasks),appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
+      if(data.stops)recordRouteSignals(proposed,data.stops,shuffle,replaced,Date.now())
+      change(old=>({...old,tasks:restorePreferHit(restoreIntentSpecified(data.stops??old.tasks, old.tasks), old.tasks, shuffle),appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
       setRouteKm(data.routeVerified?data.distanceKm??null:null)
       setTravelMin(data.routeVerified?data.travelMinutes??null:null)
       setConflicts(data.conflicts??[])
@@ -598,6 +627,21 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   const clearSeenRecord = () => {
     change(s => clearSeen(s))
     setNotice(`已清除今天換掉的 ${seenCount} 家店紀錄，可以重新搜尋。`)
+  }
+  /** 2.4（Q4）：一次清掉全部種類偏好紀錄。seen／disliked 不動；卡片上的原因行也一起拿掉。 */
+  const clearAffinityRecord = () => {
+    clearAffinity()
+    change(s => ({ ...s, tasks: s.tasks.map(t => t.preferHit ? { ...t, preferHit: undefined } : t) }))
+    setNotice('已清除學到的種類偏好。「不喜歡」與今天換掉的店紀錄不受影響。')
+  }
+  /** 2.4：標記完成 +2（取消勾選就撤回同一筆）。沒有真店或判不出種類就不記。 */
+  const toggleDone = (t: DailyTask, done: boolean) => {
+    if (t.candidate) {
+      const src = affinitySrc('done', state.day, t.id, t.candidate.id)
+      if (done) recordAffinity(kindOfCandidate(t.candidate), AFFINITY_WEIGHT.done, Date.now(), src)
+      else dropAffinity(src)
+    }
+    change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done}:x)}))
   }
   // 按「用目前位置」＝切到目前位置並立刻搜尋（定位拿不到就只顯示原因）。
   const pickHere = () => {change(s=>({...s,useHere:true}));clearRoute();void searchRoute(undefined,{...state,useHere:true})}
@@ -726,6 +770,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 {t.candidate ? <div className="dd-place-meta">
                   <strong>⌖ {t.candidate.address}</strong>
                   <span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{openStatusText(t)} · Google Places</span>
+                  {t.preferHit&&<span data-testid="daily-prefer-reason">你常選這類，優先挑了這間</span>}
                   {t.eta&&(t.openAtEta==='closed'||t.openAtEta==='closing')&&<span className="dd-place-unresolved" role="status">⚠ {t.openAtEta==='closed'?'預計 '+t.eta+' 到店時，這間店沒有營業。請先確認營業時間。':'預計 '+t.eta+' 到店時，離打烊不到 10 分鐘。'}</span>}
                   <a className="dd-place-link" href={t.candidate.mapUrl} target="_blank" rel="noopener noreferrer">Google Maps 店家詳情 ↗</a>
                 </div> : t.noCandidate ? <div className="dd-place-unresolved" role="status">⚠ {noCandidateText(t, state.area)}
@@ -742,7 +787,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                   {t.candidate&&!t.done&&!t.locked&&kindOfCandidate(t.candidate)&&<button className="dd-muted" disabled={busy!==null} onClick={()=>dislikeKind(t)}>不要「{kindLabel(kindOfCandidate(t.candidate)!)}」這類</button>}
                 </div>
                 <div className="dd-actions dd-actions-secondary">
-                  <label className="dd-done"><input type="checkbox" checked={t.done} onChange={e=>change(s=>({...s,tasks:s.tasks.map(x=>x.id===t.id?{...x,done:e.target.checked}:x)}))}/><span>{t.done?'已完成':'標記完成'}</span></label>
+                  <label className="dd-done"><input type="checkbox" checked={t.done} onChange={e=>toggleDone(t,e.target.checked)}/><span>{t.done?'已完成':'標記完成'}</span></label>
                   {/* 「今天略過」同時移除該站的活動勾選、並在它是目的地站時把站清為 ''（目的地文字保留）。
                     經 normalizeIntent 重跑（設計 §1.4 單一寫入規則）：便利預設已不在 normalizeIntent 裡，
                     略過後剩單一活動也不會重新附著。 */}
@@ -851,6 +896,8 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
           <textarea aria-label="補充偏好" value={feedback} maxLength={160} rows={3} placeholder="例如：今天想吃拉麵（僅備註，不影響搜尋）" onChange={e=>setFeedback(e.target.value)}/>
           <button className="dd-secondary" onClick={addFeedback} disabled={!feedback.trim()}>儲存備註</button>
           <div className="dd-notes">{state.notes.map((n,i)=><p key={i}>· {n}</p>)}</div>
+          <small>班長會記住你常選、常換掉的店家種類，下次挑店時參考；只存在這支手機。</small>
+          <button className="dd-secondary" data-testid="daily-clear-affinity" disabled={busy!==null} onClick={clearAffinityRecord}>清除學到的偏好</button>
         </div>
         </div>
         <button type="button" className="sheet-cancel" data-testid="daily-sheet-close" onClick={()=>setSheet(null)}>完成</button>
