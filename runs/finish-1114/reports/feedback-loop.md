@@ -53,3 +53,7 @@ STOP 自查：
 - ⚠️ 清除按鈕放在「備註」選單，一直顯示（沒有紀錄時也能按）。
 - ⚠️ 環境：一開始 `node_modules/.bin` 不存在（`sh: 1: vitest: not found`），我跑了 `npm rebuild --ignore-scripts`（只動 node_modules）。之後第一次 `npm test` 出現 `Tests  500 passed (500)`／`Errors  36 errors`，沒留下細節；接著重跑都是 59 檔 1248 個全過，改完後 62 檔 1327 個全過。
 - 沒做：預覽站真 Google 驗證（依指示由總調度做）；沒有 commit、push，沒動 `.handoff/`、`STATE.md`、`docs/ROADMAP.md`、`contract.md`、`decisions.md`。
+
+
+---
+總調度加註（2026-11-14，把關 R1 F3／F4）：第 7 條的 `check:bundle` FAIL 只發生在新檔未追蹤時；commit `cde60c2` 後總調度與把關者重跑都是 `BUNDLE PASS`。第 9 條「預覽站真 POST 還沒做」已由 `snapshots/preview-prefer.out.json` 補上（見 `reports/main.md`）。把關 R1 後另修兩處：原因行只補伺服器原樣保留的站（F1）、換店 −1 同一天同一站只算一次（F2）。

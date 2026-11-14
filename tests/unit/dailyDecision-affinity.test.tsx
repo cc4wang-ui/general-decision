@@ -147,18 +147,22 @@ describe('原因行（Q9）', () => {
     await settle()
     expect(screen.queryByTestId('daily-prefer-reason')).toBeNull()
   })
-  it('同一間店沒換（伺服器原樣保留、不回旗標）：原因行留著；店換了就拿掉；清除偏好也拿掉', async () => {
-    seed([task('meal', { candidate: cand('r1', '一蘭 渋谷店'), preferHit: true })])
-    let next = cand('r1', '一蘭 渋谷店')
-    const bodies = routeFetch((b) => b.stops.map((s) => ({ id: s.id, title: s.title, minutes: s.minutes, kind: s.kind, done: s.done, candidate: next })))
+  it('已完成站（伺服器原樣保留、不回旗標）：同一間店沒換，原因行留著', async () => {
+    seed([task('meal', { candidate: cand('r1', '一蘭 渋谷店'), preferHit: true, done: true })])
+    const bodies = routeFetch((b) => b.stops.map((s) => ({ id: s.id, title: s.title, minutes: s.minutes, kind: s.kind, done: s.done, candidate: cand('r1', '一蘭 渋谷店') })))
     render(<DailyDecision onBack={() => {}} />)
     await settle()
     await generate(bodies)
     expect(screen.getByTestId('daily-prefer-reason')).toBeTruthy()
-    next = cand('p9', '別的店', 'restaurant')
+  })
+  it('完整重新生成的自動站：伺服器沒回旗標就不顯示，就算剛好挑回同一間（把關 R1 F1：不謊稱）', async () => {
+    seed([task('meal', { candidate: cand('r1', '一蘭 渋谷店'), preferHit: true })])
+    const bodies = routeFetch((b) => b.stops.map((s) => ({ id: s.id, title: s.title, minutes: s.minutes, kind: s.kind, done: s.done, candidate: cand('r1', '一蘭 渋谷店') })))
+    render(<DailyDecision onBack={() => {}} />)
+    await settle()
+    expect(screen.getByTestId('daily-prefer-reason')).toBeTruthy()
     await generate(bodies)
-    await waitFor(() => expect(screen.getByText('別的店')).toBeTruthy())
-    expect(screen.queryByTestId('daily-prefer-reason')).toBeNull()
+    await waitFor(() => expect(screen.queryByTestId('daily-prefer-reason')).toBeNull())
   })
   it('清除偏好：卡片上的原因行一起拿掉', async () => {
     seed([task('meal', { candidate: cand('r1', '一蘭 渋谷店'), preferHit: true })])
@@ -197,12 +201,12 @@ describe('recordRouteSignals：搜尋成功後的行為訊號', () => {
     recordRouteSignals(proposed, [task('meal', { candidate: cand('r1', '一蘭 渋谷店') })], undefined, undefined, NOW)
     expect(loadAffinity()).toEqual([])
   })
-  it('單站換店換掉自動挑的拉麵 → ramen −1；每換一次記一筆', () => {
+  it('單站換店換掉自動挑的拉麵 → ramen −1；同一天同一站連換只算一次（把關 R1 F2）', () => {
     const proposed = state([task('meal', { candidate: cand('r1', '一蘭 渋谷店') })])
     const stops = [task('meal', { candidate: cand('p1', '定食屋', 'restaurant') })]
     recordRouteSignals(proposed, stops, 'meal', proposed.tasks[0], NOW)
     recordRouteSignals(proposed, stops, 'meal', proposed.tasks[0], NOW + 5)
-    expect(loadAffinity().map((e) => [e.k, e.w])).toEqual([['ramen', -1], ['ramen', -1]])
+    expect(loadAffinity().map((e) => [e.k, e.w])).toEqual([['ramen', -1]])
   })
   it('完整重新生成（沒有 shuffle）→ 不記 −1', () => {
     const proposed = state([task('meal', { candidate: cand('r1', '一蘭 渋谷店') })])

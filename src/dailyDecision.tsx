@@ -356,21 +356,24 @@ const restoreIntentSpecified = (stops: DailyTask[], old: DailyTask[]): DailyTask
   })
 /** 2.4：伺服器只在「這次新挑」的站回 preferHit；原樣保留的站（單站換店時的其他站、已完成站）
  * 回應裡沒有這個旗標。同一站、同一間店沒換，原因也沒變，從舊 state 補回來；店換了就不補。 */
-const restorePreferHit = (stops: DailyTask[], old: DailyTask[]): DailyTask[] =>
+const restorePreferHit = (stops: DailyTask[], old: DailyTask[], shuffle?: string): DailyTask[] =>
   stops.map(t => {
     const prev = old.find(x => x.id === t.id)
-    return prev?.preferHit && !!t.candidate && prev.candidate?.id === t.candidate.id ? { ...t, preferHit: true } : t
+    // 只補「伺服器這次原樣保留」的站：已完成站，或單站換店時的其他站。完整重新生成時自動站是重挑的，
+    // 剛好挑回同一間也不補（那次挑選沒有受偏好影響，補了就是謊稱；把關 R1 F1）。
+    const kept = t.done === true || (shuffle !== undefined && t.id !== shuffle)
+    return kept && prev?.preferHit && !!t.candidate && prev.candidate?.id === t.candidate.id ? { ...t, preferHit: true } : t
   })
 /** 2.4 行為訊號的來源鍵：同一天、同一站、同一間店只算一次。 */
-const affinitySrc = (what: 'spec' | 'done', day: string, stopId: string, placeId: string): string => `${what}:${day}:${stopId}:${placeId}`
+const affinitySrc = (what: 'spec' | 'done' | 'swap', day: string, stopId: string, placeId: string): string => `${what}:${day}:${stopId}:${placeId}`
 /** 2.4：搜尋成功後記行為訊號（只寫本機）。手動指定的站這次解析到真店 +3；
- * 單站換店換掉的是自動挑的店 −1。種類判不出就不記（recordAffinity 內處理）。 */
+ * 單站換店換掉的是自動挑的店 −1（同一天同一站只算一次：連換幾間只是想換店，不是討厭這個種類；把關 R1 F2）。種類判不出就不記（recordAffinity 內處理）。 */
 export function recordRouteSignals(proposed: DailyState, stops: DailyTask[], shuffle: string | undefined, replaced: DailyTask | undefined, now: number): void {
   for (const t of stops) {
     const sent = proposed.tasks.find(x => x.id === t.id)
     if (t.candidate && t.specified && sent?.specified && !sent.candidate) recordAffinity(kindOfCandidate(t.candidate), AFFINITY_WEIGHT.specified, now, affinitySrc('spec', proposed.day, t.id, t.candidate.id))
   }
-  if (shuffle && replaced?.candidate && !replaced.done && !replaced.locked && !replaced.custom && !replaced.specified) recordAffinity(kindOfCandidate(replaced.candidate), AFFINITY_WEIGHT.swapped, now)
+  if (shuffle && replaced?.candidate && !replaced.done && !replaced.locked && !replaced.custom && !replaced.specified) recordAffinity(kindOfCandidate(replaced.candidate), AFFINITY_WEIGHT.swapped, now, affinitySrc('swap', proposed.day, replaced.id, '*'))
 }
 /** 2.4：請求多帶的種類偏好。沒有過閾值的種類就不帶欄位（請求與沒有這個功能時相同）。 */
 export function affinityRequestFields(now: number): { prefer?: string[]; demote?: string[] } {
@@ -578,7 +581,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       const data=(await response.json()) as DailyRouteResponse
       if(!response.ok)throw new Error(data.message??'搜尋失敗')
       if(data.stops)recordRouteSignals(proposed,data.stops,shuffle,replaced,Date.now())
-      change(old=>({...old,tasks:restorePreferHit(restoreIntentSpecified(data.stops??old.tasks, old.tasks), old.tasks),appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
+      change(old=>({...old,tasks:restorePreferHit(restoreIntentSpecified(data.stops??old.tasks, old.tasks), old.tasks, shuffle),appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle?{}:{routedFrom:originKey(s)})}))
       setRouteKm(data.routeVerified?data.distanceKm??null:null)
       setTravelMin(data.routeVerified?data.travelMinutes??null:null)
       setConflicts(data.conflicts??[])

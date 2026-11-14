@@ -6,7 +6,7 @@
 
 ## 0. 結論
 
-下一輪先上線 Round 8，再補「歇要營業中」規則。兩項都只改 `src/scene.ts` 的排除與過濾，風險低。試用期內不加新功能，只修派錯店。上架與擴大使用者留到試用結束後，用試用匯出的數據決定。
+（⚠️ 本段是 2026-11-03 寫的，已過時；現況看 §6。）下一輪先上線 Round 8，再補「歇要營業中」規則。兩項都只改 `src/scene.ts` 的排除與過濾，風險低。試用期內不加新功能，只修派錯店。上架與擴大使用者留到試用結束後，用試用匯出的數據決定。
 
 ## 1. 產品目標
 
@@ -32,7 +32,7 @@
 | 4 | 2026-11-01 11:25 | 不空手（超商救援）、不重複、照預算、模型失敗用模板口令、60 天試用紀錄 | `docs/archive/state/ROUND4-PROGRESS.md` |
 | 5 | 2026-11-01 21:45 | 吃／歇先選情境（5 種＋其他）、沒做先問原因、看剩餘營業時間 | `docs/archive/state/ROUND5-PROGRESS.md` |
 | 6 | 2026-11-02 13:52 | 地下沒定位 → 報站、定位可疑先問、日文站名查座標、距離切圓、口令從出站寫起 | `docs/archive/state/ROUND6-PROGRESS.md` |
-| 7 | 2026-11-02 15:48（現況） | 東京的歇用日文關鍵字；不派水煙吧、購物中心；未跑 checker | `docs/archive/state/ROUND7-PROGRESS.md` |
+| 7 | 2026-11-02 15:48（當時現況；最新看 §6） | 東京的歇用日文關鍵字；不派水煙吧、購物中心；未跑 checker | `docs/archive/state/ROUND7-PROGRESS.md` |
 | 8 | 只在 preview | 歇選咖啡不派卡拉OK／美食街；外帶不派酒吧；白天 12/12；深夜未量 | `docs/archive/state/ROUND8-PROGRESS.md` |
 
 ## 3. 路線圖
@@ -43,7 +43,7 @@
 
 | # | 項目 | 問題（證據） | 做法 | 成功指標 | 規模 | 依賴 | 🔒 |
 |---|---|---|---|---|---|---|---|
-| N1 | Round 8 上線 | 深夜歇派到卡拉OK、美食街；外帶派到酒吧（`docs/archive/state/ROUND7-PROGRESS.md` 深夜；`docs/archive/state/ROUND8-PROGRESS.md`） | 東京 01:00 手動量 preview-1 → `state/handoff-tools/r8-check.mjs` → checker → Cross 上線 | 深夜新宿歇 6 情境＋外帶：0 筆派錯店；上線後 runtime error 0 | S | 深夜量測、checker | 🔒 上線 |
+| N1 | Round 8 上線 | 深夜歇派到卡拉OK、美食街；外帶派到酒吧（`docs/archive/state/ROUND7-PROGRESS.md` 深夜；`docs/archive/state/ROUND8-PROGRESS.md`） | 東京 01:00 手動量 preview-1 → `state/handoff-tools/r8-check.mjs`（該工具已在 PR #44 刪除，要看請查 git 歷史） → checker → Cross 上線 | 深夜新宿歇 6 情境＋外帶：0 筆派錯店；上線後 runtime error 0 | S | 深夜量測、checker | 🔒 上線 |
 | N2 | 歇要「營業中」 | 09:25 派到 10:00 才開的店；歇只有宵夜有 openNow（`docs/archive/state/ROUND8-PROGRESS.md` 白天觀察；`src/scene.ts:118,245`） | 歇全部情境：走到店時還沒開的不派；只剩這些才整批放回 | 白天量測：0 筆到店時間早於開門；台灣單元測試原樣過 | S | N1 上線後 | 🔒 上線 |
 | N3 | 約會派到酒吧 | Round 6 起約會派到 Bar Vier；約會排除清單沒有酒吧類（`docs/archive/state/ROUND6-PROGRESS.md` 風險；`src/scene.ts:109`） | 依決策 Q1 | 深夜量測：約會 0 筆主類別是酒吧 | S | Q1 | 🔒 上線 |
 | N4 | 試用期中匯出 | 試用紀錄存 localStorage，清資料就沒了；文件建議每 2 週匯出（`docs/archive/state/ROUND4-PROGRESS.md` 風險） | Cross 從除錯畫面匯出 JSON；分析派錯店率、服從率、WOO | 一份 JSON＋一頁分析；列出前 3 種派錯店 | S | Cross 動作 | — |
@@ -145,15 +145,17 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 | 核心迴圈 2.0・PR-1 | ✅ 2026-11-10 | PR #50（`5bf71a87`）：結構化意圖，刪 `mode`；見 §7 |
 | 2.1／2.2・PR-2 | ✅ 2026-11-10 | PR #51（`ce7827e5`）：部分行程標示＋seen 跨請求留存；production 已驗（bundle index-BtC-1r0b.js）；見 §7 |
 | 開始時間・PR-4 | ✅ 2026-11-10 | PR #52（`43a82820`）：開始時間輸入；rebase 後 head `09e8cd7`；production 已驗（bundle index-ScDXdLMo.js）；見 §7 |
-| 2.3 AKOMEYA 觀察 | ✅ 觀察完成 | Production bundle 與 main @ `5bf71a87` SHA-256 一致；按鈕今日文字未確認，文案待裁定；見 §7 |
-| 2.4 回饋迴圈設計 | ✅ 設計完成 | 設計稿待使用者核准（Q1–Q11），未實作；見 §7 |
-| 步驟 4 | ⏳ 進行中 | ADR-001／ADR-002 已合併（PR #48／#49）；錯誤分類統計在 workspace（`~/workspace/improvement-research/ERROR-TAXONOMY-STATS.md`），defect escape rate 追蹤未確認（repo 內無對應檔案） |
-| 分支清理 | ⏳ 部分 | PR #44／#45／#46 的分支已刪；遠端仍有 `feature/daily-intent-first`、`docs/adr-001`、`docs/adr-002`、`step3/stryker-threshold`（2026-11-10 查 `git branch -r`） |
+| 2.3 AKOMEYA 觀察 | ✅ 結案 2026-11-14 | 文案維持 `不要「{kindLabel}」這類`（Fable 代核）。真資料證據：預覽站 2026-11-14 回應裡「AKOMEYA食堂 東急プラザ渋谷」的種類判定是 `cafe`（`runs/finish-1114/snapshots/preview-prefer.out.json`），標籤來源就是當下 Google types |
+| 2.4 回饋迴圈 | ✅ 2026-11-14 | PR #79：最簡版已實作（種類偏好軟排序）。Q1–Q11 由 Fable 代核（Cross 原話 `其他fable代替我核准`），裁定在 `runs/finish-1114/decisions.md`；見 §7.5 |
+| 步驟 4 | ⏸ 不再追（2026-11-14 Fable 代核） | ADR-001／ADR-002 已合併（PR #48／#49）；錯誤分類統計在 workspace（`~/workspace/improvement-research/ERROR-TAXONOMY-STATS.md`），defect escape rate 追蹤未確認（repo 內無對應檔案） | 2026-11-14：defect escape rate 追蹤不做——統計檔在 repo 外、沒有入庫，單人試用期每輪已有獨立把關紀錄（`runs/*/reports/`）可回溯 |
+| 分支清理 | ⏳ 待 Cross | 2026-11-14：遠端除 main 外 23 個分支，16 個已完整併入 main。代理刪除兩次都被平台擋（11-12 `[Git Destructive]`、11-14 `[Destructive or Unwanted Actions]`）。清單在 `runs/finish-1114/reports/main.md`。過期 PR #25、#37、#58、#62 已關閉 |
 | 今日行程到店要開著 | ✅ 2026-11-12 | 自動站依預估到店時間（含跨日）檢查營業時間，剩不到 10 分鐘也不派，換同池下一間；全不符標 `closed`。指定／固定站不換，只在卡片警告。沒有營業時間資料不擋。PR #63（c7579984）。估計到店偏快時（繞路），估計時還沒開的店仍會交給實際路線驗證，不再被跳過（把關 R3 已修）。契約：`runs/daily-open-on-arrival/contract.md` |
 
 ~~已知未修：早上「約會吃好一點」常找不到 4.3★，改派附近最高分（4.1–4.2★），可能走 30 分以上（checker 第 2 輪）。~~ Round 11（2026-11-04 19:21 上線）：約會最多走 15 分；放寬評分時派 15 分內最高分。早上實測排在 11-05。
 
-下一步：Cross 處理表中「待 Cross」各項，並決定約會要不要加步行上限；日期未知。
+下一步：Cross 處理「只能 Cross 做」各項（清單見 `.handoff/LATEST.md` 與 `runs/finish-1114/decisions.md`）；日期未知。
+
+> 證據路徑說明（2026-11-14）：本檔 §6／§7 與 ADR-002 裡的 `~/workspace/...` 路徑是外部工作區，**沒有入庫**，從 repo 無法驗證；repo 內可驗的證據在 `runs/*/`、`state/evidence/`。
 
 ## 7. 核心迴圈重構 2.0（2026-11-10）
 
@@ -242,8 +244,8 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 |---|---|---|
 | 2.1 O1：池子太薄時回傳部分行程並標示缺站 | ✅ PR-2 已合併（PR #51） | 已裁定（2026-11-10，使用者授權按目的決定）；見 §7.4 PR-2 (c) |
 | 2.2 O2：`seen` 跨請求保存（當天、弱於 `disliked`、可清除） | ✅ PR-2 已合併（PR #51） | 已裁定（同上）；見 §7.4 PR-2 (d)。注意：此處的 O2 是「seen 跨請求保存」；PR-1 紅隊第 5 輪的 O2 觀察是另一件事，見 §7.6 |
-| 2.3 AKOMEYA 食堂排除按鈕標籤 | ✅ 觀察 done（文案待裁） | Production 觀察 2026-11-10 19:03–19:07 JST：production bundle 與 main @ `5bf71a87` SHA-256 一致（`a2667822762537875babe8381fc2658a1a84134337e24109abbe7e2cc979e366`，`assets/index-VHua357e.js`）；按鈕模板唯一：`不要「{kindLabel}」這類`；kind 唯一來源是當下候選的 Google Places types／primaryType（type＋brand 判定，店名零貢獻）；stale 標籤假設在 UI 渲染層不成立。**AKOMEYA 今日的 types 未確認**（需瀏覽器實測 production 渲染）；文案決定待使用者看證據後做 |
-| 2.4 行為回饋迴圈＋權重圖 | ✅ 設計 done（待核准，未實作） | 設計稿 `~/workspace/general-decision-core-loop-2.0/design-2.4/DESIGN-feedback-loop.md`；訊號三層（手動輸入最強／明確表態／隱性訊號）、圖譜軟分數、半衰期 30 天、`prefer` 加權皆為提案；待核准問題 Q1–Q11（權重數字、衰減、儲存位置、清除粒度、跨日目的地、標記完成是否寫入核心記憶、`prefer` 加權與放寬、種類親和閾值、說明文字、活動跨日效果、是否讀取愛店）。核准後才實作 |
+| 2.3 AKOMEYA 食堂排除按鈕標籤 | ✅ 結案（2026-11-14：文案維持，見 §6） | Production 觀察 2026-11-10 19:03–19:07 JST：production bundle 與 main @ `5bf71a87` SHA-256 一致（`a2667822762537875babe8381fc2658a1a84134337e24109abbe7e2cc979e366`，`assets/index-VHua357e.js`）；按鈕模板唯一：`不要「{kindLabel}」這類`；kind 唯一來源是當下候選的 Google Places types／primaryType（type＋brand 判定，店名零貢獻）；stale 標籤假設在 UI 渲染層不成立。**AKOMEYA 今日的 types 未確認**（需瀏覽器實測 production 渲染）；文案決定待使用者看證據後做 |
+| 2.4 行為回饋迴圈＋權重圖 | ✅ 最簡版已實作（2026-11-14，PR #79） | 設計稿 `~/workspace/general-decision-core-loop-2.0/design-2.4/DESIGN-feedback-loop.md`；訊號三層（手動輸入最強／明確表態／隱性訊號）、圖譜軟分數、半衰期 30 天、`prefer` 加權皆為提案；待核准問題 Q1–Q11（權重數字、衰減、儲存位置、清除粒度、跨日目的地、標記完成是否寫入核心記憶、`prefer` 加權與放寬、種類親和閾值、說明文字、活動跨日效果、是否讀取愛店）。核准後才實作 | **2026-11-14 實作範圍**：只做「種類親和」軟排序（`src/dailyAffinity.ts`）；原設計稿不在 repo，權重圖、跨日目的地、讀取愛店都沒做（Q5、Q6、Q10、Q11 裁定為不做）。 |
 
 ### 7.6 不在本批次：O2（PR-1 紅隊第 5 輪觀察）
 
