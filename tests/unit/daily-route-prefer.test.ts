@@ -79,7 +79,8 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
-describe('機率偏向（seed 亂數，各抽 1500 次）', () => {
+// 每個測試抽樣 4500 次，本機約 3 秒；CI 機器較慢，預設 5 秒會超時（PR #79 第一次 CI）。
+describe('機率偏向（seed 亂數，各抽 1500 次）', { timeout: 30_000 }, () => {
   it('沒帶偏好：拉麵佔約 2/5；帶 prefer 拉麵：約 12/18；帶 demote 拉麵：約 2/8', async () => {
     seedRandom(1); const none = await sample(base(), N)
     seedRandom(1); const pref = await sample(base({ prefer: ['ramen'] }), N)
