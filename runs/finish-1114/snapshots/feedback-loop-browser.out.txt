@@ -1,0 +1,13 @@
+PASS 1 第一次請求不帶 prefer／demote ｜ {"keys":["location","area","areaOnly","startTime","stops","exclude","excludeKinds","seen"]}
+PASS 1 還沒有偏好紀錄 ｜ {"affinity":null}
+PASS 1 沒有原因行
+PASS 2 標完成後 localStorage 有紀錄（兩筆 ramen +2） ｜ [{"k":"ramen","w":2,"t":1794631692027,"src":"done:2026-11-14:meal:r1"},{"k":"ramen","w":2,"t":1794631692095,"src":"done:2026-11-14:coffee:r2"}]
+PASS 3 下一次請求 body 帶 prefer:["ramen"] ｜ {"prefer":["ramen"]}
+PASS 3 回應帶旗標的站顯示原因行 ｜ {"count":1,"text":"你常選這類，優先挑了這間"}
+PASS 4 清除後 localStorage 偏好紀錄不存在 ｜ {"affinity":null}
+PASS 4 seen／disliked／dislikedKinds 沒被清除動到 ｜ {"before":[{"shopping":["r3"]},[],[]],"after":[{"shopping":["r3"]},[],[]]}
+PASS 4 清除後原因行消失
+PASS 4 清除後下一次請求不帶 prefer／demote ｜ {"keys":["location","area","areaOnly","startTime","stops","exclude","excludeKinds","seen"]}
+PASS 5 偏好紀錄是壞 JSON：頁面照常、請求不帶 prefer ｜ {"stops":3}
+PASS 頁面沒有未捕捉的錯誤 ｜ []
+請求數：4；失敗檢查數：0

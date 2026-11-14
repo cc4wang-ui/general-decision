@@ -3,6 +3,7 @@ import { openAtEta, dispatchableAt, type HoursPeriod, type OpenAtEta } from '../
 import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from '../src/venueCheck.ts'
 import { areaCenter, AREA_RADIUS_M, distanceKm } from '../src/areas.ts'
+import { sanitizeKindList, softWeights, weightedIndex } from '../src/dailyAffinity.ts'
 // Daily Decision: real Google Places results and approximate geographic route ordering.
 // Does not claim live traffic, transit ETAs, reservations or confirmed stock.
 export const config = { runtime:'nodejs' }
@@ -12,7 +13,7 @@ const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{stat
 type Coord={lat:number;lng:number}
 /** hours：Google currentOpeningHours.periods（已在 MASK 裡，不加費用），到店營業判斷用。 */
 type Candidate={id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types:string[];primaryType?:string;userRatingCount?:number;hours?:HoursPeriod[]}
-type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;done?:boolean;custom?:boolean;specified?:boolean;start?:string;minutes?:number;candidate?:Candidate;noCandidate?:boolean;noCandidateReason?:'area'|'filtered'|'empty'|'closed';eta?:string;etaDayOffset?:number;travelMin?:number;openAtEta?:OpenAtEta}
+type Stop={id:string;kind:string;place?:string;title?:string;locked?:boolean;done?:boolean;custom?:boolean;specified?:boolean;start?:string;minutes?:number;candidate?:Candidate;noCandidate?:boolean;noCandidateReason?:'area'|'filtered'|'empty'|'closed';eta?:string;etaDayOffset?:number;travelMin?:number;openAtEta?:OpenAtEta;/** 2.4：這一站的店是種類偏好提高機率後挑中的（只在偏好真的改變了這一站的挑選機率、且挑中的是偏好種類時才有）。 */preferHit?:boolean}
 const queries:Record<string,string>={gym:'FIT-EASY Shibuya Sakura Stage',meal:'Japanese set meal restaurant',creative:'art gallery exhibition',coffee:'quiet specialty coffee cafe',shopping:'sports goods drugstore'}
 /** 每一站的 Places includedType（Table A）。沒有這一層，通用查詢字串回什麼全憑 Google 相關度，車站／地標／商場都會混進來。 */
 const includedTypes:Record<string,string>={gym:'gym',meal:'restaurant',creative:'art_gallery',coffee:'cafe',shopping:'drugstore'}
@@ -185,6 +186,14 @@ async function handler(req:Request):Promise<Response>{
   * 上限 200，跟 exclude 同步（每站最多 20 筆，9 站最多 180，200 蓋得住）。
   */
  const seen=Array.isArray(input.seen)?input.seen.filter(x=>typeof x==='string').slice(0,200):[]
+ /**
+  * 2.4 行為回饋（decisions.md Q7／Q8）：prefer／demote 是前端從本機行為紀錄算出的種類清單。
+  * 只做軟排序——只改下方「前 5 名裡隨機挑」的機率，不進 usableHere／venueOk／areaOk／
+  * retentionOk，任何門檻與可用候選集合都不變。同時在兩邊的種類當成沒帶。
+  * 輸入未驗證：非陣列、非字串、過長一律忽略，各最多 20 個。不寫進 log。
+  */
+ const preferIn=sanitizeKindList(input.prefer,normalizeKind),demoteIn=sanitizeKindList(input.demote,normalizeKind)
+ const prefer=preferIn.filter(k=>!demoteIn.includes(k)),demote=demoteIn.filter(k=>!preferIn.includes(k))
  // 地區偏好（F7）：開啟才生效；未知地區名退回澀谷（src/areas.ts areaCenter），
  // 不再 fail-open——未知地區名＋開啟時全站都過，跟沒開偏好一樣（紅隊 round 6 F7 註記）。
  const areaPref=input.areaOnly===true&&typeof input.area==='string'?areaCenter(input.area):null
@@ -308,11 +317,16 @@ async function handler(req:Request):Promise<Response>{
    // 打破確定性排序：不在固定取第一名，改在前 5 名裡隨機挑。seen-list 存在時，
    // 每次 shuffle 排除掉已出現的，本來就會往下走；隨機是為了每天開局不永遠是同一間。
    const top=found.ranked.slice(0,5)
-   const selected=top[randomIndex(top.length)]!
+   // 2.4：自動站帶了種類偏好、且這 5 名裡種類權重不一樣時，改成加權隨機（權重都 ≥1，每一間都還抽得到）。
+   // 沒帶偏好、指定／固定站、或權重全相同：weights 為 null，走原本的均勻隨機，行為不變。
+   const weights=auto?softWeights(top.map(p=>kindOfCandidate(p)),prefer,demote):null
+   const selected=weights?top[weightedIndex(weights,randomIndex(weights.reduce((a,b)=>a+b,0)))]!:top[randomIndex(top.length)]!
+   const selectedKind=weights?kindOfCandidate(selected):undefined
+   const preferHit=!!selectedKind&&prefer.includes(selectedKind)
    // 本請求已挑出：後面站的 eligible 過濾與保留重驗都要排除這間（round 10 R9-K1）。
    picked.add(selected.id)
    if(auto)pools.set(s.id,found.ranked.filter(p=>p.id!==selected.id))
-   result.push({...stop,title:preserve?stop.title:selected.name,place:selected.address,candidate:selected,noCandidate:undefined,noCandidateReason:undefined})
+   result.push({...stop,title:preserve?stop.title:selected.name,place:selected.address,candidate:selected,noCandidate:undefined,noCandidateReason:undefined,...(preferHit?{preferHit:true}:{})})
   }
   // 開始時間（PR-4）：使用者開始時間合法且比當下晚才取代伺服器當下時間；
   // 未指定／不合法／已過去時就是伺服器當下時間——跟今天完全相同。
@@ -350,7 +364,7 @@ async function handler(req:Request):Promise<Response>{
    const isAuto=(s:Stop)=>!s.done&&!s.locked&&!s.custom&&!s.specified
    const stateOf=(s:Stop)=>openAtEta(s.candidate?.hours,anchorDate,s.eta,s.etaDayOffset??0)
    const badOf=(list:Stop[])=>list.filter(s=>isAuto(s)&&!!s.candidate&&!dispatchableAt(stateOf(s)))
-   const closedStop=(s:Stop):Stop=>({...s,candidate:undefined,place:undefined,title:CATALOG_TITLES[s.id]??s.title,noCandidate:true,noCandidateReason:'closed'})
+   const closedStop=(s:Stop):Stop=>({...s,candidate:undefined,place:undefined,title:CATALOG_TITLES[s.id]??s.title,noCandidate:true,noCandidateReason:'closed',preferHit:undefined})
    const banned=new Map<string,Set<string>>()
    // pending-tests（2026-11-13，正式站 E2E 實測）：已完成站是「已經去過」，不再排進路線。
    // 舊版把它當沒有 start 的固定站，排到最後並給未來 ETA（實測：晚餐標完成後顯示 01:47 抵達），
@@ -392,7 +406,7 @@ async function handler(req:Request):Promise<Response>{
      // 把關第 2 輪 R3：估計只是排順序。估計挑不到（例如繞路使估計偏快，店還沒開）不直接標 closed，
      // 改派池裡第一個還沒試過的候選，交給下一輪 Routes 實算 ETA 驗證；不合格會進 banned。輪數上限不變。
      const next=usable.find(p=>estAt(p)==='open')??usable.find(p=>estAt(p)==='unknown')??usable.find(p=>at(p)==='open')??usable[0]
-     current=current.map(x=>x.id!==s.id?x:next?{...x,title:next.name,place:next.address,candidate:next,noCandidate:undefined,noCandidateReason:undefined}:closedStop(x))
+     current=current.map(x=>x.id!==s.id?x:next?{...x,title:next.name,place:next.address,candidate:next,noCandidate:undefined,noCandidateReason:undefined,preferHit:undefined}:closedStop(x))
     }
     ordered=order(current,center)
     located=ordered.stops.filter(routable);
