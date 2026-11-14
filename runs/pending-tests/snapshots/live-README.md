@@ -31,9 +31,9 @@
 - **WebKit**：本容器能跑（下載 WebKit 26.6＋`playwright install-deps` 補齊系統函式庫），iPhone WebKit 兩個測試都 PASS。故 WebKit 已驗，非「未驗」。
 - 真 iPhone Safari 實機：留給 Cross 一次性確認。步驟：手機 Safari 開 `https://general-decision.vercel.app` → 點「今日行程」→ 出發地填「渋谷駅」→ 勾想做的事 → 加一個固定行程 → 按「搜尋店家並生成路線」→ 看店名、照片、ETA 是否正常、頁面不左右晃。
 
-## 4. 測出的 bug：已完成站被排進未來路線（已修，未部署）
+## 4. 測出的 bug：已完成站被排進未來路線（已修，正式站重驗 PASS）
 - 現象（正式站現場重現，iPhone＋WebKit 兩次）：把晚餐標記完成後重新排路線，已完成站被排到行程最後、給未來 ETA **03:19 抵達**，還多算一段步行（報告 annotation `done-stop-eta: 03:19`；`snapshots/iphone-shuffle-2-swap.json` meal 站 `done:true` 卻 `eta 03:19`）。
 - 根因：`api/daily-route.ts` 排路線時把 `done` 站當成沒有 `start` 的固定站，排進 `scheduleRoute` 的矩陣。
 - 修正（本分支）：排路線只收 `!s.done` 的站（`routable`）；已完成站留在原位、不給 ETA、不算步行。新增單元測試 `tests/unit/daily-route.test.ts`「已完成站不排進路線」，拔掉修正會 FAIL。
 - **預覽站實測 PASS（2026-11-13 10:3x UTC）**：部署上限已恢復，PR #77 預覽 `dpl_ArQZpgwumkAVJuvdjncSobKrcxWr`（commit `532ec8e`）READY。用 `EXPECT_DONE_FIX=1` 對預覽站跑 iPhone＋WebKit 共 4 個測試全過；已完成站（権八）換站後、重新搜尋後都**沒有 ETA**（`preview/snapshots/*-shuffle-2-swap.json`、`*-3-regenerate.json`；截圖 `preview/shots/`；報告 `preview/reports/e2e-report.json`）。
-- 正式站：合併後再用 `EXPECT_DONE_FIX=1` 跑一次。
+- **正式站重驗 PASS（2026-11-14 04:41 UTC）**：main `fb75135` 重新部署為 `dpl_H2rbmAB8wDWdE3Vnx6PFsnZQFLr3`（READY，別名 `general-decision.vercel.app`）。用 `EXPECT_DONE_FIX=1` 對正式站跑 iPhone＋WebKit `4 passed (54.8s)`；回應裡已完成站（meal，`done:true`）沒有 `eta`（`prod-after/snapshots/*-shuffle-2-swap.json`；報告 `prod-after/reports/e2e-report.json`）。快照裡 `_request.stops` 的舊 `eta` 是瀏覽器送出的上一輪值，不是回應。
