@@ -1,0 +1,232 @@
+{
+ "browser": "webkit",
+ "checks": {
+  "A1 所有輸入框字級 ≥16px（iOS 不自動放大）": {
+   "pass": true,
+   "detail": {
+    "count": 15,
+    "sizes": [
+     "16px"
+    ]
+   }
+  },
+  "A2 目的地逐鍵打「Fuglen Tokyo」不丟空白、不失焦": {
+   "pass": true,
+   "detail": {
+    "got": "Fuglen Tokyo",
+    "savedIntent": "Fuglen Tokyo"
+   }
+  },
+  "A4 目的地按 Enter 收起選單": {
+   "pass": true,
+   "detail": {}
+  },
+  "A5 逐站指定：打字時卡片不跳動、不失焦、字不丟": {
+   "pass": true,
+   "detail": {
+    "jumpPx": 0,
+    "got": "Fuglen Tokyo"
+   }
+  },
+  "A6 逐站指定按 Enter 送出：只重找這一站，文字原樣當地點名稱": {
+   "pass": true,
+   "detail": {
+    "shuffle": "meal",
+    "stop": {
+     "id": "meal",
+     "place": "Fuglen Tokyo",
+     "specified": true
+    }
+   }
+  },
+  "A7 行程畫面上直接有「加一個我想去的地方」輸入框（不用點開任何東西）": {
+   "pass": true,
+   "detail": {
+    "box": {
+     "x": 20,
+     "y": -932.8125,
+     "width": 257.5,
+     "height": 48.796875
+    }
+   }
+  },
+  "A8 加地點按 Enter：加進行程並查這一站": {
+   "pass": true,
+   "detail": {
+    "want": {
+     "id": "want-…",
+     "place": "下北沢 本屋 B&B",
+     "custom": true,
+     "specified": true
+    },
+    "inputAfter": ""
+   }
+  },
+  "A9 加地點按按鈕也能送出": {
+   "pass": true,
+   "detail": {}
+  },
+  "B1 上移／下移按鈕 ≥44×44px，固定行程沒有按鈕": {
+   "pass": true,
+   "detail": {
+    "w": 44,
+    "h": 44
+   }
+  },
+  "B2 按下移：這一站往下一格，出現順序列": {
+   "pass": true,
+   "detail": {
+    "before": [
+     "(fixed)",
+     "meal",
+     "creative",
+     "coffee",
+     "want-1794714293781",
+     "want-1794714293912"
+    ],
+    "after": [
+     "(fixed)",
+     "creative",
+     "meal",
+     "coffee",
+     "want-1794714293781",
+     "want-1794714293912"
+    ]
+   }
+  },
+  "B3 「照這個順序更新時間」：請求帶 manualOrder:true＋reorderOnly:true，站的順序＝畫面順序，不換店": {
+   "pass": true,
+   "detail": {
+    "manualOrder": true,
+    "reorderOnly": true,
+    "sentOrder": [
+     "fixed-1",
+     "creative",
+     "meal",
+     "coffee",
+     "want",
+     "want"
+    ]
+   }
+  },
+  "B4 回應後畫面順序仍是使用者的順序": {
+   "pass": true,
+   "detail": {
+    "after": [
+     "(fixed)",
+     "creative",
+     "meal",
+     "coffee",
+     "want",
+     "want"
+    ]
+   }
+  },
+  "B5 重開頁面順序還在（存檔有 manualOrder）": {
+   "pass": true,
+   "detail": {
+    "manualOrder": true
+   }
+  },
+  "B6 重新產生不打亂：請求仍帶 manualOrder、順序相同；畫面順序相同": {
+   "pass": true,
+   "detail": {
+    "sentOrder": [
+     "fixed-1",
+     "creative",
+     "meal",
+     "coffee",
+     "want",
+     "want"
+    ]
+   }
+  },
+  "B7 換一站不打亂順序": {
+   "pass": true,
+   "detail": {
+    "shuffle": "creative"
+   }
+  },
+  "B8 恢復自動排序：請求不再帶 manualOrder（帶 reorderOnly，不換店），順序列消失": {
+   "pass": true,
+   "detail": {
+    "reorderOnly": true
+   }
+  },
+  "C1 探索站可換主題：選單有「讓導遊決定」＋7 個主題": {
+   "pass": true,
+   "detail": {
+    "opts": [
+     "auto=讓導遊決定",
+     "view_cafe=景觀好的咖啡",
+     "good_coffee=好喝的咖啡",
+     "fun=有趣的地方",
+     "park=漂亮的公園",
+     "new_area=沒去過的區域",
+     "destination_meal=值得專程去的餐廳",
+     "art=藝文展覽"
+    ]
+   }
+  },
+  "C2 選「漂亮的公園」：只重找探索站，請求逐站帶 theme": {
+   "pass": true,
+   "detail": {
+    "shuffle": "creative",
+    "theme": "park"
+   }
+  },
+  "C3 卡片有理由行（主題、評分、評論數、步行分鐘都來自回應）": {
+   "pass": true,
+   "detail": {
+    "reason": "為什麼推這裡：主題「漂亮的公園」・Google ★4.3（321 則評論）・從上一站步行 8 分鐘"
+   }
+  },
+  "C4 自己選的主題重新產生時不被換掉": {
+   "pass": true,
+   "detail": {}
+  },
+  "C5 讓導遊決定：每次重新產生都換主題；今天出過的（含剛才的公園）在一輪出完前不重複": {
+   "pass": true,
+   "detail": {
+    "usedBefore": [
+     "art",
+     "park"
+    ],
+    "seq": [
+     "fun",
+     "view_cafe",
+     "good_coffee",
+     "destination_meal",
+     "good_coffee"
+    ],
+    "freshCount": 4
+   }
+  },
+  "C6 選「沒去過的區域」：請求帶 themeArea（地區清單裡、不是自己的生活圈）": {
+   "pass": true,
+   "detail": {
+    "theme": "new_area",
+    "themeArea": "代官山",
+    "reason": "為什麼推這裡：主題「沒去過的區域」・你還沒去過的代官山・Google ★4.3（321 則評論）・從上一站步行 11 分鐘"
+   }
+  },
+  "C7 咖啡站可選景觀好／好喝兩種": {
+   "pass": true,
+   "detail": {
+    "copts": [
+     "auto",
+     "view_cafe",
+     "good_coffee"
+    ]
+   }
+  },
+  "D1 沒有橫向捲動": {
+   "pass": true,
+   "detail": {
+    "overflow": 0
+   }
+  }
+ },
+ "requests": 16,
+ "allPass": true
+}
