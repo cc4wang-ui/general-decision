@@ -105,18 +105,36 @@ await up.click()
 const order1 = await cardIds()
 ok('B2 按下移：這一站往下一格，出現順序列', order1.indexOf('meal') > order1.indexOf(order0[order0.indexOf('meal') + 1] === '(fixed)' ? order0[order0.indexOf('meal') + 2] : order0[order0.indexOf('meal') + 1]) && await page.getByTestId('daily-order-bar').isVisible(), { before: order0, after: order1 })
 await page.getByTestId('daily-order-bar').evaluate((el) => el.scrollIntoView({ block: 'start' })); await shot('order-moved')
+// 把關 R1-C：還沒重算就重開頁面，按鈕要還在。
+await page.reload(); await page.getByTestId('daily-entry').click(); await page.locator('[data-screen="daily-decision"]').waitFor()
+ok('B2c 改了順序還沒重算就重開頁面：「照這個順序更新時間」還在、順序還在', await page.getByTestId('daily-order-apply').isVisible() && JSON.stringify(await cardIds()) === JSON.stringify(order1) && (await saved()).orderDirty === true, { orderDirty: (await saved()).orderDirty })
+// 把關 R1-E：連按 3 次 ↑，同一顆按鈕每次都還在畫面內（沒被底部按鍵列蓋住）、焦點還在它身上。
+const lastId = order1[order1.length - 1]
+const upBtn = page.getByTestId('daily-move-up-' + lastId)
+await upBtn.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+const hops = []
+for (let i = 0; i < 3; i++) {
+  await upBtn.click()
+  await page.waitForTimeout(150)
+  const box = await upBtn.boundingBox()
+  const dockY = (await page.locator('.dd-dock').boundingBox()).y
+  hops.push({ y: Math.round(box.y), inView: box.y >= 0 && box.y + box.height <= dockY, focused: await upBtn.evaluate((el) => document.activeElement === el), order: (await cardIds()).map((x) => x.replace(/want-\d+/, 'want')) })
+  if (i === 0) await shot('order-arrows')
+}
+ok('B2e 連按 3 次 ↑：按鈕每次都在畫面內、焦點留在同一顆、每次往上一格', hops.every((h) => h.inView && h.focused) && (await cardIds()).filter((x) => x !== '(fixed)').indexOf(lastId) === order1.filter((x) => x !== '(fixed)').length - 4, { hops })
+const order2 = await cardIds()
 await page.getByTestId('daily-order-apply').click(); await idle()
 const rp = sent[sent.length - 1]
 const movableOf = (ids) => ids.filter((x) => x !== '(fixed)' && x !== 'fixed-1')
-ok('B3 「照這個順序更新時間」：請求帶 manualOrder:true＋reorderOnly:true，站的順序＝畫面順序，不換店', rp.manualOrder === true && rp.reorderOnly === true && rp.shuffle === undefined && JSON.stringify(movableOf(rp.stops.map((s) => s.id))) === JSON.stringify(movableOf(order1)), { manualOrder: rp.manualOrder, reorderOnly: rp.reorderOnly, sentOrder: rp.stops.map((s) => s.id.replace(/want-\d+/, 'want')) })
-ok('B4 回應後畫面順序仍是使用者的順序', JSON.stringify(movableOf(await cardIds())) === JSON.stringify(movableOf(order1)), { after: (await cardIds()).map((x) => x.replace(/want-\d+/, 'want')) })
+ok('B3 「照這個順序更新時間」：請求帶 manualOrder:true＋reorderOnly:true，站的順序＝畫面順序，不換店', rp.manualOrder === true && rp.reorderOnly === true && rp.shuffle === undefined && JSON.stringify(movableOf(rp.stops.map((s) => s.id))) === JSON.stringify(movableOf(order2)), { manualOrder: rp.manualOrder, reorderOnly: rp.reorderOnly, sentOrder: rp.stops.map((s) => s.id.replace(/want-\d+/, 'want')) })
+ok('B4 回應後畫面順序仍是使用者的順序', JSON.stringify(movableOf(await cardIds())) === JSON.stringify(movableOf(order2)), { after: (await cardIds()).map((x) => x.replace(/want-\d+/, 'want')) })
 await page.reload(); await page.getByTestId('daily-entry').click(); await page.locator('[data-screen="daily-decision"]').waitFor()
-ok('B5 重開頁面順序還在（存檔有 manualOrder）', JSON.stringify(movableOf(await cardIds())) === JSON.stringify(movableOf(order1)) && (await saved()).manualOrder === true, { manualOrder: (await saved()).manualOrder })
+ok('B5 重開頁面順序還在（存檔有 manualOrder）', JSON.stringify(movableOf(await cardIds())) === JSON.stringify(movableOf(order2)) && (await saved()).manualOrder === true, { manualOrder: (await saved()).manualOrder })
 await page.getByTestId('daily-generate').click(); await idle()
 const gp = sent[sent.length - 1]
-ok('B6 重新產生不打亂：請求仍帶 manualOrder、順序相同；畫面順序相同', gp.manualOrder === true && gp.reorderOnly === undefined && JSON.stringify(movableOf(gp.stops.map((s) => s.id))) === JSON.stringify(movableOf(order1)) && JSON.stringify(movableOf(await cardIds())) === JSON.stringify(movableOf(order1)), { sentOrder: gp.stops.map((s) => s.id.replace(/want-\d+/, 'want')) })
+ok('B6 重新產生不打亂：請求仍帶 manualOrder、順序相同；畫面順序相同', gp.manualOrder === true && gp.reorderOnly === undefined && JSON.stringify(movableOf(gp.stops.map((s) => s.id))) === JSON.stringify(movableOf(order2)) && JSON.stringify(movableOf(await cardIds())) === JSON.stringify(movableOf(order2)), { sentOrder: gp.stops.map((s) => s.id.replace(/want-\d+/, 'want')) })
 await page.getByText('↻ 換這一站').first().click(); await idle()
-ok('B7 換一站不打亂順序', sent[sent.length - 1].manualOrder === true && JSON.stringify(movableOf(await cardIds())) === JSON.stringify(movableOf(order1)), { shuffle: sent[sent.length - 1].shuffle })
+ok('B7 換一站不打亂順序', sent[sent.length - 1].manualOrder === true && JSON.stringify(movableOf(await cardIds())) === JSON.stringify(movableOf(order2)), { shuffle: sent[sent.length - 1].shuffle })
 await page.getByTestId('daily-order-auto').click(); await idle()
 const au = sent[sent.length - 1]
 ok('B8 恢復自動排序：請求不再帶 manualOrder（帶 reorderOnly，不換店），順序列消失', au.manualOrder === undefined && au.reorderOnly === true && await page.getByTestId('daily-order-bar').count() === 0 && (await saved()).manualOrder === undefined, { manualOrder: au.manualOrder, reorderOnly: au.reorderOnly })
@@ -138,12 +156,12 @@ await page.getByTestId('daily-generate').click(); await idle()
 ok('C4 自己選的主題重新產生時不被換掉', sent[sent.length - 1].stops.find((s) => s.id === 'creative').theme === 'park', {})
 const usedBefore = (await saved()).themesToday ?? []
 await chip.click(); await page.getByTestId('daily-theme-opt-auto').click(); await idle()
-const seq = [sent[sent.length - 1].stops.find((s) => s.id === 'creative').theme]
-for (let i = 0; i < 4; i++) { await page.getByTestId('daily-generate').click(); await idle(); seq.push(sent[sent.length - 1].stops.find((s) => s.id === 'creative').theme) }
-// 開著「只在這一帶找店」時導遊有 6 個主題可輪（不自動挑沒去過的區域）。今天還沒出過的先出完，才開始新的一輪；任何時候都不連續重複。
-const freshCount = 6 - usedBefore.filter((x) => x !== 'new_area').length
-const firstRound = seq.slice(0, freshCount)
-ok('C5 讓導遊決定：每次重新產生都換主題；今天出過的（含剛才的公園）在一輪出完前不重複', new Set(firstRound).size === firstRound.length && firstRound.every((x) => !usedBefore.includes(x)) && seq.every((x, i) => i === 0 || x !== seq[i - 1]) && !seq.includes('new_area'), { usedBefore, seq, freshCount })
+const pickOf = () => sent[sent.length - 1].stops.find((s) => s.id === 'creative')
+const picks = [pickOf()]
+for (let i = 0; i < 5; i++) { await page.getByTestId('daily-generate').click(); await idle(); picks.push(pickOf()) }
+const seq = picks.map((p) => p.theme)
+// 行程裡有午餐站與咖啡站：導遊只在 有趣／公園／藝文／沒去過的區域 之間輪（把關 R1-B、F），不連續重複；輪到沒去過的區域一定帶區域。
+ok('C5 讓導遊決定：每次重新產生都換主題；不跟午餐站／咖啡站重複；會輪到「沒去過的區域」（開著只在這一帶也會）', seq.every((x, i) => ['fun', 'park', 'art', 'new_area'].includes(x) && (i === 0 || x !== seq[i - 1])) && seq.includes('new_area') && new Set(seq).size >= 3 && picks.every((p) => (p.theme === 'new_area') === !!p.themeArea), { usedBefore, seq, areas: picks.map((p) => p.themeArea ?? null) })
 await chip.click(); await page.getByTestId('daily-theme-opt-new_area').click(); await idle()
 const na = sent[sent.length - 1].stops.find((s) => s.id === 'creative')
 ok('C6 選「沒去過的區域」：請求帶 themeArea（地區清單裡、不是自己的生活圈）', na.theme === 'new_area' && ['新宿', '原宿', '表参道', '恵比寿', '代官山'].includes(na.themeArea), { theme: na.theme, themeArea: na.themeArea, reason: await page.getByTestId('daily-reason-creative').textContent() })
@@ -151,6 +169,12 @@ await page.getByTestId('daily-theme-coffee').click()
 const copts = await page.locator('[data-testid^="daily-theme-opt-"]').evaluateAll((els) => els.filter((e) => e.offsetParent).map((e) => e.dataset.testid.replace('daily-theme-opt-', '')))
 await page.getByTestId('daily-theme-opt-view_cafe').click(); await idle()
 ok('C7 咖啡站可選景觀好／好喝兩種', JSON.stringify(copts) === JSON.stringify(['auto', 'view_cafe', 'good_coffee']) && sent[sent.length - 1].stops.find((s) => s.id === 'coffee').theme === 'view_cafe', { copts })
+// 把關 R1-D：加到 9 站後再加，打的字要留著。
+const addBox = page.getByTestId('daily-add-place')
+while ((await saved()).tasks.length < 9) { await addBox.fill('補滿用的地點' + (await saved()).tasks.length); await addBox.press('Enter'); await idle() }
+const callsFull = sent.length
+await addBox.fill('第十個想去的地方'); await addBox.press('Enter'); await page.waitForTimeout(200)
+ok('D0 已有 9 站再按 Enter：打的字還在、有提示、沒有送請求', (await addBox.inputValue()) === '第十個想去的地方' && sent.length === callsFull && await page.getByText('一天最多排 9 站').isVisible() && (await saved()).tasks.length === 9, { inputAfterEnter: await addBox.inputValue(), calls: sent.length - callsFull })
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 ok('D1 沒有橫向捲動', overflow <= 0, { overflow })
 await page.evaluate(() => scrollTo(0, 0)); await shot('final-top')

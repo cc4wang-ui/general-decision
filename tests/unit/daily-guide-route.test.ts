@@ -204,6 +204,25 @@ describe('探索主題（theme）', () => {
     mockGoogle(() => [near('tower', { primaryType: 'tourist_attraction', types: ['tourist_attraction'] }), near('st', { primaryType: 'train_station', types: ['train_station'] })])
     expect((await run({ origin: SHIBUYA, areaOnly: false, stops: [stop('creative', { theme: 'park' })] })).stops[0]!.noCandidate).toBe(true)
   })
+  it('把關 R1-G：咖啡主題只收 primaryType 是 cafe／coffee_shop 的店——lounge_bar、bar、沒有類型的都不收；其他主題不受影響', async () => {
+    const lounge = near('paradise-lounge', { name: 'Paradise Lounge', primaryType: 'lounge_bar', types: ['lounge_bar', 'bar', 'cafe'] })
+    for (const [stopId, theme] of [['creative', 'view_cafe'], ['creative', 'good_coffee'], ['coffee', 'view_cafe'], ['coffee', 'good_coffee']] as const) {
+      mockGoogle(() => [lounge, near('typeless', { primaryType: undefined }), near('some-bar', { primaryType: 'bar', types: ['bar'] })])
+      expect((await run({ origin: SHIBUYA, areaOnly: false, stops: [stop(stopId, { theme })] })).stops[0]).toMatchObject({ noCandidate: true, noCandidateReason: 'filtered' })
+      mockGoogle(() => [lounge, near('real-coffee', { primaryType: 'coffee_shop', types: ['coffee_shop', 'cafe'] })])
+      expect((await run({ origin: SHIBUYA, areaOnly: false, stops: [stop(stopId, { theme })] })).stops[0]!.candidate!.id).toBe('real-coffee')
+    }
+    // 沒有主題的咖啡站、其他主題：照舊（lounge 不被這條規則擋）。
+    mockGoogle(() => [lounge])
+    expect((await run({ origin: SHIBUYA, areaOnly: false, stops: [stop('coffee')] })).stops[0]!.candidate!.id).toBe('paradise-lounge')
+    expect((await run({ origin: SHIBUYA, areaOnly: false, stops: [stop('creative', { theme: 'fun' })] })).stops[0]!.candidate!.id).toBe('paradise-lounge')
+    // 換別站時：咖啡主題站留著的舊店若是 lounge，清掉重找；沒有 primaryType 的舊店當未知、照留。
+    const kept = (primaryType?: string) => ({ ...stop('coffee', { theme: 'view_cafe' }), candidate: { ...cand('old', 1), primaryType, types: primaryType ? [primaryType] : [] } })
+    const meal = { id: 'meal', kind: 'meal', title: '午餐', minutes: 45, candidate: cand('old-meal', 2) }
+    mockGoogle(req => req.textQuery === THEMES.view_cafe.query ? [near('real-coffee', { primaryType: 'cafe', types: ['cafe'] })] : [near('new-meal')])
+    expect((await run({ origin: SHIBUYA, areaOnly: false, shuffle: 'meal', stops: [meal, kept('lounge_bar')] })).stops.find(s => s.id === 'coffee')!.candidate!.id).toBe('real-coffee')
+    expect((await run({ origin: SHIBUYA, areaOnly: false, shuffle: 'meal', stops: [meal, kept(undefined)] })).stops.find(s => s.id === 'coffee')!.candidate!.id).toBe('old')
+  })
   it('主題站也要過既有門檻：評論數不到 50 的不派', async () => {
     mockGoogle(() => [near('tiny')])
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ places: [{ ...gPlace(near('tiny')), userRatingCount: 12 }] }), { status: 200 }))))

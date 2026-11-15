@@ -11,8 +11,8 @@ vi.mock('../../src/placeMem.ts', () => ({
   clearDislike: vi.fn(() => Promise.resolve({ sharedRemains: false })),
 }))
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { applyUserOrder, clearStaleCandidate, DailyDecision, exploreReason, loadDaily, moveTask, replanDaily, rotateThemes, type DailyState, type DailyTask } from '../../src/dailyDecision.tsx'
-import { loadVisitedAreas, markAreasVisited, pickNewArea, pickTheme, STATION_THEMES, THEME_IDS, themeAreaFor, themeFor, themePool, unmarkAreasVisited, VISITED_AREAS_KEY } from '../../src/dailyThemes.ts'
+import { applyUserOrder, clearStaleCandidate, DailyDecision, exploreReason, fillThemeArea, loadDaily, moveTask, replanDaily, rotateThemes, type DailyState, type DailyTask, type ThemeContext } from '../../src/dailyDecision.tsx'
+import { loadSeenAreas, loadVisitedAreas, markAreasSeen, markAreasVisited, pickNewArea, pickTheme, reachableAreas, SEEN_AREAS_KEY, STATION_THEMES, THEME_IDS, themeAreaFor, themeFor, themePool, unmarkAreasVisited, VISITED_AREAS_KEY, type AreaRecords } from '../../src/dailyThemes.ts'
 import { AREAS, AREA_NAMES } from '../../src/areas.ts'
 
 const KEY = 'decide.daily.v1'
@@ -51,6 +51,7 @@ describe('手動排序（純函式）', () => {
     const s = moveTask(stateOf(tasks), 'creative', 1)
     expect(s.tasks.map(t => t.id)).toEqual(['fixed-1', 'meal', 'coffee', 'fixed-2', 'creative'])
     expect(s.manualOrder).toBe(true)
+    expect(s.orderDirty).toBe(true)
     expect(s.tasks.every(t => t.eta === undefined && t.travelMin === undefined)).toBe(true)
     expect(moveTask(stateOf(tasks), 'creative', -1).tasks.map(t => t.id)).toEqual(['fixed-1', 'creative', 'meal', 'fixed-2', 'coffee'])
   })
@@ -132,6 +133,74 @@ describe('手動排序（畫面）', () => {
     expect('manualOrder' in sent[0]!).toBe(false)
     expect(saved().manualOrder).toBeUndefined()
     expect(screen.queryByTestId('daily-order-bar')).toBeNull()
+  })
+})
+
+describe('把關 R1：C 重開頁面、D 滿 9 站、E 移動後按鈕還在', () => {
+  const three = () => stateOf([task('meal', { title: '定食屋', candidate: cand('m', '定食屋'), eta: '10:10' }), task('creative', { title: '藝廊', candidate: cand('g', '藝廊'), eta: '11:00' }), task('coffee', { title: '咖啡店', candidate: cand('c', '咖啡店'), eta: '12:00' })])
+  it('C：改了順序還沒重算就重開頁面 →「照這個順序更新時間」還在；按了重算成功才消失（存檔的 orderDirty 跟著清）', async () => {
+    seed(three())
+    const first = render(<DailyDecision onBack={() => {}} />)
+    await settle()
+    fireEvent.click(screen.getByTestId('daily-move-down-meal'))
+    expect(saved().orderDirty).toBe(true)
+    first.unmount()
+    render(<DailyDecision onBack={() => {}} />)
+    await settle()
+    expect(titles()).toEqual(['藝廊', '定食屋', '咖啡店'])
+    fireEvent.click(screen.getByTestId('daily-order-apply'))
+    await idle()
+    expect(sent[0]).toMatchObject({ manualOrder: true, reorderOnly: true })
+    expect(saved().orderDirty).toBeUndefined()
+    expect(screen.queryByTestId('daily-order-apply')).toBeNull()
+    expect(screen.getByTestId('daily-order-auto')).toBeTruthy()
+  })
+  it('C：換天或髒值不留 orderDirty；重算失敗時按鈕留著', async () => {
+    seed({ ...three(), day: '2020-01-01', manualOrder: true, orderDirty: true })
+    expect(loadDaily().orderDirty).toBeUndefined()
+    seed({ ...three(), manualOrder: true, orderDirty: 'yes' })
+    expect(loadDaily().orderDirty).toBeUndefined()
+    seed({ ...three(), manualOrder: true, orderDirty: true })
+    vi.stubGlobal('fetch', vi.fn((url: string | URL | Request) => Promise.resolve(urlText(url).includes('/api/daily-route') ? { ok: false, json: () => Promise.resolve({ message: '壞了' }) } : { ok: false })))
+    render(<DailyDecision onBack={() => {}} />)
+    await settle()
+    fireEvent.click(screen.getByTestId('daily-order-apply'))
+    await idle()
+    expect(saved().orderDirty).toBe(true)
+    expect(screen.getByTestId('daily-order-apply')).toBeTruthy()
+  })
+  it('D：已有 9 站時在「想去哪？」送出 → 打的字留著、有提示、不送請求、不加站；移除一站後再送就成功', async () => {
+    seed(stateOf(Array.from({ length: 9 }, (_, i) => task('want-' + i, { title: '地點' + i, place: '地點' + i, custom: true, specified: true, candidate: cand('w' + i, '地點' + i) }))))
+    render(<DailyDecision onBack={() => {}} />)
+    await settle()
+    const input = screen.getByTestId<HTMLInputElement>('daily-add-place')
+    fireEvent.change(input, { target: { value: '下北沢 B&B' } })
+    fireEvent.submit(input.closest('form')!)
+    expect(input.value).toBe('下北沢 B&B')
+    expect(screen.getByText(/一天最多排 9 站/)).toBeTruthy()
+    expect(sent).toHaveLength(0)
+    expect(saved().tasks).toHaveLength(9)
+    fireEvent.click(screen.getAllByText('移除安排')[0]!)
+    fireEvent.submit(input.closest('form')!)
+    await idle()
+    expect(sent).toHaveLength(1)
+    expect(input.value).toBe('')
+    expect(saved().tasks.some(t => t.place === '下北沢 B&B')).toBe(true)
+  })
+  it('E：按 ↑／↓ 後，同一顆按鈕被捲回畫面（不做動畫）並留住焦點；移到頂時焦點換到 ↓', async () => {
+    seed(three())
+    const scrolled: { id: string; arg: unknown }[] = []
+    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) { scrolled.push({ id: (this as HTMLElement).dataset.testid ?? '', arg }) }
+    render(<DailyDecision onBack={() => {}} />)
+    await settle()
+    fireEvent.click(screen.getByTestId('daily-move-up-coffee'))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('daily-move-up-coffee')))
+    expect(scrolled[scrolled.length - 1]).toEqual({ id: 'daily-move-up-coffee', arg: { block: 'center' } })
+    fireEvent.click(screen.getByTestId('daily-move-up-coffee'))
+    expect(titles()).toEqual(['咖啡店', '定食屋', '藝廊'])
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('daily-move-down-coffee')))
+    expect(scrolled[scrolled.length - 1]!.id).toBe('daily-move-down-coffee')
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
   })
 })
 
@@ -247,12 +316,14 @@ describe('探索主題', () => {
     expect(themeAreaFor('fun', '原宿')).toBeUndefined()
     expect([...STATION_THEMES.coffee!]).toEqual(['view_cafe', 'good_coffee'])
   })
+  const SHIBUYA = AREAS['澀谷']!
+  const none = { visited: {}, seen: {} }
+  const everywhere = { visited: Object.fromEntries(AREA_NAMES.map(a => [a, 1])), seen: {} }
+  const ctx = (rec: AreaRecords = none, center = SHIBUYA): ThemeContext => ({ rec, center })
+  const run = (s: DailyState, c: ThemeContext, rand: () => number, n: number) => { const seq: string[] = []; for (let i = 0; i < n; i++) { s = rotateThemes(s, c, rand); seq.push(s.tasks.find(t => t.id === 'creative')!.theme!) } return seq }
   it('輪替不重複：連續重新生成，一輪（7 個主題）內每個主題剛好出一次；下一輪第一個不跟上一個一樣', () => {
     for (let seedN = 1; seedN <= 50; seedN++) {
-      const rand = lcg(seedN)
-      let s = stateOf([task('creative')], { areaOnly: false })
-      const seq: string[] = []
-      for (let i = 0; i < 15; i++) { s = rotateThemes(s, {}, rand); seq.push(s.tasks[0]!.theme!) }
+      const seq = run(stateOf([task('creative')]), ctx(), lcg(seedN), 15)
       expect(new Set(seq.slice(0, 7)).size).toBe(7)
       expect(new Set(seq.slice(7, 14)).size).toBe(7)
       for (let i = 1; i < seq.length; i++) expect(seq[i]).not.toBe(seq[i - 1])
@@ -260,40 +331,88 @@ describe('探索主題', () => {
     }
   })
   it('輪替有變化：不同亂數起點，第一個主題不只一種', () => {
-    const firsts = new Set(Array.from({ length: 40 }, (_, i) => rotateThemes(stateOf([task('creative')], { areaOnly: false }), {}, lcg((i + 1) * 2654435761)).tasks[0]!.theme))
+    const firsts = new Set(Array.from({ length: 40 }, (_, i) => rotateThemes(stateOf([task('creative')]), ctx(), lcg((i + 1) * 2654435761)).tasks[0]!.theme))
     expect(firsts.size).toBeGreaterThanOrEqual(4)
   })
-  it('開著「只在這一帶找店」：導遊不自動挑「沒去過的區域」（6 個主題輪）', () => {
-    expect(themePool(false)).not.toContain('new_area')
-    const rand = lcg(7)
-    let s = stateOf([task('creative')])
-    const seq: string[] = []
-    for (let i = 0; i < 12; i++) { s = rotateThemes(s, {}, rand); seq.push(s.tasks[0]!.theme!) }
-    expect(seq).not.toContain('new_area')
-    expect(new Set(seq.slice(0, 6)).size).toBe(6)
+  it('把關 R1-B：行程裡已有咖啡站 → 不輪到兩個咖啡主題；已有吃飯站 → 不輪到餐廳主題；都沒有才會出現', () => {
+    for (let seedN = 1; seedN <= 30; seedN++) {
+      const both = run(stateOf([task('meal'), task('creative'), task('coffee')]), ctx(), lcg(seedN), 12)
+      expect(both.filter(t => ['view_cafe', 'good_coffee', 'destination_meal'].includes(t))).toEqual([])
+      expect(new Set(both.slice(0, 4))).toEqual(new Set(['fun', 'park', 'art', 'new_area']))
+      const coffeeOnly = run(stateOf([task('creative'), task('coffee', { done: true })]), ctx(), lcg(seedN), 10)
+      expect(coffeeOnly.filter(t => t === 'view_cafe' || t === 'good_coffee')).toEqual([])
+      expect(coffeeOnly).toContain('destination_meal')
+      const mealOnly = run(stateOf([task('meal'), task('creative')]), ctx(), lcg(seedN), 12)
+      expect(mealOnly).not.toContain('destination_meal')
+      expect(mealOnly).toContain('view_cafe')
+    }
+    expect(themePool({ newArea: true, hasCoffee: true, hasMeal: true })).toEqual(['fun', 'park', 'new_area', 'art'])
+    // 使用者自己選的不受限：行程有咖啡站，自己選的「好喝的咖啡」照留。
+    const own = rotateThemes(stateOf([task('creative', { theme: 'good_coffee', themeFixed: true }), task('coffee')]), ctx(), lcg(1))
+    expect(own.tasks[0]).toMatchObject({ theme: 'good_coffee', themeFixed: true })
+  })
+  it('把關 R1-F：附近有還沒去過的區域 → 開著「只在這一帶找店」也會輪到「沒去過的區域」，區域一定走得到、不是自己的生活圈', () => {
+    for (let seedN = 1; seedN <= 30; seedN++) {
+      const rand = lcg(seedN)
+      let s = stateOf([task('creative')], { areaOnly: true, area: '新宿' })
+      const areas: string[] = []
+      for (let i = 0; i < 7; i++) { s = rotateThemes(s, ctx(none, AREAS['新宿']), rand); if (s.tasks[0]!.theme === 'new_area') areas.push(s.tasks[0]!.themeArea!) }
+      expect(areas).toHaveLength(1)
+      expect(['澀谷', '原宿', '表参道']).toContain(areas[0])
+    }
+    expect(reachableAreas(AREAS['新宿']!, '新宿')).toEqual(['澀谷', '原宿', '表参道'])
+    expect(reachableAreas(SHIBUYA, '澀谷')).toEqual(['新宿', '原宿', '表参道', '恵比寿', '代官山'])
+  })
+  it('把關 R1-F：沒有走得到的沒去過區域（都去過、或出發點離每一區都超過 3.5 公里）→ 不輪到這個主題', () => {
+    const far = { lat: 35.9, lng: 139.7 }
+    expect(reachableAreas(far)).toEqual([])
+    for (let seedN = 1; seedN <= 20; seedN++) {
+      expect(run(stateOf([task('creative')], { areaOnly: false }), ctx(everywhere), lcg(seedN), 12)).not.toContain('new_area')
+      expect(run(stateOf([task('creative')], { areaOnly: false }), ctx(none, far), lcg(seedN), 12)).not.toContain('new_area')
+    }
+    // 只「看過」不算去過：還是會輪到，而且先挑完全沒紀錄的。
+    const seenSome = { visited: {}, seen: { 新宿: 5, 原宿: 6, 表参道: 7, 恵比寿: 8 } }
+    const s = rotateThemes(stateOf([task('creative')], { themesToday: THEME_IDS.filter(x => x !== 'new_area') }), ctx(seenSome), lcg(3))
+    expect(s.tasks[0]).toMatchObject({ theme: 'new_area', themeArea: '代官山' })
   })
   it('使用者自己選的主題不被輪替換掉；已完成／指定／固定的探索站、其他站都不動', () => {
-    const fixed = rotateThemes(stateOf([task('creative', { theme: 'park', themeFixed: true })]), {}, lcg(1))
+    const fixed = rotateThemes(stateOf([task('creative', { theme: 'park', themeFixed: true })]), ctx(), lcg(1))
     expect(fixed.tasks[0]).toMatchObject({ theme: 'park', themeFixed: true })
     expect(fixed.themesToday).toEqual([])
     for (const extra of [{ done: true }, { specified: true, place: 'X' }, { locked: true }, { custom: true }] as Partial<DailyTask>[]) {
       const t = task('creative', extra)
-      expect(rotateThemes(stateOf([t]), {}, lcg(1)).tasks[0]).toBe(t)
+      expect(rotateThemes(stateOf([t]), ctx(), lcg(1)).tasks[0]).toBe(t)
     }
     const others = [task('meal'), task('coffee')]
-    expect(rotateThemes(stateOf(others), {}, lcg(1)).tasks).toEqual(others)
+    expect(rotateThemes(stateOf(others), ctx(), lcg(1)).tasks).toEqual(others)
   })
   it('輪到「沒去過的區域」時帶一個區域；換成別的主題時區域清掉', () => {
-    const s = rotateThemes(stateOf([task('creative')], { areaOnly: false, themesToday: THEME_IDS.filter(x => x !== 'new_area') }), {}, lcg(3))
+    const s = rotateThemes(stateOf([task('creative')], { themesToday: THEME_IDS.filter(x => x !== 'new_area') }), ctx(), lcg(3))
     expect(s.tasks[0]!.theme).toBe('new_area')
     expect(AREA_NAMES).toContain(s.tasks[0]!.themeArea)
     expect(s.tasks[0]!.themeArea).not.toBe('澀谷')
-    const next = rotateThemes(s, {}, lcg(3))
+    const next = rotateThemes(s, ctx(), lcg(3))
     expect(next.tasks[0]!.theme).not.toBe('new_area')
     expect(next.tasks[0]!.themeArea).toBeUndefined()
   })
   it('pickTheme：全部出過時避開目前這個', () => {
-    for (let i = 1; i <= 30; i++) expect(pickTheme([...THEME_IDS], { allowNewArea: true, current: 'art' }, lcg(i))).not.toBe('art')
+    for (let i = 1; i <= 30; i++) expect(pickTheme([...THEME_IDS], THEME_IDS, 'art', lcg(i))).not.toBe('art')
+  })
+  it('fillThemeArea：自己選「沒去過的區域」→ 補一個走得到的區域；附近完全沒有其他區域 → 放棄這個主題（不送一定落空的請求）', () => {
+    const own = stateOf([task('creative', { theme: 'new_area', themeFixed: true })], { area: '新宿' })
+    const ok = fillThemeArea(own, ctx(none, AREAS['新宿']), lcg(2))
+    expect(ok.dropped).toBe(false)
+    expect(['澀谷', '原宿', '表参道']).toContain(ok.state.tasks[0]!.themeArea)
+    // 走得到的都去過：挑最久沒去的（不落空）。
+    expect(fillThemeArea(own, ctx({ visited: { 澀谷: 30, 原宿: 10, 表参道: 20 }, seen: {} }, AREAS['新宿']), lcg(2)).state.tasks[0]!.themeArea).toBe('原宿')
+    const none2 = fillThemeArea(own, ctx(none, { lat: 35.9, lng: 139.7 }), lcg(2))
+    expect(none2.dropped).toBe(true)
+    expect(none2.state.tasks[0]).toMatchObject({ id: 'creative' })
+    expect(none2.state.tasks[0]!.theme).toBeUndefined()
+    expect(none2.state.tasks[0]!.themeFixed).toBeUndefined()
+    // 已經有區域、不是這個主題、不是自動站：原封不動。
+    const kept = stateOf([task('creative', { theme: 'new_area', themeArea: '原宿' }), task('meal')])
+    expect(fillThemeArea(kept, ctx()).state).toBe(kept)
   })
   it('畫面：卡片上換主題 → 只重找這一站、請求逐站帶 theme；理由行只寫回應裡有的資料', async () => {
     seed(stateOf([task('meal', { title: '定食屋', candidate: cand('m', '定食屋') }), task('creative', { title: '藝廊', candidate: cand('g', '藝廊') }), task('coffee', { title: '咖啡店', candidate: cand('c', '咖啡店') })]))
@@ -333,7 +452,8 @@ describe('探索主題', () => {
     expect(sent[3]!.stops.find(s => s.id === 'coffee')!.theme).toBe('good_coffee')
   })
   it('畫面：完整重新生成時「讓導遊決定」的探索站每次送不同主題', async () => {
-    seed(stateOf([task('creative', { title: '藝廊', candidate: cand('g', '藝廊') })]))
+    // 今天略過午餐與咖啡：7 個主題都能輪。
+    seed(stateOf([task('creative', { title: '藝廊', candidate: cand('g', '藝廊') })], { avoid: ['gym', 'meal', 'coffee', 'shopping', 'rest'] }))
     render(<DailyDecision onBack={() => {}} />)
     await settle()
     for (let i = 0; i < 6; i++) { fireEvent.click(screen.getByTestId('daily-generate')); await idle() }
@@ -341,17 +461,61 @@ describe('探索主題', () => {
     expect(new Set(seq).size).toBe(6)
     expect(saved().themesToday).toHaveLength(6)
   })
+  it('畫面（把關 R1-B、F）：行程有午餐站與咖啡站時，重新生成不會輪到咖啡／餐廳主題；會輪到「沒去過的區域」並帶走得到的區域', async () => {
+    seed(stateOf([task('creative', { title: '藝廊', candidate: cand('g', '藝廊') })]))
+    render(<DailyDecision onBack={() => {}} />)
+    await settle()
+    for (let i = 0; i < 8; i++) { fireEvent.click(screen.getByTestId('daily-generate')); await idle() }
+    expect(sent[0]!.stops.map(s => s.id)).toEqual(['meal', 'creative', 'coffee'])
+    const picks = sent.map(r => r.stops.find(s => s.id === 'creative')!)
+    expect(new Set(picks.slice(0, 4).map(s => s.theme))).toEqual(new Set(['fun', 'park', 'art', 'new_area']))
+    expect(picks.filter(s => ['view_cafe', 'good_coffee', 'destination_meal'].includes(s.theme ?? ''))).toEqual([])
+    for (const s of picks) expect(s.theme === 'new_area' ? ['新宿', '原宿', '表参道', '恵比寿', '代官山'].includes(s.themeArea ?? '') : s.themeArea === undefined).toBe(true)
+  })
 })
 
 describe('沒去過的區域', () => {
-  it('pickNewArea：有沒去過的就挑沒去過的；自己的生活圈不挑', () => {
-    const visited = { 新宿: 5, 原宿: 9 }
-    for (let i = 1; i <= 40; i++) expect(['表参道', '恵比寿', '代官山']).toContain(pickNewArea(visited, '澀谷', lcg(i)))
+  const rec = (visited: Record<string, number> = {}, seen: Record<string, number> = {}): AreaRecords => ({ visited, seen })
+  const five = ['新宿', '原宿', '表参道', '恵比寿', '代官山']
+  it('pickNewArea 先後（把關 R1-A）：完全沒紀錄 → 只看過沒去過（最久沒看的先）→ 都去過時最久沒去的', () => {
+    // 新宿去過、原宿與表参道只看過 → 只會挑完全沒紀錄的恵比寿／代官山。
+    for (let i = 1; i <= 40; i++) expect(['恵比寿', '代官山']).toContain(pickNewArea(rec({ 新宿: 5 }, { 原宿: 9, 表参道: 3 }), five, lcg(i * 7919)))
+    // 沒有完全沒紀錄的了：挑只看過的裡最久沒看的。
+    expect(pickNewArea(rec({ 新宿: 5 }, { 原宿: 9, 表参道: 3, 恵比寿: 4, 代官山: 8 }), five)).toBe('表参道')
+    // 去過的就算也看過，還是排在只看過的後面。
+    expect(pickNewArea(rec({ 新宿: 5, 表参道: 1 }, { 原宿: 9, 表参道: 3, 恵比寿: 4, 代官山: 8, 新宿: 1 }), five)).toBe('恵比寿')
+    // 都去過：最久沒去的。
+    expect(pickNewArea(rec({ 新宿: 50, 原宿: 30, 表参道: 20, 恵比寿: 40, 代官山: 60 }, { 表参道: 999 }), five)).toBe('表参道')
   })
-  it('pickNewArea：全都去過就挑最久沒去的；沒有紀錄時照常給（不發明紀錄）', () => {
-    expect(pickNewArea({ 澀谷: 1, 新宿: 50, 原宿: 30, 表参道: 20, 恵比寿: 40, 代官山: 60 }, '澀谷')).toBe('表参道')
-    expect(pickNewArea({ 澀谷: 1, 新宿: 50, 原宿: 30, 表参道: 20, 恵比寿: 40, 代官山: 60 })).toBe('澀谷')
-    expect(AREA_NAMES.filter(a => a !== '澀谷')).toContain(pickNewArea({}, '澀谷', lcg(1)))
+  it('pickNewArea：沒有紀錄時照常給（不發明紀錄）；沒有可挑的區域回 undefined', () => {
+    expect(five).toContain(pickNewArea(rec(), five, lcg(1)))
+    expect(pickNewArea(rec(), [])).toBeUndefined()
+    expect(loadVisitedAreas()).toEqual({})
+    expect(loadSeenAreas()).toEqual({})
+  })
+  it('看過的區域：用店的座標對地區清單記；跟「去過」分開存；取消完成只撤回去過那筆', () => {
+    markAreasSeen([AREAS['新宿']!, { lat: 35.0, lng: 135.0 }, AREAS['原宿']!], 500)
+    expect(loadSeenAreas()).toEqual({ 新宿: 500, 原宿: 500 })
+    expect(loadVisitedAreas()).toEqual({})
+    markAreasVisited(AREAS['新宿']!, 1000, 'done:a')
+    unmarkAreasVisited('done:a')
+    expect(loadVisitedAreas()).toEqual({})
+    expect(loadSeenAreas()).toEqual({ 新宿: 500, 原宿: 500 })
+    markAreasSeen([], 900)
+    for (const raw of ['[1]', '{bad', JSON.stringify({ 火星: 1, 新宿: 'x', 原宿: 7 })]) {
+      localStorage.setItem(SEEN_AREAS_KEY, raw)
+      expect(loadSeenAreas()).toEqual(raw.includes('原宿') ? { 原宿: 7 } : {})
+    }
+  })
+  it('畫面：路線回應顯示出來的店 → 所在區域記「看過」（不算去過）', async () => {
+    seed(stateOf([task('meal', { title: '定食屋', candidate: cand('m', '定食屋') })]))
+    mockRoute(req => req.stops.map(s => ({ ...s, candidate: cand('h', '原宿的店', AREAS['原宿']) })))
+    render(<DailyDecision onBack={() => {}} />)
+    await settle()
+    expect(loadSeenAreas()).toEqual({})
+    fireEvent.click(screen.getByTestId('daily-generate'))
+    await idle()
+    expect(Object.keys(loadSeenAreas())).toEqual(['原宿'])
     expect(loadVisitedAreas()).toEqual({})
   })
   it('標記完成 → 記下店所在的區域（用座標對地區清單）；取消勾選 → 撤回；不在任何地區的店不記', () => {
@@ -380,7 +544,7 @@ describe('沒去過的區域', () => {
     await idle()
     // 澀谷是生活圈、其餘四區去過：只剩代官山沒去過。
     expect(sent[0]!.stops.find(s => s.id === 'creative')).toMatchObject({ theme: 'new_area', themeArea: '代官山' })
-    expect(screen.getByTestId('daily-reason-creative').textContent).toContain('你還沒去過的代官山')
+    expect(screen.getByTestId('daily-reason-creative').textContent).toContain('代官山（紀錄裡還沒去過）')
   })
 })
 
@@ -391,6 +555,9 @@ describe('理由行（exploreReason）', () => {
     expect(exploreReason(task('creative', { theme: 'fun', candidate: { ...c, rating: undefined, userRatingCount: undefined } }))).toBe('為什麼推這裡：主題「有趣的地方」')
     expect(exploreReason(task('creative', { candidate: { ...c, userRatingCount: undefined } }))).toBe('為什麼推這裡：Google ★4.5')
     expect(exploreReason(task('creative', { theme: 'new_area', themeArea: '新宿', candidate: c }), { 新宿: 1 })).toBe('為什麼推這裡：主題「沒去過的區域」・新宿・Google ★4.5（300 則評論）')
+    // 把關 R1-H：沒有去過的紀錄不說成「你沒去過」；第一站的步行是從出發地算。
+    expect(exploreReason(task('creative', { theme: 'new_area', themeArea: '新宿', candidate: c }), {})).toBe('為什麼推這裡：主題「沒去過的區域」・新宿（紀錄裡還沒去過）・Google ★4.5（300 則評論）')
+    expect(exploreReason(task('creative', { theme: 'fun', candidate: c, travelMin: 6 }), {}, true)).toBe('為什麼推這裡：主題「有趣的地方」・Google ★4.5（300 則評論）・從出發地步行 6 分鐘')
   })
   it('沒有資料就不寫：沒有店、舊存檔探索站沒有評分也沒有步行時間、不是探索站也沒有主題', () => {
     expect(exploreReason(task('creative', { theme: 'fun' }))).toBe('')

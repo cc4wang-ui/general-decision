@@ -4,7 +4,7 @@ import { kindOfCandidate, normalizeKind } from '../src/placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from '../src/venueCheck.ts'
 import { areaCenter, AREA_RADIUS_M, distanceKm } from '../src/areas.ts'
 import { sanitizeKindList, softWeights, weightedIndex } from '../src/dailyAffinity.ts'
-import { THEMES, themeFor, themeAreaFor, themeAllows, themeTitle, type ThemeId } from '../src/dailyThemes.ts'
+import { THEMES, themeFor, themeAreaFor, themeAllows, themeRejects, themeTitle, type ThemeId } from '../src/dailyThemes.ts'
 // Daily Decision: real Google Places results and approximate geographic route ordering.
 // Does not claim live traffic, transit ETAs, reservations or confirmed stock.
 export const config = { runtime:'nodejs' }
@@ -67,6 +67,8 @@ function venueOk(p:Candidate,s:Stop,excludeKinds:string[]):boolean{
  // 主題要找的類型（例：公園主題的 park）不被地標規則擋掉；只對自動站、只看 primaryType。
  if(isDeniedName(p.name)||(isDeniedCandidate(p)&&!(auto&&themeAllows(s.theme,p.primaryType))))return false
  if(!auto)return true
+ // 把關 R1-G：咖啡主題只收 cafe／coffee_shop（預覽站曾回 lounge_bar）。
+ if(themeRejects(s.theme,p.primaryType,true))return false
  // 固定健身房 FIT-EASY 是使用者指定的店，不是探索發現：不套評論數門檻（類型 gym 照樣過濾）。
  if(s.id!=='gym'&&s.kind!=='gym'&&(p.userRatingCount??0)<MIN_REVIEWS)return false
  return true
@@ -105,6 +107,7 @@ function retentionOk(c:Candidate,s:Stop,opts:{excluded:string[];excludeKinds:str
  const auto=!s.done&&!s.locked&&!s.custom&&!s.specified
  if(!auto)return true
  if(isDeniedName(c.name)||(isDeniedCandidate(c)&&!themeAllows(s.theme,c.primaryType)))return false
+ if(themeRejects(s.theme,c.primaryType,false))return false
  if(s.id!=='gym'&&s.kind!=='gym'&&c.userRatingCount!==undefined&&c.userRatingCount<MIN_REVIEWS)return false
  if(opts.areaPref&&distanceKm(opts.areaPref,c)*1000>AREA_RADIUS_M)return false
  // daily-retain-radius：保留的舊店跟新派的店同一個半徑（第一次挑店 nearOk、換店 usable 都是

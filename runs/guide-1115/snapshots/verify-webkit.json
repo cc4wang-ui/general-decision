@@ -81,16 +81,68 @@
      "meal",
      "creative",
      "coffee",
-     "want-1794714293781",
-     "want-1794714293912"
+     "want-1794715852927",
+     "want-1794715853070"
     ],
     "after": [
      "(fixed)",
      "creative",
      "meal",
      "coffee",
-     "want-1794714293781",
-     "want-1794714293912"
+     "want-1794715852927",
+     "want-1794715853070"
+    ]
+   }
+  },
+  "B2c 改了順序還沒重算就重開頁面：「照這個順序更新時間」還在、順序還在": {
+   "pass": true,
+   "detail": {
+    "orderDirty": true
+   }
+  },
+  "B2e 連按 3 次 ↑：按鈕每次都在畫面內、焦點留在同一顆、每次往上一格": {
+   "pass": true,
+   "detail": {
+    "hops": [
+     {
+      "y": 310,
+      "inView": true,
+      "focused": true,
+      "order": [
+       "(fixed)",
+       "creative",
+       "meal",
+       "coffee",
+       "want",
+       "want"
+      ]
+     },
+     {
+      "y": 310,
+      "inView": true,
+      "focused": true,
+      "order": [
+       "(fixed)",
+       "creative",
+       "meal",
+       "want",
+       "coffee",
+       "want"
+      ]
+     },
+     {
+      "y": 310,
+      "inView": true,
+      "focused": true,
+      "order": [
+       "(fixed)",
+       "creative",
+       "want",
+       "meal",
+       "coffee",
+       "want"
+      ]
+     }
     ]
    }
   },
@@ -102,9 +154,9 @@
     "sentOrder": [
      "fixed-1",
      "creative",
+     "want",
      "meal",
      "coffee",
-     "want",
      "want"
     ]
    }
@@ -115,9 +167,9 @@
     "after": [
      "(fixed)",
      "creative",
+     "want",
      "meal",
      "coffee",
-     "want",
      "want"
     ]
    }
@@ -134,9 +186,9 @@
     "sentOrder": [
      "fixed-1",
      "creative",
+     "want",
      "meal",
      "coffee",
-     "want",
      "want"
     ]
    }
@@ -185,29 +237,37 @@
    "pass": true,
    "detail": {}
   },
-  "C5 讓導遊決定：每次重新產生都換主題；今天出過的（含剛才的公園）在一輪出完前不重複": {
+  "C5 讓導遊決定：每次重新產生都換主題；不跟午餐站／咖啡站重複；會輪到「沒去過的區域」（開著只在這一帶也會）": {
    "pass": true,
    "detail": {
     "usedBefore": [
-     "art",
+     "fun",
      "park"
     ],
     "seq": [
+     "new_area",
+     "art",
      "fun",
-     "view_cafe",
-     "good_coffee",
-     "destination_meal",
-     "good_coffee"
+     "art",
+     "new_area",
+     "park"
     ],
-    "freshCount": 4
+    "areas": [
+     "新宿",
+     null,
+     null,
+     null,
+     "表参道",
+     null
+    ]
    }
   },
   "C6 選「沒去過的區域」：請求帶 themeArea（地區清單裡、不是自己的生活圈）": {
    "pass": true,
    "detail": {
     "theme": "new_area",
-    "themeArea": "代官山",
-    "reason": "為什麼推這裡：主題「沒去過的區域」・你還沒去過的代官山・Google ★4.3（321 則評論）・從上一站步行 11 分鐘"
+    "themeArea": "表参道",
+    "reason": "為什麼推這裡：主題「沒去過的區域」・表参道（紀錄裡還沒去過）・Google ★4.3（321 則評論）・從上一站步行 11 分鐘"
    }
   },
   "C7 咖啡站可選景觀好／好喝兩種": {
@@ -220,6 +280,13 @@
     ]
    }
   },
+  "D0 已有 9 站再按 Enter：打的字還在、有提示、沒有送請求": {
+   "pass": true,
+   "detail": {
+    "inputAfterEnter": "第十個想去的地方",
+    "calls": 0
+   }
+  },
   "D1 沒有橫向捲動": {
    "pass": true,
    "detail": {
@@ -227,6 +294,6 @@
    }
   }
  },
- "requests": 16,
+ "requests": 20,
  "allPass": true
 }

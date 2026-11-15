@@ -5,9 +5,9 @@ import { getLocation, type GeoReason } from './api.ts'
 import { blockedPlaceIds, clearDislike, markDailyDislike, migrateDailyDislike } from './placeMem.ts'
 import { kindLabel, kindOfCandidate, normalizeKind } from './placeKind.ts'
 import { isDeniedCandidate, isDeniedName, MIN_REVIEWS } from './venueCheck.ts'
-import { AREA_NAMES, withinArea } from './areas.ts'
+import { AREA_NAMES, areaCenter, withinArea } from './areas.ts'
 import { AFFINITY_WEIGHT, affinityHints, clearAffinity, dropAffinity, loadAffinity, recordAffinity } from './dailyAffinity.ts'
-import { STATION_THEMES, THEMES, loadVisitedAreas, markAreasVisited, pickNewArea, pickTheme, themeAllows, themePool, themeAreaFor, themeFor, themeTitle, unmarkAreasVisited, type ThemeId } from './dailyThemes.ts'
+import { STATION_THEMES, THEMES, loadAreaRecords, loadVisitedAreas, markAreasSeen, markAreasVisited, pickNewArea, pickTheme, reachableAreas, themeAllows, themePool, themeAreaFor, type AreaRecords, themeFor, themeTitle, unmarkAreasVisited, type ThemeId } from './dailyThemes.ts'
 
 export type DailyTask = { id: string; title: string; minutes: number; kind: 'gym'|'meal'|'creative'|'shopping'|'rest'; done: boolean; place?: string; detail?: string; locked?: boolean; start?: string; custom?: boolean; specified?: boolean; /** 該站是結構化日意圖指定的（true）還是逐站指定的（false／undefined）。舊存檔沒有此欄位時視為 undefined＝逐站指定，完全相容。結構化日意圖只能改 intentSpecified 的站，絕不覆蓋逐站指定。 */ intentSpecified?: boolean; variant?: number; candidate?: {id:string;name:string;address:string;mapUrl:string;lat:number;lng:number;rating?:number;openNow?:boolean;types?:string[];primaryType?:string;userRatingCount?:number;hours?:unknown[]}; eta?:string;departure?:string;travelMin?:number;conflict?:string; /** 跨日偏移（PR-4 修正輪）：錨點當日 0，跨過午夜 1，依此類推；與 eta／departure 同一束，清掉 ETA 時一起清。舊存檔／舊回應沒有此欄位時視為 0（當天）。 */ etaDayOffset?:number;departureDayOffset?:number; noCandidate?: boolean; noCandidateReason?: 'area'|'filtered'|'empty'|'denied'|'closed'; /** 伺服器依 ETA 判斷的到店營業狀態（daily-open-on-arrival）。只在有 eta 時顯示。 */ openAtEta?: 'open'|'closing'|'closed'|'unknown'; /** 2.4：伺服器標示這間店是種類偏好提高機率後挑中的；卡片顯示一行原因。 */ preferHit?: boolean; /** guide-1115：探索主題（src/dailyThemes.ts 白名單；舊存檔沒有＝沒帶）。themeArea＝「沒去過的區域」這一站要去的區域。themeFixed＝使用者自己選的主題（沒有＝讓導遊決定，重新生成時輪替）。 */ theme?: string; themeArea?: string; themeFixed?: boolean }
 /** 可被意圖指定的站：5 個可搜尋站。rest 不在內——rest 是純文字站，永遠不是搜尋目標。 */
@@ -106,6 +106,8 @@ export type DailyState = {
   dislikedKinds?: string[]
   /** guide-1115：使用者手動排過順序（順序就是 tasks 陣列順序）。只在當日有效。有這個旗標時請求帶 manualOrder:true，伺服器照陣列順序排。 */
   manualOrder?: boolean
+  /** 把關 R1-C：順序改了、到店時間還沒重算。存檔，重開頁面後「照這個順序更新時間」還在。只在當日有效。 */
+  orderDirty?: boolean
   /** guide-1115：今天探索站已經出過的主題（輪替時避開）。只在當日有效。 */
   themesToday?: string[]
 }
@@ -258,6 +260,7 @@ export function loadDaily(): DailyState {
       startTime: raw.day === fresh.day ? normalizeStartTime((raw as { startTime?: unknown }).startTime) : '',
       // guide-1115：手動順序與今天出過的主題只留今天；舊存檔沒有這兩個欄位＝沒排過、沒出過。
       manualOrder: raw.day === fresh.day && raw.manualOrder === true ? true : undefined,
+      orderDirty: raw.day === fresh.day && raw.orderDirty === true ? true : undefined,
       themesToday: raw.day === fresh.day ? sanitizeIds(raw.themesToday, 20) : [],
       // 地區偏好移轉（F7）：舊資料的跨區自由文字偏好對應成 area='澀谷'＋areaOnly 開啟；
       // 舊資料沒有 areaOnly 欄位時預設開啟（當時沒有關掉的辦法，開啟才是忠實轉換）。
@@ -392,7 +395,7 @@ export function moveTask(s: DailyState, id: string, dir: -1 | 1): DailyState {
   if (j < 0 || j >= s.tasks.length) return s
   const tasks = s.tasks.map(t => ({ ...t, ...NO_ETA }))
   ;[tasks[i], tasks[j]] = [tasks[j]!, tasks[i]!]
-  return { ...s, manualOrder: true, tasks }
+  return { ...s, manualOrder: true, orderDirty: true, tasks }
 }
 /** 手動順序的保證：ref 裡可移動站（非 locked）的先後，套到 stops 上——只換可移動站彼此的位置，
  * 固定行程與 ref 裡沒有的新站留在原位。伺服器回應、重新產生（replanDaily 會把站重排）都過這一關。 */
@@ -402,22 +405,41 @@ export function applyUserOrder(stops: DailyTask[], ref: DailyTask[]): DailyTask[
   let k = 0
   return stops.map(t => rank.has(t.id) ? movable[k++]! : t)
 }
-/** 「讓導遊決定」的主題輪替（完整重新生成時）：探索站（自動、沒被使用者固定主題）換一個今天還沒出過的主題。
- * 「沒去過的區域」要帶一個區域：從地區清單挑沒去過的（visited＝本機去過紀錄）。開著「只在這一帶找店」時不自動挑這個主題。 */
-export function rotateThemes(s: DailyState, visited: Record<string, number>, rand: () => number = Math.random): DailyState {
+/** 挑主題／挑區域要看的本機資料：去過與看過的區域紀錄、出發點（GPS 有座標就用它，否則用所選地區的中心）。 */
+export type ThemeContext = { rec: AreaRecords; center: { lat: number; lng: number } }
+const isAutoExplore = (t: DailyTask): boolean => t.id === 'creative' && !t.done && !t.locked && !t.custom && !t.specified
+/** 「讓導遊決定」的主題輪替：探索站（自動、沒被使用者固定主題）換一個今天還沒出過的主題。
+ * 不跟同一天的咖啡站／吃飯站重複（把關 R1-B）。附近（3.5 公里內）有還沒去過的區域時才會輪到「沒去過的區域」，
+ * 不管「只在這一帶找店」開不開——這一站本來就帶自己的區域（把關 R1-F）。使用者自己選的主題不動。 */
+export function rotateThemes(s: DailyState, ctx: ThemeContext, rand: () => number = Math.random): DailyState {
+  const freshAreas = reachableAreas(ctx.center, s.area).filter(a => ctx.rec.visited[a] === undefined)
+  const pool = themePool({ newArea: freshAreas.length > 0, hasCoffee: s.tasks.some(t => t.id === 'coffee'), hasMeal: s.tasks.some(t => t.id === 'meal') })
   let used = s.themesToday ?? []
   const tasks = s.tasks.map(t => {
-    if (t.id !== 'creative' || t.done || t.locked || t.custom || t.specified) return t
-    const fixed = t.themeFixed ? themeFor(t.id, t.theme) : undefined
-    const theme = fixed ?? pickTheme(used, { allowNewArea: s.areaOnly === false, current: t.theme }, rand)
+    if (!isAutoExplore(t) || (t.themeFixed && themeFor(t.id, t.theme))) return t
+    const theme = pickTheme(used, pool, t.theme, rand)
     // 全部主題今天都出過了：重新一輪（pickTheme 已避開剛剛那一個）。
-    if (!fixed) used = [...(themePool(s.areaOnly === false).every(x => used.includes(x)) ? [] : used).filter(x => x !== theme), theme]
-    return { ...t, theme, themeFixed: fixed ? true : undefined, themeArea: theme === 'new_area' ? themeAreaFor(theme, t.themeArea) ?? pickNewArea(visited, s.area, rand) : undefined }
+    used = [...(pool.every(x => used.includes(x)) ? [] : used).filter(x => x !== theme), theme]
+    return { ...t, theme, themeFixed: undefined, themeArea: theme === 'new_area' ? pickNewArea(ctx.rec, freshAreas, rand) : undefined }
   })
   return { ...s, tasks, themesToday: used }
 }
-/** 探索站卡片的理由行：只用手上真的有的資料（主題、Google 評分與評論數、步行分鐘、是不是沒去過的區域）。沒有資料回空字串＝不顯示。 */
-export function exploreReason(t: DailyTask, visited: Record<string, number> = {}): string {
+/** 使用者自己選了「沒去過的區域」但還沒有區域：從走得到的區域挑一個（沒紀錄 → 只看過 → 最久沒去）。
+ * 附近沒有任何其他區域（dropped）：這個主題做不到，改回讓導遊決定，不送一個一定落空的請求。 */
+export function fillThemeArea(s: DailyState, ctx: ThemeContext, rand: () => number = Math.random): { state: DailyState; dropped: boolean } {
+  let dropped = false
+  const tasks = s.tasks.map(t => {
+    if (!isAutoExplore(t) || t.theme !== 'new_area' || themeAreaFor('new_area', t.themeArea)) return t
+    const area = pickNewArea(ctx.rec, reachableAreas(ctx.center, s.area), rand)
+    if (area) return { ...t, themeArea: area }
+    dropped = true
+    return { ...t, theme: undefined, themeFixed: undefined, themeArea: undefined }
+  })
+  return { state: dropped || tasks.some((t, i) => t !== s.tasks[i]) ? { ...s, tasks } : s, dropped }
+}
+/** 探索站卡片的理由行：只用手上真的有的資料（主題、Google 評分與評論數、步行分鐘、區域有沒有去過的紀錄）。沒有資料回空字串＝不顯示。
+ * first＝這一站是路線的第一站（步行是從出發地算的）。 */
+export function exploreReason(t: DailyTask, visited: Record<string, number> = {}, first = false): string {
   // 使用者自己指定／固定／加的地方不是導遊推的：不寫理由（殘留的舊主題也不算）。
   if (!t.candidate || t.specified || t.locked || t.custom) return ''
   const theme = themeFor(t.id, t.theme)
@@ -425,9 +447,10 @@ export function exploreReason(t: DailyTask, visited: Record<string, number> = {}
   const parts: string[] = []
   if (theme) parts.push('主題「' + THEMES[theme].label + '」')
   const area = themeAreaFor(theme, t.themeArea)
-  if (area) parts.push((visited[area] === undefined ? '你還沒去過的' : '') + area)
+  // 「沒去過」只代表這支手機沒有標記完成的紀錄，不說成「你沒去過」。
+  if (area) parts.push(area + (visited[area] === undefined ? '（紀錄裡還沒去過）' : ''))
   if (typeof t.candidate.rating === 'number') parts.push('Google ★' + t.candidate.rating.toFixed(1) + (typeof t.candidate.userRatingCount === 'number' ? `（${t.candidate.userRatingCount} 則評論）` : ''))
-  if (typeof t.travelMin === 'number') parts.push('從上一站步行 ' + t.travelMin + ' 分鐘')
+  if (typeof t.travelMin === 'number') parts.push((first ? '從出發地步行 ' : '從上一站步行 ') + t.travelMin + ' 分鐘')
   return parts.length ? '為什麼推這裡：' + parts.join('・') : ''
 }
 /** 2.4 行為訊號的來源鍵：同一天、同一站、同一間店只算一次。 */
@@ -591,11 +614,11 @@ const SHEET_TITLE: Record<SheetId, string> = { origin:'出發地', time:'幾點�
 /** 地點輸入（guide-1115）：打字只動這裡的草稿，按 Enter 或按鈕才送出。
  * 之前每敲一鍵就改行程（清掉候選、整張卡片變矮 44px、輸入框在手指下跳走）；現在打字時卡片不動。
  * 輸入法組字中的 Enter（選字）不送出。 */
-function PlaceForm({ label, placeholder, value, submitText, clearText, disabled, testid, onSubmit }: { label: string; placeholder: string; value: string; submitText: string; clearText?: string; disabled: boolean; testid?: string; onSubmit: (text: string) => void }) {
+function PlaceForm({ label, placeholder, value, submitText, clearText, disabled, testid, onSubmit }: { label: string; placeholder: string; value: string; submitText: string; clearText?: string; disabled: boolean; testid?: string; onSubmit: (text: string) => boolean | void }) {
   const [draft, setDraft] = useState<string | null>(null)
   const shown = draft ?? value
   const empty = !shown.trim()
-  return <form className="dd-place-form" onSubmit={e => { e.preventDefault(); if (disabled || (empty && !clearText)) return; onSubmit(shown.trim()); setDraft(null) }}>
+  return <form className="dd-place-form" onSubmit={e => { e.preventDefault(); if (disabled || (empty && !clearText)) return; if (onSubmit(shown.trim()) !== false) setDraft(null) }}>
     <input aria-label={label} data-testid={testid} value={shown} maxLength={100} placeholder={placeholder} enterKeyHint="go" autoComplete="off"
       onChange={e => setDraft(e.target.value)}
       onKeyDown={e => { if (e.key === 'Enter' && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault() }} />
@@ -632,7 +655,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   const [fixedTime,setFixedTime] = useState('15:00')
   const [fixedMinutes,setFixedMinutes] = useState('60')
   /** guide-1115：順序改了、到店時間還沒重算。 */
-  const [orderDirty,setOrderDirty] = useState(false)
+  const orderDirty = state.orderDirty === true
+  /** 把關 R1-E：剛按了哪一站的上／下鍵。順序換完後把那顆按鈕捲回畫面並留住焦點，連按可以一路移。 */
+  const moved = useRef<{ id: string; dir: -1 | 1 } | null>(null)
   /** 「換主題」選單是替哪一站開的。 */
   const [themeStop,setThemeStop] = useState<string | null>(null)
   const change = (fn:(s:DailyState)=>DailyState) => setState(s=>{ const next=fn(s); saveDaily(next); return next })
@@ -646,7 +671,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
    * anchorTime 是伺服器實際用的錨點（PR-4 修正輪 O2；舊回應沒有此欄位時視為未提供）。 */
   type DailyRouteResponse={message?:string;stops?:DailyTask[];routeVerified?:boolean;distanceKm?:number;travelMinutes?:number;conflicts?:string[];partial?:boolean;missingStops?:{id:string;reason?:string}[];anchorTime?:string}
   /** opts.reorder＝只照目前順序重算路線（不換店）；opts.themeChange＝換主題造成的換店，不算「不喜歡原本那一類」。 */
-  const searchRoute = async (shuffle?:string, s:DailyState=state, opts:{reorder?:boolean;themeChange?:boolean}={}) => {
+  const searchRoute = async (shuffle?:string, s:DailyState=state, opts:{reorder?:boolean;themeChange?:boolean;rotate?:boolean}={}) => {
     if(busy)return
     setBusy(shuffle??'all')
     // 目前位置：每次搜尋都重新定位。拿不到就停在這裡——原行程不動，也不改用預設的澀谷站。
@@ -659,7 +684,12 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
     }
     let proposed=shuffle||opts.reorder ? s : routeProposal(s)
     // guide-1115：完整重新生成時，「讓導遊決定」的探索站換一個今天還沒出過的主題。
-    if(!shuffle&&!opts.reorder)proposed=rotateThemes(proposed,loadVisitedAreas())
+    // 「沒去過的區域」只挑走得到的：出發點有 GPS 座標就用它，否則用所選地區的中心。
+    const themeCtx:ThemeContext={rec:loadAreaRecords(),center:here??areaCenter(s.area)}
+    const filled=fillThemeArea(proposed,themeCtx)
+    proposed=filled.state
+    if(filled.dropped)setNotice('附近 3.5 公里內沒有其他區域可以去，探索站改由導遊決定。')
+    if((!shuffle&&!opts.reorder)||opts.rotate||filled.dropped)proposed=rotateThemes(proposed,themeCtx)
     // shuffle 先把被換掉的那間記進 seen：這次請求就要排除它，否則下一輪它又回來。
     const replaced=shuffle?proposed.tasks.find(t=>t.id===shuffle):undefined
     const replacedId=replaced?.candidate?.id
@@ -689,8 +719,9 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
       if(data.stops)recordRouteSignals(proposed,data.stops,shuffle,opts.themeChange?undefined:replaced,Date.now())
       // guide-1115：手動排過順序時，伺服器回來的順序不能蓋掉使用者的（伺服器本來就照做；這裡是保險）。
       const ordered=data.stops&&proposed.manualOrder?applyUserOrder(data.stops,proposed.tasks):data.stops
-      setOrderDirty(false)
-      change(old=>({...old,tasks:restoreThemeFixed(restorePreferHit(restoreIntentSpecified(ordered??old.tasks, old.tasks), old.tasks, shuffle), proposed.tasks),themesToday:proposed.themesToday??old.themesToday,appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle||opts.reorder?{}:{routedFrom:originKey(s)})}))
+      // 把關 R1-A：路線上顯示出來的店，所在區域記一筆「看過」（比「去過」弱）。
+      markAreasSeen((data.stops??[]).flatMap(t=>t.candidate?[t.candidate]:[]),Date.now())
+      change(old=>({...old,tasks:restoreThemeFixed(restorePreferHit(restoreIntentSpecified(ordered??old.tasks, old.tasks), old.tasks, shuffle), proposed.tasks),themesToday:proposed.themesToday??old.themesToday,orderDirty:undefined,appliedIntent:proposed.appliedIntent ?? copyIntent(proposed.intent),seen:{...(old.seen??{}),...(proposed.seen??{})},disliked:proposed.disliked??old.disliked,dislikedKinds:proposed.dislikedKinds??old.dislikedKinds,...(shuffle||opts.reorder?{}:{routedFrom:originKey(s)})}))
       setRouteKm(data.routeVerified?data.distanceKm??null:null)
       setTravelMin(data.routeVerified?data.travelMinutes??null:null)
       setConflicts(data.conflicts??[])
@@ -761,25 +792,27 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
 /** guide-1115 手動排序：移一格、記下「排過」、舊的到店時間作廢。 */
   const move = (id: string, dir: -1 | 1) => {
     setRouteKm(null);setTravelMin(null);setConflicts([])
+    moved.current = { id, dir }
     change(s => moveTask(s, id, dir))
-    setOrderDirty(true)
     setStatus('順序已改。按「照這個順序更新時間」重算到店時間。')
   }
   /** 恢復自動排序：拿掉旗標，店不換，請伺服器重新排最順的路線。 */
   const autoOrder = () => {
-    const next = { ...state, manualOrder: undefined }
+    const next = { ...state, manualOrder: undefined, orderDirty: undefined }
     change(() => next)
     void searchRoute(undefined, next, { reorder: true })
   }
   /** 一步加一個想去的地方：使用者打的字原樣當地點名稱去查（不解析意思），查到真店才有導航；不會被換掉。 */
-  const addWanted = (text: string) => {
+  const addWanted = (text: string): boolean => {
     const place = text.slice(0, 100)
-    if (!place || busy !== null) return
-    if (state.tasks.length >= 9) { setNotice('一天最多排 9 站。先移除或略過一站，再加新的地方。'); return }
+    if (!place || busy !== null) return false
+    // 滿了：回 false，輸入框裡打的字留著（把關 R1-D）。
+    if (state.tasks.length >= 9) { setNotice('一天最多排 9 站。先移除或略過一站，再按一次加入；你打的字還在。'); return false }
     const task: DailyTask = { id: 'want-' + Date.now(), title: place, place, minutes: 60, kind: 'creative', done: false, custom: true, specified: true, detail: '你想去的地方：不會被換掉。' }
     const next = { ...state, tasks: [...state.tasks, task] }
     change(() => next)
     void searchRoute(task.id, next)
+    return true
   }
   /** 逐站指定地點：送出才寫進行程（清掉舊店與舊時間）並重找這一站；清空送出＝取消指定。 */
   const specifyPlace = (t: DailyTask, text: string) => {
@@ -792,14 +825,24 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   const chooseTheme = (stopId: string, pick: ThemeId | '') => {
     setSheet(null)
     if (busy !== null) return
-    const visited = loadVisitedAreas()
     const set = (patch: Partial<DailyTask>): DailyState => ({ ...state, tasks: state.tasks.map(x => x.id === stopId ? { ...x, ...patch } : x) })
+    // 「沒去過的區域」的區域、交給導遊時的新主題，都在 searchRoute 裡挑（那時才知道出發點座標）。
     const next = pick
-      ? { ...set({ theme: pick, themeFixed: true, themeArea: pick === 'new_area' ? pickNewArea(visited, state.area) : undefined }), themesToday: [...(state.themesToday ?? []).filter(x => x !== pick), pick] }
-      : stopId === 'creative' ? rotateThemes(set({ themeFixed: undefined }), visited) : set({ theme: undefined, themeFixed: undefined, themeArea: undefined })
+      ? { ...set({ theme: pick, themeFixed: true, themeArea: undefined }), themesToday: [...(state.themesToday ?? []).filter(x => x !== pick), pick] }
+      : stopId === 'creative' ? set({ themeFixed: undefined }) : set({ theme: undefined, themeFixed: undefined, themeArea: undefined })
     change(() => next)
-    void searchRoute(stopId, next, { themeChange: true })
+    void searchRoute(stopId, next, { themeChange: true, rotate: !pick && stopId === 'creative' })
   }
+  useEffect(() => {
+    const m = moved.current
+    if (!m) return
+    moved.current = null
+    const btn = (dir: -1 | 1) => [...document.querySelectorAll<HTMLButtonElement>('.dd-move button')].find(b => b.dataset.testid === `daily-move-${dir < 0 ? 'up' : 'down'}-${m.id}`)
+    // 移到頂／底時那顆鍵會停用：焦點改放另一顆。直接捲到位，不做動畫。
+    const target = btn(m.dir)?.disabled ? btn(m.dir < 0 ? 1 : -1) : btn(m.dir)
+    target?.scrollIntoView?.({ block: 'center' })
+    target?.focus({ preventScroll: true })
+  }, [state.tasks])
   const addFeedback = () => {
     const v=feedback.trim()
     if(!v) return
@@ -902,6 +945,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
   }
   const completed=state.tasks.filter(t=>t.done).length
   const visitedAreas=loadVisitedAreas()
+  const firstRouted=state.tasks.find(t=>t.eta&&!t.done)?.id
   const movable=state.tasks.filter(t=>!t.locked)
   const themeTask=state.tasks.find(t=>t.id===themeStop)
   return <section className="screen dd" data-screen="daily-decision">
@@ -947,7 +991,7 @@ export function DailyDecision({ onBack }: { onBack: () => void }) {
                 {t.candidate ? <div className="dd-place-meta">
                   <strong>⌖ {t.candidate.address}</strong>
                   <span>{typeof t.candidate.rating==='number'?'★ '+t.candidate.rating.toFixed(1)+' · ':''}{openStatusText(t)} · Google Places</span>
-                  {exploreReason(t,visitedAreas)&&<span data-testid={'daily-reason-'+t.id}>{exploreReason(t,visitedAreas)}</span>}
+                  {exploreReason(t,visitedAreas,t.id===firstRouted)&&<span data-testid={'daily-reason-'+t.id}>{exploreReason(t,visitedAreas,t.id===firstRouted)}</span>}
                   {t.preferHit&&<span data-testid="daily-prefer-reason">你常選這類，優先挑了這間</span>}
                   {t.eta&&(t.openAtEta==='closed'||t.openAtEta==='closing')&&<span className="dd-place-unresolved" role="status">⚠ {t.openAtEta==='closed'?'預計 '+t.eta+' 到店時，這間店沒有營業。請先確認營業時間。':'預計 '+t.eta+' 到店時，離打烊不到 10 分鐘。'}</span>}
                   <a className="dd-place-link" href={t.candidate.mapUrl} target="_blank" rel="noopener noreferrer">Google Maps 店家詳情 ↗</a>
