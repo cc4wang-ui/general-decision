@@ -1,0 +1,460 @@
+{
+ "base": "https://general-decision-enbpv9oam-cc4wang-uis-projects.vercel.app",
+ "at": "2026-11-15T09:15:56.832Z",
+ "themes": {
+  "view_cafe": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "view_cafe",
+      "name": "WHITE GLASS COFFEE",
+      "pid": "ChIJYcfmTGOLGGAReESqYToNQ8Q",
+      "primaryType": "cafe",
+      "rating": 4.2,
+      "n": 1033,
+      "address": "日本、〒150-0031 東京都渋谷区桜丘町２３−１８ ビジョナリーアーツ 1F",
+      "eta": "18:27",
+      "start": "",
+      "title": "WHITE GLASS COFFEE"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "view_cafe",
+      "name": "347CAFE&LOUNGE",
+      "pid": "ChIJozhgx6eMGGARKtWlrbOX7ns",
+      "primaryType": "cafe",
+      "rating": 3.4,
+      "n": 620,
+      "address": "日本、〒150-0002 東京都渋谷区渋谷１丁目２３−１６ 3F",
+      "eta": "18:25",
+      "start": "",
+      "title": "347CAFE&LOUNGE"
+     }
+    ]
+   }
+  ],
+  "good_coffee": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "good_coffee",
+      "name": "CHIMNEY COFFEE 渋谷本店",
+      "pid": "ChIJScjylXiLGGARHvz6qXgAw6g",
+      "primaryType": "cafe",
+      "rating": 4.2,
+      "n": 247,
+      "address": "日本、〒150-0031 東京都渋谷区桜丘町２５−１８ ＮＴ渋谷ビル 1F",
+      "eta": "18:24",
+      "start": "",
+      "title": "CHIMNEY COFFEE 渋谷本店"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "good_coffee",
+      "name": "REC COFFEE | レックコーヒー渋谷東店",
+      "pid": "ChIJdcc7EL6LGGAR3x0MGxHis6A",
+      "primaryType": "coffee_shop",
+      "rating": 4.6,
+      "n": 335,
+      "address": "日本、〒150-0011 東京都渋谷区東１丁目４−１ 尚豊ビル 1F",
+      "eta": "18:27",
+      "start": "",
+      "title": "REC COFFEE | レックコーヒー渋谷東店"
+     }
+    ]
+   }
+  ],
+  "fun": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "fun",
+      "name": "Manhattan Records",
+      "pid": "ChIJYQBxTqmMGGAR4SKO82UNbs4",
+      "primaryType": "store",
+      "rating": 4.4,
+      "n": 155,
+      "address": "日本、〒150-0042 東京都渋谷区宇田川町１０−１ 木船ビル",
+      "eta": "18:30",
+      "start": "",
+      "title": "Manhattan Records"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "fun",
+      "name": "HMV record shop 渋谷",
+      "pid": "ChIJoyRZQamMGGAR1QXLgPSo7oE",
+      "primaryType": "store",
+      "rating": 4.2,
+      "n": 795,
+      "address": "日本、〒150-0042 東京都渋谷区宇田川町３６−２ １Ｆ／２Ｆ",
+      "eta": "18:29",
+      "start": "",
+      "title": "HMV record shop 渋谷"
+     }
+    ]
+   }
+  ],
+  "park": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "park",
+      "name": "渋谷区立鍋島松濤公園",
+      "pid": "ChIJq0aKTKuMGGARqxiPD_P3HFY",
+      "primaryType": "park",
+      "rating": 3.9,
+      "n": 968,
+      "address": "日本、〒150-0046 東京都渋谷区松濤２丁目１０−７",
+      "eta": "18:35",
+      "start": "",
+      "title": "渋谷区立鍋島松濤公園"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "park",
+      "name": "渋谷区立鍋島松濤公園",
+      "pid": "ChIJq0aKTKuMGGARqxiPD_P3HFY",
+      "primaryType": "park",
+      "rating": 3.9,
+      "n": 968,
+      "address": "日本、〒150-0046 東京都渋谷区松濤２丁目１０−７",
+      "eta": "18:35",
+      "start": "",
+      "title": "渋谷区立鍋島松濤公園"
+     }
+    ]
+   }
+  ],
+  "new_area": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "new_area",
+      "themeArea": "原宿",
+      "name": "文房具カフェ",
+      "pid": "ChIJo_xoV5-MGGARhuOFAkLLh-s",
+      "primaryType": "cafe",
+      "rating": 3.9,
+      "n": 447,
+      "address": "日本、〒150-0001 東京都渋谷区神宮前４丁目８−１",
+      "eta": "18:45",
+      "start": "",
+      "title": "文房具カフェ"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "new_area",
+      "themeArea": "恵比寿",
+      "start": "",
+      "noCandidate": true,
+      "reason": "closed",
+      "title": "探索｜沒去過的區域"
+     }
+    ]
+   }
+  ],
+  "destination_meal": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "destination_meal",
+      "name": "イタリアンレストラン渋谷 ズッカ",
+      "pid": "ChIJl2n2aFqLGGARUXTJXd4xhXk",
+      "primaryType": "restaurant",
+      "rating": 4.3,
+      "n": 435,
+      "address": "日本、〒150-0031 東京都渋谷区桜丘町１０−４ Modmarche渋谷桜丘 1F",
+      "eta": "18:28",
+      "start": "",
+      "title": "イタリアンレストラン渋谷 ズッカ"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "destination_meal",
+      "name": "Oysterbar&Wine BELON 渋谷店",
+      "pid": "ChIJFwi_a1aLGGARipDXkhcyH5I",
+      "primaryType": "oyster_bar_restaurant",
+      "rating": 4.2,
+      "n": 308,
+      "address": "日本、〒150-0043 東京都渋谷区道玄坂１丁目１７−２ 1階",
+      "eta": "18:25",
+      "start": "",
+      "title": "Oysterbar&Wine BELON 渋谷店"
+     }
+    ]
+   }
+  ],
+  "art": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "art",
+      "name": "東京都渋谷公園通りギャラリー",
+      "pid": "ChIJr54X6aiMGGARiekcIjB0o98",
+      "primaryType": "art_gallery",
+      "rating": 4.2,
+      "n": 84,
+      "address": "日本、〒150-0041 東京都渋谷区神南１丁目１９−８ 都営神南1丁目アパート １F",
+      "eta": "18:29",
+      "start": "",
+      "title": "東京都渋谷公園通りギャラリー"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "art",
+      "name": "GALLERY X BY PARCO",
+      "pid": "ChIJJRfz46iMGGAR1tgHRKUoY5M",
+      "primaryType": "art_gallery",
+      "rating": 3.8,
+      "n": 315,
+      "address": "日本、〒150-0042 東京都渋谷区宇田川町１５−１ 渋谷パルコ B1F",
+      "eta": "18:28",
+      "start": "",
+      "title": "GALLERY X BY PARCO"
+     }
+    ]
+   }
+  ],
+  "invalid": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "name": "SAI",
+      "pid": "ChIJ_znUqB6NGGARIQhwVKvdrVI",
+      "primaryType": "art_gallery",
+      "rating": 4.1,
+      "n": 52,
+      "address": "日本、〒150-0002 東京都渋谷区神宮前６丁目２０−１０ MIYASHITA PARK SOUTH 3F 30800",
+      "eta": "18:26",
+      "start": "",
+      "title": "SAI"
+     }
+    ]
+   }
+  ],
+  "coffee": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "coffee",
+      "theme": "view_cafe",
+      "name": "347CAFE&LOUNGE",
+      "pid": "ChIJozhgx6eMGGARKtWlrbOX7ns",
+      "primaryType": "cafe",
+      "rating": 3.4,
+      "n": 620,
+      "address": "日本、〒150-0002 東京都渋谷区渋谷１丁目２３−１６ 3F",
+      "eta": "18:26",
+      "start": "",
+      "title": "347CAFE&LOUNGE"
+     }
+    ]
+   }
+  ]
+ },
+ "order": {
+  "autoOrder": [
+   "meal",
+   "creative",
+   "shopping",
+   "fixed-1"
+  ],
+  "sentMovable": [
+   "shopping",
+   "creative",
+   "meal"
+  ],
+  "gotMovable": [
+   "shopping",
+   "creative",
+   "meal"
+  ],
+  "status": 200,
+  "samePlaces": true,
+  "fixedStartKept": "23:30",
+  "routeVerified": true,
+  "etas": [
+   [
+    "shopping",
+    "18:22"
+   ],
+   [
+    "creative",
+    "19:19"
+   ],
+   [
+    "meal",
+    "20:34"
+   ],
+   [
+    "fixed-1",
+    "23:30"
+   ]
+  ],
+  "conflicts": []
+ },
+ "summary": {
+  "all200": true,
+  "themesWithRealPlace": {
+   "view_cafe": [
+    "WHITE GLASS COFFEE",
+    "347CAFE&LOUNGE"
+   ],
+   "good_coffee": [
+    "CHIMNEY COFFEE 渋谷本店",
+    "REC COFFEE | レックコーヒー渋谷東店"
+   ],
+   "fun": [
+    "Manhattan Records",
+    "HMV record shop 渋谷"
+   ],
+   "park": [
+    "渋谷区立鍋島松濤公園",
+    "渋谷区立鍋島松濤公園"
+   ],
+   "new_area": [
+    "文房具カフェ",
+    "(無：closed)"
+   ],
+   "destination_meal": [
+    "イタリアンレストラン渋谷 ズッカ",
+    "Oysterbar&Wine BELON 渋谷店"
+   ],
+   "art": [
+    "東京都渋谷公園通りギャラリー",
+    "GALLERY X BY PARCO"
+   ],
+   "invalid": [
+    "SAI"
+   ],
+   "coffee": [
+    "347CAFE&LOUNGE"
+   ]
+  },
+  "themeTypes": {
+   "view_cafe": [
+    "cafe",
+    "cafe"
+   ],
+   "good_coffee": [
+    "cafe",
+    "coffee_shop"
+   ],
+   "fun": [
+    "store",
+    "store"
+   ],
+   "park": [
+    "park",
+    "park"
+   ],
+   "new_area": [
+    "cafe",
+    null
+   ],
+   "destination_meal": [
+    "restaurant",
+    "oyster_bar_restaurant"
+   ],
+   "art": [
+    "art_gallery",
+    "art_gallery"
+   ],
+   "invalid": [
+    "art_gallery"
+   ],
+   "coffee": [
+    "cafe"
+   ]
+  },
+  "invalidThemeEchoed": null,
+  "manualOrderHonoured": true,
+  "manualKeptPlaces": true,
+  "fixedStartKept": "23:30"
+ }
+}
