@@ -1,0 +1,465 @@
+{
+ "base": "https://general-decision-ox9y7l5rl-cc4wang-uis-projects.vercel.app",
+ "at": "2026-11-15T03:55:49.155Z",
+ "themes": {
+  "view_cafe": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "view_cafe",
+      "name": "Paradise Lounge",
+      "pid": "ChIJ8WnpNtuLGGAR2AaaGW5Fzxs",
+      "primaryType": "lounge_bar",
+      "rating": 3.7,
+      "n": 117,
+      "address": "日本、〒150-0002 東京都渋谷区渋谷２丁目２４−１２ スクランブルスクエア 46F",
+      "eta": "13:00",
+      "start": "",
+      "title": "Paradise Lounge"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "view_cafe",
+      "name": "VALLEY PARK STAND",
+      "pid": "ChIJxd9C0TyNGGARYqwdFTz1TkU",
+      "primaryType": "cafe",
+      "rating": 4.2,
+      "n": 355,
+      "address": "日本、〒150-0001 東京都渋谷区神宮前６丁目２０−１０ MIYASHITA PARK North, MIYASHITA PARK North sequence MIYASHITA PARK 4F",
+      "eta": "13:06",
+      "start": "",
+      "title": "VALLEY PARK STAND"
+     }
+    ]
+   }
+  ],
+  "good_coffee": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "good_coffee",
+      "name": "OBSCURA COFFEE ROASTERS Front",
+      "pid": "ChIJr838VoaLGGARoGFfmfEXojs",
+      "primaryType": "coffee_shop",
+      "rating": 4.4,
+      "n": 110,
+      "address": "日本、〒150-0043 東京都渋谷区道玄坂１丁目１２−１ B1F",
+      "eta": "13:01",
+      "start": "",
+      "title": "OBSCURA COFFEE ROASTERS Front"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "good_coffee",
+      "name": "CHIMNEY COFFEE 渋谷本店",
+      "pid": "ChIJScjylXiLGGARHvz6qXgAw6g",
+      "primaryType": "cafe",
+      "rating": 4.2,
+      "n": 247,
+      "address": "日本、〒150-0031 東京都渋谷区桜丘町２５−１８ ＮＴ渋谷ビル 1F",
+      "eta": "13:04",
+      "start": "",
+      "title": "CHIMNEY COFFEE 渋谷本店"
+     }
+    ]
+   }
+  ],
+  "fun": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "fun",
+      "name": "HMV record shop 渋谷",
+      "pid": "ChIJoyRZQamMGGAR1QXLgPSo7oE",
+      "primaryType": "store",
+      "rating": 4.2,
+      "n": 795,
+      "address": "日本、〒150-0042 東京都渋谷区宇田川町３６−２ １Ｆ／２Ｆ",
+      "eta": "13:08",
+      "start": "",
+      "title": "HMV record shop 渋谷"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "fun",
+      "name": "next records",
+      "pid": "ChIJo6_kTamMGGARoH3P80JuQwU",
+      "primaryType": "store",
+      "rating": 4.8,
+      "n": 68,
+      "address": "日本、〒150-0042 東京都渋谷区宇田川町１１−１１ 柳光ビル本館 2nd Floor",
+      "eta": "13:10",
+      "start": "",
+      "title": "next records"
+     }
+    ]
+   }
+  ],
+  "park": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "park",
+      "name": "渋谷区立鍋島松濤公園",
+      "pid": "ChIJq0aKTKuMGGARqxiPD_P3HFY",
+      "primaryType": "park",
+      "rating": 3.9,
+      "n": 968,
+      "address": "日本、〒150-0046 東京都渋谷区松濤２丁目１０−７",
+      "eta": "13:14",
+      "start": "",
+      "title": "渋谷区立鍋島松濤公園"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "park",
+      "name": "渋谷区立鍋島松濤公園",
+      "pid": "ChIJq0aKTKuMGGARqxiPD_P3HFY",
+      "primaryType": "park",
+      "rating": 3.9,
+      "n": 968,
+      "address": "日本、〒150-0046 東京都渋谷区松濤２丁目１０−７",
+      "eta": "13:14",
+      "start": "",
+      "title": "渋谷区立鍋島松濤公園"
+     }
+    ]
+   }
+  ],
+  "new_area": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "new_area",
+      "themeArea": "原宿",
+      "name": "ラフェデリース",
+      "pid": "ChIJVVUZAKSMGGARIq9_BBZkeIc",
+      "primaryType": "restaurant",
+      "rating": 4.2,
+      "n": 393,
+      "address": "日本、〒150-0001 東京都渋谷区神宮前５丁目１１−１３",
+      "eta": "13:15",
+      "start": "",
+      "title": "ラフェデリース"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "new_area",
+      "themeArea": "恵比寿",
+      "name": "DEAN & DELUCA カフェ 東京音楽大学 中目黒 代官山キャンパス",
+      "pid": "ChIJDYSBMniLGGARXVni5F2_7Nc",
+      "primaryType": "cafe",
+      "rating": 4.3,
+      "n": 309,
+      "address": "日本、〒153-0051 東京都目黒区上目黒１丁目９−９ 東京音楽大学中目黒 代官山キャンパス 3F",
+      "eta": "13:21",
+      "start": "",
+      "title": "DEAN & DELUCA カフェ 東京音楽大学 中目黒 代官山キャンパス"
+     }
+    ]
+   }
+  ],
+  "destination_meal": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "destination_meal",
+      "name": "ブラッスリー・ヴィロン 渋谷店",
+      "pid": "ChIJZSSqcKmMGGARylOWxFCMqgE",
+      "primaryType": "bistro",
+      "rating": 4.1,
+      "n": 2243,
+      "address": "日本、〒150-0042 東京都渋谷区宇田川町３３−８ ２Ｆ",
+      "eta": "13:06",
+      "start": "",
+      "title": "ブラッスリー・ヴィロン 渋谷店"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "destination_meal",
+      "name": "Oysterbar&Wine BELON 渋谷店",
+      "pid": "ChIJFwi_a1aLGGARipDXkhcyH5I",
+      "primaryType": "oyster_bar_restaurant",
+      "rating": 4.2,
+      "n": 308,
+      "address": "日本、〒150-0043 東京都渋谷区道玄坂１丁目１７−２ 1階",
+      "eta": "13:04",
+      "start": "",
+      "title": "Oysterbar&Wine BELON 渋谷店"
+     }
+    ]
+   }
+  ],
+  "art": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "art",
+      "name": "Gallery Conceal Shibuya",
+      "pid": "ChIJSZTctFeLGGARjJZlYwb88Ic",
+      "primaryType": "art_gallery",
+      "rating": 4.1,
+      "n": 106,
+      "address": "日本、〒150-0043 東京都渋谷区道玄坂１丁目１１−４ 第１富士商事ビル 4F",
+      "eta": "13:01",
+      "start": "",
+      "title": "Gallery Conceal Shibuya"
+     }
+    ]
+   },
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "theme": "art",
+      "name": "DIESEL ART GALLERY",
+      "pid": "ChIJ8cZhwfONGGARr8fXFDprByY",
+      "primaryType": "art_gallery",
+      "rating": 4.6,
+      "n": 51,
+      "address": "日本、〒150-0002 東京都渋谷区渋谷１丁目２３−１６ B1F cocoti SHIBUYA",
+      "eta": "13:05",
+      "start": "",
+      "title": "DIESEL ART GALLERY"
+     }
+    ]
+   }
+  ],
+  "invalid": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "creative",
+      "name": "SAI",
+      "pid": "ChIJ_znUqB6NGGARIQhwVKvdrVI",
+      "primaryType": "art_gallery",
+      "rating": 4.1,
+      "n": 52,
+      "address": "日本、〒150-0002 東京都渋谷区神宮前６丁目２０−１０ MIYASHITA PARK SOUTH 3F 30800",
+      "eta": "13:05",
+      "start": "",
+      "title": "SAI"
+     }
+    ]
+   }
+  ],
+  "coffee": [
+   {
+    "status": 200,
+    "routeVerified": true,
+    "conflicts": [],
+    "stops": [
+     {
+      "id": "coffee",
+      "theme": "view_cafe",
+      "name": "VALLEY PARK STAND",
+      "pid": "ChIJxd9C0TyNGGARYqwdFTz1TkU",
+      "primaryType": "cafe",
+      "rating": 4.2,
+      "n": 355,
+      "address": "日本、〒150-0001 東京都渋谷区神宮前６丁目２０−１０ MIYASHITA PARK North, MIYASHITA PARK North sequence MIYASHITA PARK 4F",
+      "eta": "13:06",
+      "start": "",
+      "title": "VALLEY PARK STAND"
+     }
+    ]
+   }
+  ]
+ },
+ "order": {
+  "autoOrder": [
+   "meal",
+   "shopping",
+   "creative",
+   "fixed-1"
+  ],
+  "sentMovable": [
+   "creative",
+   "shopping",
+   "meal"
+  ],
+  "gotMovable": [
+   "creative",
+   "shopping",
+   "meal"
+  ],
+  "status": 200,
+  "samePlaces": true,
+  "fixedStartKept": "23:30",
+  "routeVerified": true,
+  "etas": [
+   [
+    "creative",
+    "13:03"
+   ],
+   [
+    "shopping",
+    "14:13"
+   ],
+   [
+    "meal",
+    "15:17"
+   ],
+   [
+    "fixed-1",
+    "23:30"
+   ]
+  ],
+  "conflicts": []
+ },
+ "summary": {
+  "all200": true,
+  "themesWithRealPlace": {
+   "view_cafe": [
+    "Paradise Lounge",
+    "VALLEY PARK STAND"
+   ],
+   "good_coffee": [
+    "OBSCURA COFFEE ROASTERS Front",
+    "CHIMNEY COFFEE 渋谷本店"
+   ],
+   "fun": [
+    "HMV record shop 渋谷",
+    "next records"
+   ],
+   "park": [
+    "渋谷区立鍋島松濤公園",
+    "渋谷区立鍋島松濤公園"
+   ],
+   "new_area": [
+    "ラフェデリース",
+    "DEAN & DELUCA カフェ 東京音楽大学 中目黒 代官山キャンパス"
+   ],
+   "destination_meal": [
+    "ブラッスリー・ヴィロン 渋谷店",
+    "Oysterbar&Wine BELON 渋谷店"
+   ],
+   "art": [
+    "Gallery Conceal Shibuya",
+    "DIESEL ART GALLERY"
+   ],
+   "invalid": [
+    "SAI"
+   ],
+   "coffee": [
+    "VALLEY PARK STAND"
+   ]
+  },
+  "themeTypes": {
+   "view_cafe": [
+    "lounge_bar",
+    "cafe"
+   ],
+   "good_coffee": [
+    "coffee_shop",
+    "cafe"
+   ],
+   "fun": [
+    "store",
+    "store"
+   ],
+   "park": [
+    "park",
+    "park"
+   ],
+   "new_area": [
+    "restaurant",
+    "cafe"
+   ],
+   "destination_meal": [
+    "bistro",
+    "oyster_bar_restaurant"
+   ],
+   "art": [
+    "art_gallery",
+    "art_gallery"
+   ],
+   "invalid": [
+    "art_gallery"
+   ],
+   "coffee": [
+    "cafe"
+   ]
+  },
+  "invalidThemeEchoed": null,
+  "manualOrderHonoured": true,
+  "manualKeptPlaces": true,
+  "fixedStartKept": "23:30"
+ }
+}
