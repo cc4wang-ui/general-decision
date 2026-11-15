@@ -1,6 +1,6 @@
 小組報告｜guide
 
-結論：STOP 1–7 自查全部 PASS。三件事都做完：每站有上移／下移，伺服器照使用者順序排並算到店時間；輸入難打重現出 5 個根因並修掉，行程上方多了一個「想去哪」輸入框；探索站改成 7 個主題，可自己選或讓導遊每次輪替。既有 1328 個測試一行沒改全過，新增 68 個。未做 commit／push。真 Google 的主題查詢結果還沒驗（留給 STOP 8）。
+結論：STOP 1–3、5–7 自查 PASS；STOP 4 原本只記「去過」沒記「看過」（把關 R1 判 FAIL），已在「把關 R1 修正」補上。三件事都做完：每站有上移／下移，伺服器照使用者順序排並算到店時間；輸入難打重現出 5 個根因並修掉，行程上方多了一個「想去哪」輸入框；探索站改成 7 個主題，可自己選或讓導遊每次輪替。既有 1328 個測試一行沒改全過，新增 68 個。未做 commit／push。真 Google 的主題查詢結果還沒驗（留給 STOP 8）。
 
 輸入難打的根因：
 重現方式：`npx vite --port 5199` 後跑 `BROWSER=chromium|webkit node runs/guide-1115/snapshots/repro-input.mjs`（iPhone 13 模擬；這支是對「修正前」程式寫的，修正後 Enter 會收起選單，腳本會停在第 36 行——這本身就是修好的證據）。修正前輸出：`snapshots/before-chromium.json`、`before-webkit.json`。
@@ -15,7 +15,7 @@
 修正後：`snapshots/verify-chromium.json`（25 項全 PASS）、`verify-webkit.json`（24 項全 PASS，WebKit 沒有 IME 注入所以少 A3）。A2 `"got":"Fuglen Tokyo"`、A3 `"got":"東京タワー レコード"`、A5 `"jumpPx":0`、A1 `"sizes":["16px"]`。
 
 新欄位：
-請求（`POST /api/daily-route`，全部可選；沒帶時行為與之前相同）
+請求（`POST /api/daily-route`，全部可選；沒帶時行為與之前相同，唯一差異：探索站沒店時的卡片標題改成 `探索｜讓導遊挑一個主題`）
 - `manualOrder`: boolean。只有 `true` 生效。可移動站照 `stops` 陣列順序走，不做貪婪／窮舉／段內最短重排。有 `start` 的固定行程（`locked` 或 `custom`）仍照自己的時間：使用者排的下一站去了會趕不上，就先去固定行程；晚到照舊回 `conflict`／`conflicts`。例：`{"manualOrder":true,"stops":[遠,近,中]}` → 回應順序 遠、近、中。
 - `reorderOnly`: boolean。只有 `true` 生效。不帶 `shuffle` 也不重挑自動站的店，只重排路線、重算時間（改順序不該換店；「恢復自動排序」也用它）。沒有店的站照常會去查。⚠️ 這個欄位是我加的，任務卡原本沒有。
 - `stops[].theme`: string，白名單 `view_cafe | good_coffee | fun | park | new_area | destination_meal | art`。探索站（id `creative`）7 個都可用；咖啡站（id `coffee`）只能 `view_cafe`、`good_coffee`；其他站、不合法值一律當沒帶。只對自動站生效（指定／固定／已完成不受影響）。
@@ -75,3 +75,20 @@ STOP 自查：
 - 順手改到的既有文案／樣式：探索站目錄標題改成 `探索｜讓導遊挑一個主題`（前後端同步）；活動標籤 `看展覽` → `探索`；空行程說明卡拿掉 ✳ 符號（多了一排輸入框後，既有 e2e「第一屏看得到整張說明卡」超出 23px，測試沒改，改樣式讓它過）。
 - 一天最多 9 站（伺服器既有上限）：滿了再加地點會提示，不會默默丟站。
 - WebKit 沒有輸入法注入工具，組字只在 Chromium（CDP）與單元測試驗過；真 iPhone 鍵盤要 Cross 實機確認。
+
+## 把關 R1 修正（2026-11-15，對照 `gatekeeper-r1.md` 發現清單）
+
+| # | 發現 | 狀態 | 程式位置 | 測試 |
+|---|---|---|---|---|
+| A | STOP 4「看過」沒記 | 已做 | `src/dailyThemes.ts` `markAreasSeen`／`loadSeenAreas`（新本機 key `decide.daily.areasSeen.v1`）；`pickNewArea` 先後：沒紀錄→只看過→最久沒去；`src/dailyDecision.tsx` `searchRoute` 回應後呼叫 | `dailyDecision-guide.test.tsx`「pickNewArea 先後（把關 R1-A）」、`markAreasSeen` 用例 |
+| B | 輪替跟咖啡站／午餐站重複 | 已做 | `themePool({hasCoffee,hasMeal})`；`rotateThemes` 依行程有無 coffee／meal 站決定 | 「把關 R1-B…」單元＋「畫面（把關 R1-B、F）」 |
+| C | 重開頁面後「照這個順序更新時間」消失 | 已做 | `DailyState.orderDirty` 存檔、`loadDaily` 只留當日、`moveTask` 設、重算成功清 | 「C：改了順序還沒重算就重開頁面…」「C：換天或髒值…」 |
+| D | 9 站滿時 Enter 清掉文字 | 已做 | `PlaceForm` 只在 `onSubmit` 不回 false 時清草稿；`addWanted` 滿 9 站回 false | 「D：已有 9 站時…」；瀏覽器 D0 `inputAfterEnter:"第十個想去的地方"` |
+| E | 按 ↑↓ 卡片離開畫面 | 已做 | `moved` ref＋`useEffect`：`scrollIntoView({block:'center'})`＋`focus` | 「E：按 ↑／↓ 後…」 |
+| F | 「沒去過的區域」挑到走不到的區 | 已做 | `reachableAreas`（3.5 公里）、`fillThemeArea`（附近沒區就改回讓導遊決定並提示） | 「把關 R1-F…」兩則 |
+| G | view_cafe 撈到 lounge_bar | 已做 | `THEMES.*.onlyPrimary`、`themeRejects`；`api/daily-route.ts` `venueOk`（新店嚴格）、`retentionOk`（舊店沒類型照留） | `daily-guide-route.test.ts`「把關 R1-G…」 |
+| H | 理由行措辭 | 已做 | `exploreReason`：「〇〇（紀錄裡還沒去過）」、第一站「從出發地步行」 | `exploreReason` 用例（R1-H 註解） |
+
+閘門（本輪重跑，逐字）：`npm run typecheck` EXIT 0；`npm run lint` EXIT 0；`Test Files  64 passed (64)`／`Tests  1407 passed (1407)`；`BUNDLE PASS：api/ 的 function 在 lambda 版面下載得起來。`；`✓ built in 210ms`。
+真瀏覽器（本機 vite，iPhone 13）：`ALL PASS (28 checks, chromium)`、`ALL PASS (27 checks, webkit)`（`snapshots/verify-*.json`）。
+未修、列入交付：發現 3 的「緊湊排序清單」沒做（只做捲回）；park 合格公園少；午餐站仍固定查定食；地區清單只有 6 區。

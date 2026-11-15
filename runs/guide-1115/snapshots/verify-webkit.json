@@ -81,16 +81,16 @@
      "meal",
      "creative",
      "coffee",
-     "want-1794715852927",
-     "want-1794715853070"
+     "want-1794734008964",
+     "want-1794734009102"
     ],
     "after": [
      "(fixed)",
      "creative",
      "meal",
      "coffee",
-     "want-1794715852927",
-     "want-1794715853070"
+     "want-1794734008964",
+     "want-1794734009102"
     ]
    }
   },
@@ -241,23 +241,23 @@
    "pass": true,
    "detail": {
     "usedBefore": [
-     "fun",
+     "new_area",
      "park"
     ],
     "seq": [
-     "new_area",
      "art",
      "fun",
      "art",
      "new_area",
-     "park"
+     "park",
+     "fun"
     ],
     "areas": [
+     null,
+     null,
+     null,
      "新宿",
      null,
-     null,
-     null,
-     "表参道",
      null
     ]
    }
@@ -266,8 +266,8 @@
    "pass": true,
    "detail": {
     "theme": "new_area",
-    "themeArea": "表参道",
-    "reason": "為什麼推這裡：主題「沒去過的區域」・表参道（紀錄裡還沒去過）・Google ★4.3（321 則評論）・從上一站步行 11 分鐘"
+    "themeArea": "代官山",
+    "reason": "為什麼推這裡：主題「沒去過的區域」・代官山（紀錄裡還沒去過）・Google ★4.3（321 則評論）・從上一站步行 11 分鐘"
    }
   },
   "C7 咖啡站可選景觀好／好喝兩種": {

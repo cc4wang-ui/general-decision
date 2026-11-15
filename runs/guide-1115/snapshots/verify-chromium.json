@@ -96,16 +96,16 @@
      "meal",
      "creative",
      "coffee",
-     "want-1794715842765",
-     "want-1794715842941"
+     "want-1794733962008",
+     "want-1794733962154"
     ],
     "after": [
      "(fixed)",
      "creative",
      "meal",
      "coffee",
-     "want-1794715842765",
-     "want-1794715842941"
+     "want-1794733962008",
+     "want-1794733962154"
     ]
    }
   },
@@ -256,24 +256,24 @@
    "pass": true,
    "detail": {
     "usedBefore": [
-     "art",
+     "new_area",
      "park"
     ],
     "seq": [
-     "new_area",
-     "fun",
-     "new_area",
      "art",
      "fun",
-     "park"
+     "art",
+     "fun",
+     "park",
+     "new_area"
     ],
     "areas": [
-     "原宿",
-     null,
-     "新宿",
      null,
      null,
-     null
+     null,
+     null,
+     null,
+     "恵比寿"
     ]
    }
   },
@@ -281,8 +281,8 @@
    "pass": true,
    "detail": {
     "theme": "new_area",
-    "themeArea": "新宿",
-    "reason": "為什麼推這裡：主題「沒去過的區域」・新宿（紀錄裡還沒去過）・Google ★4.3（321 則評論）・從上一站步行 11 分鐘"
+    "themeArea": "原宿",
+    "reason": "為什麼推這裡：主題「沒去過的區域」・原宿（紀錄裡還沒去過）・Google ★4.3（321 則評論）・從上一站步行 11 分鐘"
    }
   },
   "C7 咖啡站可選景觀好／好喝兩種": {
