@@ -75,7 +75,9 @@ export async function travelMatrix(key:string,origin:Point,stops:ScheduledStop[]
  if(matrix.some(row=>row.some(v=>!Number.isFinite(v))))throw new Error('部分站點沒有可用步行路線；不會以直線距離冒充實際路線')
  return {matrix,distances}
 }
-export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[][],distances:number[][],now:string):{stops:T[];distanceKm:number;travelMinutes:number;conflicts:string[]}{
+/** manual（guide-1115）：使用者手動排過順序。可移動站照 stops 陣列順序走，不做貪婪／窮舉／段內最短重排；
+ * 有開始時間的固定行程仍在自己的時間（早到等、晚到警告），插在「下一個可移動站去了就趕不上」的位置之前。 */
+export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[][],distances:number[][],now:string,manual=false):{stops:T[];distanceKm:number;travelMinutes:number;conflicts:string[]}{
  const originIndex=0,idx=new Map(stops.map((s,i)=>[s.id,i+1]))
  const anchorMin=minute(now)??9*60
  /** 固定安排只有 HH:MM、沒有日期（PR-4 修正輪，午夜規則，見 DESIGN §8）：
@@ -93,7 +95,7 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
  }
  /** 絕對分鐘轉跨日偏移：錨點當日 0，跨過午夜 1，依此類推（clock() 只管 HH:MM 顯示）。 */
  const dayOffset=(abs:number)=>Math.floor(abs/1440)
- const appointments=stops.filter(s=>s.locked||s.custom||s.done).sort((a,b)=>(deadlineAbs(a.start)??Infinity)-(deadlineAbs(b.start)??Infinity))
+ const appointments=stops.filter(s=>manual?!!(s.locked||s.custom)&&deadlineAbs(s.start)!==null:s.locked||s.custom||s.done).sort((a,b)=>(deadlineAbs(a.start)??Infinity)-(deadlineAbs(b.start)??Infinity))
  const flexible=stops.filter(s=>!appointments.includes(s))
  const ordered:T[]=[]
  let position=originIndex,at=anchorMin,travelMinutes=0,distanceKm=0
@@ -128,7 +130,8 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
     return {i,leg,feasible}
    }).filter((x):x is {i:number;leg:number;feasible:boolean}=>x.feasible&&x.leg!==undefined&&Number.isFinite(x.leg)).sort((a,b)=>a.leg-b.leg)
    if(!possible.length)break
-   const first=possible[0]
+   // 手動順序：只看使用者排的下一站；它去了會趕不上固定行程，就先去固定行程。
+   const first=manual?possible.find(x=>x.i===0):possible[0]
    if(!first)break
    const removed=flexible.splice(first.i,1)[0]
    if(!removed)break
@@ -138,10 +141,11 @@ export function scheduleRoute<T extends ScheduledStop>(stops:T[],matrix:number[]
  }
  // If a fixed appointment cannot be met, surface the conflict, never silently discard stops.
  // leg 未知（矩陣缺列）時以 Infinity 計：排到最後，visit 會因非有限時間而 throw，不靜默丟站。
- while(flexible.length){const row=matrix[position];const ranked=flexible.map((s,i)=>({i,leg:row?.[idx.get(s.id)??-1]??Infinity})).sort((a,b)=>a.leg-b.leg);const first=ranked[0];if(!first)break;const removed=flexible.splice(first.i,1)[0];if(!removed)break;visit(removed)}
+ while(flexible.length){const row=matrix[position];const ranked=flexible.map((s,i)=>({i,leg:row?.[idx.get(s.id)??-1]??Infinity})).sort((a,b)=>a.leg-b.leg);const first=manual?{i:0}:ranked[0];if(!first)break;const removed=flexible.splice(first.i,1)[0];if(!removed)break;visit(removed)}
  // daily-fixed-ontime（P0）：貪婪排法報晚到時，再找一次晚到站數最少的排法（目標 0）；嚴格比貪婪少才改用。
  // 把關第 1 輪：不能「全有或全無」——一個怎樣都趕不上的固定行程（例：時間已過）不能害其他行程失去救援。
  const replay=(seq:T[])=>{ordered.length=0;conflicts.length=0;position=originIndex;at=anchorMin;travelMinutes=0;distanceKm=0;for(const s of seq)visit(s)}
+ if(manual)return {stops:ordered,distanceKm:Math.round(distanceKm*10)/10,travelMinutes,conflicts}
  if(conflicts.length){
   const seq=fewestLateOrder(stops,idx,matrix,anchorMin,deadlineAbs,conflicts.length)
   if(seq)replay(seq)

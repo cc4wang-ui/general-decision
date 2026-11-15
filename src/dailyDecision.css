@@ -139,3 +139,22 @@
 .dd-empty{padding:12px 16px}
 .dd-empty>span{font-size:1.5rem;line-height:1.2}
 .dd-empty h3{font-size:1rem;margin:2px 0 4px}
+/* guide-1115：輸入框一律 16px——iPhone Safari 對小於 16px 的輸入框一對焦就把整頁放大。 */
+.dd input:not([type=checkbox]),.dd textarea,.dd select{font-size:16px}
+/* 鍵盤升起時把底部選單墊到鍵盤上面（--dd-kb 由 visualViewport 量出，沒有鍵盤時是 0）。 */
+.dd .sheet-wrap{padding-bottom:var(--dd-kb,0px)}
+/* 地點輸入：輸入框＋送出鍵同一排（行程上方「加一個我想去的地方」與逐站指定共用）。 */
+.dd-place-form{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.dd-place-form input{flex:1 1 150px;min-height:47px;background:var(--paper);color:var(--ink);border:var(--card-edge) solid var(--edge);border-radius:14px;padding:10px 12px;box-shadow:none}
+.dd-place-form .dd-secondary{flex:0 0 auto;width:auto;margin:0;min-height:47px;padding:10px 14px}
+.dd-change-place .dd-place-form .dd-secondary{flex:1 1 100%}
+/* 手動排序：上移／下移（44px 觸控目標）與順序列。 */
+.dd-move{display:inline-flex;gap:6px;margin-left:auto}
+.dd-move button{width:44px;height:44px;display:grid;place-items:center;font-size:1rem;font-weight:850;color:var(--ink);background:var(--paper);border:var(--card-edge) solid var(--edge);border-radius:14px}
+.dd-order{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:.75rem;font-weight:800;color:var(--ink)}
+.dd-order>span{flex:1 1 100%}
+.dd-order .dd-secondary{flex:1 1 0;width:auto;margin:0;min-height:44px}
+.dd-theme{margin:0 0 10px;min-height:44px}
+.dd-sheet .sheet-opt{min-height:52px}
+/* 空行程：上面多了一排「想去哪」輸入框，說明卡拿掉裝飾符號，第一屏仍整張看得到。 */
+.dd-empty>span{display:none}

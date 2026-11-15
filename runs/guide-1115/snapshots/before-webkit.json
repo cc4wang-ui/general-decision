@@ -1,0 +1,69 @@
+{
+ "fontSizes": [
+  {
+   "label": "定食屋 指定地點",
+   "px": "14px"
+  },
+  {
+   "label": "咖啡店 指定地點",
+   "px": "14px"
+  },
+  {
+   "label": "出發地",
+   "px": "14px"
+  },
+  {
+   "label": "幾點開始",
+   "px": "14px"
+  },
+  {
+   "label": "想去哪裡",
+   "px": "14px"
+  },
+  {
+   "label": "目的地是哪一站",
+   "px": "14px"
+  },
+  {
+   "label": "地區偏好",
+   "px": "14px"
+  },
+  {
+   "label": "既有行程名稱",
+   "px": "14px"
+  },
+  {
+   "label": "既有行程地點",
+   "px": "14px"
+  },
+  {
+   "label": "開始時間",
+   "px": "14px"
+  },
+  {
+   "label": "行程長度分鐘",
+   "px": "14px"
+  },
+  {
+   "label": "補充偏好",
+   "px": "14px"
+  }
+ ],
+ "destTyped": {
+  "typed": "Fuglen Tokyo",
+  "got": "FuglenTokyo"
+ },
+ "destEnter": {
+  "sheetStillOpen": true
+ },
+ "stopInput": {
+  "visibleWithoutExpanding": false,
+  "pageYBeforeFirstKey": 744,
+  "pageYAfterFirstKey": 700,
+  "jumpPx": -44,
+  "got": "Fuglen Tokyo",
+  "focusedAfterTyping": true,
+  "enterTriggeredSearch": false
+ },
+ "quickAddEntry": 0
+}
