@@ -147,6 +147,7 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 | 開始時間・PR-4 | ✅ 2026-11-10 | PR #52（`43a82820`）：開始時間輸入；rebase 後 head `09e8cd7`；production 已驗（bundle index-ScDXdLMo.js）；見 §7 |
 | 2.3 AKOMEYA 觀察 | ✅ 結案 2026-11-14 | 文案維持 `不要「{kindLabel}」這類`（Fable 代核）。真資料證據：預覽站 2026-11-14 回應裡「AKOMEYA食堂 東急プラザ渋谷」的種類判定是 `cafe`（`runs/finish-1114/snapshots/preview-prefer.out.json`），標籤來源就是當下 Google types |
 | 2.4 回饋迴圈 | ✅ 2026-11-14 | PR #79：最簡版已實作（種類偏好軟排序）。Q1–Q11 由 Fable 代核（Cross 原話 `其他fable代替我核准`），裁定在 `runs/finish-1114/decisions.md`；見 §7.5 |
+| 個人生活導遊（guide-1115） | ✅ 2026-11-15 | PR #81（`26220ec`）：手動排序（請求欄位 `manualOrder`、`reorderOnly`）、輸入修正＋「想去哪」、探索 7 主題（請求逐站 `theme`、`themeArea`）、沒去過的區域（本機 key `decide.daily.areas.v1` 去過、`decide.daily.areasSeen.v1` 看過）、理由行；探索站目錄標題改 `探索｜讓導遊挑一個主題`。證據 `runs/guide-1115/` |
 | 步驟 4 | ⏸ 不再追（2026-11-14 Fable 代核） | ADR-001／ADR-002 已合併（PR #48／#49）；錯誤分類統計在 workspace（`~/workspace/improvement-research/ERROR-TAXONOMY-STATS.md`），defect escape rate 追蹤未確認（repo 內無對應檔案）；2026-11-14：defect escape rate 追蹤不做——統計檔在 repo 外、沒有入庫，單人試用期每輪已有獨立把關紀錄（`runs/*/reports/`）可回溯 |
 | 分支清理 | ⏳ 待 Cross | 2026-11-14：遠端除 main 外 23 個分支，16 個已完整併入 main。代理刪除兩次都被平台擋（11-12 `[Git Destructive]`、11-14 `[Destructive or Unwanted Actions]`）。清單在 `runs/finish-1114/reports/main.md`。過期 PR #25、#37、#58、#62 已關閉 |
 | 今日行程到店要開著 | ✅ 2026-11-12 | 自動站依預估到店時間（含跨日）檢查營業時間，剩不到 10 分鐘也不派，換同池下一間；全不符標 `closed`。指定／固定站不換，只在卡片警告。沒有營業時間資料不擋。PR #63（c7579984）。估計到店偏快時（繞路），估計時還沒開的店仍會交給實際路線驗證，不再被跳過（把關 R3 已修）。契約：`runs/daily-open-on-arrival/contract.md` |
@@ -191,7 +192,7 @@ Q1–Q3 照 §4 的建議答案（Cross 2026-11-03 23:05「全部產品路線圖
 |---|---|
 | PR | #50，merge commit `5bf71a87`（2026-11-10 18:24 JST），分支 `feature/daily-intent-first`，7 個 commits（`653de0c` → `da67c16`），head `da67c16` |
 | 改動 | `git diff f2890748..da67c16 --stat`：6 檔，934 insertions、46 deletions（`src/dailyDecision.tsx`、`src/dailyDecision.css`、`tests/unit/dailyDecision.test.ts`、`tests/unit/dailyDecision-ui.test.tsx`、`tests/unit/dailyDecision-intent.test.ts`（新）、`tests/e2e/daily-location.spec.ts`） |
-| 內容 | 刪 `mode` 欄位（舊存檔剝離）；意圖輸入＝目的地欄位（max 120 字）＋目的地站選單（5 個可搜尋站）＋5 個活動 checkbox（健身／吃飯／看展覽／喝咖啡／購物，rest 永遠不在選項內）；目的地站走既有 specified 語意（查詢字串＝原文、不套類型／地區／評論門檻、完整重生時保留）；`appliedIntent` state 層快照保留同一意圖重跑的候選；便利預設只在兩個 UI 輸入處理器觸發；選站選單會解除該站的 `avoid` |
+| 內容 | 刪 `mode` 欄位（舊存檔剝離）；意圖輸入＝目的地欄位（max 120 字）＋目的地站選單（5 個可搜尋站）＋5 個活動 checkbox（健身／吃飯／看展覽（2026-11-15 起標籤改為「探索」）／喝咖啡／購物，rest 永遠不在選項內）；目的地站走既有 specified 語意（查詢字串＝原文、不套類型／地區／評論門檻、完整重生時保留）；`appliedIntent` state 層快照保留同一意圖重跑的候選；便利預設只在兩個 UI 輸入處理器觸發；選站選單會解除該站的 `avoid` |
 | 測試 | 全套 1125/1125（52 檔）；lint 0 errors／0 warnings；`npx tsc -b` exit 0；e2e `daily-location` 2 passed |
 | CI | 5/5 綠（check／e2e／required＋Vercel） |
 | Production 驗證 | 2026-11-10 ~18:27 JST：bundle `assets/index-VHua357e.js`；結構化輸入 testid 在、舊模式按鈕 gone、`parseIntent` absent |
